@@ -456,114 +456,137 @@ function renderSetup(data) {
   const container = document.getElementById("setup-content");
   container.innerHTML = "";
 
-  // Framework Detection section
-  container.innerHTML += `<div class="section-header">Framework Detection</div>`;
+  // Helper: create a collapsible section
+  function addSection(title, badgeHtml, bodyHtml, startOpen) {
+    container.innerHTML += `
+      <div class="setup-section${startOpen ? " open" : ""}">
+        <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="setup-chevron">▶</span>
+          <span class="setup-section-title">${title}</span>
+          <span class="setup-section-badge">${badgeHtml}</span>
+        </div>
+        <div class="setup-section-body">${bodyHtml}</div>
+      </div>`;
+  }
+
+  // 1. Framework Detection
+  let fwBadge, fwBody;
   if (data.framework && data.framework.name !== "Unknown") {
-    let details = `
-      <div class="detail-row"><span class="detail-key">Framework</span>
-        <span class="detail-val">${escapeHtml(data.framework.name)}
-        ${data.framework.version ? ` <span class="badge badge-blue">${escapeHtml(data.framework.version)}</span>` : ""}
-        </span></div>`;
-    if (data.framework.renderer) {
-      details += `<div class="detail-row"><span class="detail-key">Renderer</span><span class="detail-val">${escapeHtml(data.framework.renderer)}</span></div>`;
-    }
-    if (data.framework.mode) {
-      details += `<div class="detail-row"><span class="detail-key">Mode</span><span class="detail-val">${escapeHtml(data.framework.mode)}</span></div>`;
-    }
-    container.innerHTML += details;
+    const ver = data.framework.version ? ` ${escapeHtml(data.framework.version)}` : "";
+    fwBadge = `<span class="badge badge-blue">${escapeHtml(data.framework.name)}${ver}</span>`;
+    fwBody = `<div class="detail-row"><span class="detail-key">Framework</span><span class="detail-val">${escapeHtml(data.framework.name)}${data.framework.version ? ` <span class="badge badge-blue">${escapeHtml(data.framework.version)}</span>` : ""}</span></div>`;
+    if (data.framework.renderer) fwBody += `<div class="detail-row"><span class="detail-key">Renderer</span><span class="detail-val">${escapeHtml(data.framework.renderer)}</span></div>`;
+    if (data.framework.mode) fwBody += `<div class="detail-row"><span class="detail-key">Mode</span><span class="detail-val">${escapeHtml(data.framework.mode)}</span></div>`;
   } else {
-    container.innerHTML += `<div class="detail-row"><span class="detail-key">Framework</span><span class="detail-val">Could not detect — may be vanilla JS or server-rendered</span></div>`;
+    fwBadge = `<span class="badge badge-yellow">Unknown</span>`;
+    fwBody = `<div class="detail-row"><span class="detail-key">Framework</span><span class="detail-val">Could not detect — may be vanilla JS or server-rendered</span></div>`;
   }
+  addSection("Framework", fwBadge, fwBody, false);
 
-  // Snippet Analysis section
-  container.innerHTML += `<div class="section-header">Snippet Analysis</div>`;
+  // 2. Snippet Analysis
   if (data.snippet) {
-    let snipHtml = `
+    const asyncOk = data.snippet.isAsync;
+    const snipBadge = asyncOk
+      ? `<span class="badge badge-green">Async</span>`
+      : `<span class="badge badge-yellow">Sync</span>`;
+    let snipBody = `
       <div class="detail-row"><span class="detail-key">Load method</span><span class="detail-val">${escapeHtml(data.snippet.loadMethod)}</span></div>
-      <div class="detail-row"><span class="detail-key">Async</span><span class="detail-val">${data.snippet.isAsync ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-yellow">No</span>'}</span></div>`;
-    if (data.snippet.placement) {
-      snipHtml += `<div class="detail-row"><span class="detail-key">Placement</span><span class="detail-val">${escapeHtml(data.snippet.placement)}</span></div>`;
-    }
-    if (data.snippet.scriptCount !== undefined) {
-      snipHtml += `<div class="detail-row"><span class="detail-key">Script tags</span><span class="detail-val">${data.snippet.scriptCount}</span></div>`;
-    }
-    container.innerHTML += snipHtml;
+      <div class="detail-row"><span class="detail-key">Async</span><span class="detail-val">${asyncOk ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-yellow">No</span>'}</span></div>`;
+    if (data.snippet.placement) snipBody += `<div class="detail-row"><span class="detail-key">Placement</span><span class="detail-val">${escapeHtml(data.snippet.placement)}</span></div>`;
+    if (data.snippet.scriptCount !== undefined) snipBody += `<div class="detail-row"><span class="detail-key">Script tags</span><span class="detail-val">${data.snippet.scriptCount}</span></div>`;
+    addSection("Snippet", snipBadge, snipBody, false);
   }
 
-  // Initialization section — implementation details only (runtime state is in Health Check)
-  container.innerHTML += `<div class="section-header">Initialization</div>`;
+  // 3. Initialization
   if (data.initialization) {
-    let initHtml = `
-      <div class="detail-row"><span class="detail-key">Method</span><span class="detail-val">${escapeHtml(data.initialization.method)}</span></div>`;
-    if (data.initialization.timing) {
-      initHtml += `<div class="detail-row"><span class="detail-key">Timing</span><span class="detail-val">${escapeHtml(data.initialization.timing)}</span></div>`;
-    }
-    container.innerHTML += initHtml;
+    const initBadge = `<span class="badge badge-green">${escapeHtml(data.initialization.method)}</span>`;
+    let initBody = `<div class="detail-row"><span class="detail-key">Method</span><span class="detail-val">${escapeHtml(data.initialization.method)}</span></div>`;
+    if (data.initialization.timing) initBody += `<div class="detail-row"><span class="detail-key">Timing</span><span class="detail-val">${escapeHtml(data.initialization.timing)}</span></div>`;
+    addSection("Initialization", initBadge, initBody, false);
   }
 
-  // CSP Analysis section
+  // 4. CSP Analysis
   if (data.csp) {
-    container.innerHTML += `<div class="section-header">Content Security Policy</div>`;
+    let cspBadge, cspBody;
     if (data.csp.detected) {
-      let cspHtml = `<div class="detail-row"><span class="detail-key">CSP detected</span><span class="detail-val"><span class="badge badge-yellow">Yes</span> (${escapeHtml(data.csp.source || "meta tag")})</span></div>`;
+      const hasErrors = data.csp.issues && data.csp.issues.some(i => i.severity === "error");
+      const hasWarnings = data.csp.issues && data.csp.issues.some(i => i.severity === "warning");
+      if (hasErrors) cspBadge = `<span class="badge badge-red">${data.csp.issues.length} issue${data.csp.issues.length !== 1 ? "s" : ""}</span>`;
+      else if (hasWarnings) cspBadge = `<span class="badge badge-yellow">${data.csp.issues.length} issue${data.csp.issues.length !== 1 ? "s" : ""}</span>`;
+      else cspBadge = `<span class="badge badge-green">OK</span>`;
 
-      // Show directive summary
+      cspBody = `<div class="detail-row"><span class="detail-key">CSP detected</span><span class="detail-val"><span class="badge badge-yellow">Yes</span> (${escapeHtml(data.csp.source || "meta tag")})</span></div>`;
       const dirNames = Object.keys(data.csp.directives || {});
-      if (dirNames.length > 0) {
-        cspHtml += `<div class="detail-row"><span class="detail-key">Directives</span><span class="detail-val">${escapeHtml(dirNames.join(", "))}</span></div>`;
-      }
-
-      // Show issues
+      if (dirNames.length > 0) cspBody += `<div class="detail-row"><span class="detail-key">Directives</span><span class="detail-val">${escapeHtml(dirNames.join(", "))}</span></div>`;
       if (data.csp.issues && data.csp.issues.length > 0) {
         data.csp.issues.forEach((issue) => {
           const icon = issue.severity === "error" ? "❌" : issue.severity === "warning" ? "⚠️" : "💡";
-          const cls = issue.severity === "error" ? "badge-red" : issue.severity === "warning" ? "badge-yellow" : "badge-blue";
-          cspHtml += `<div class="detail-row"><span class="detail-key">${icon} ${escapeHtml(issue.directive)}</span><span class="detail-val">${escapeHtml(issue.detail)}</span></div>`;
+          cspBody += `<div class="detail-row"><span class="detail-key">${icon} ${escapeHtml(issue.directive)}</span><span class="detail-val">${escapeHtml(issue.detail)}</span></div>`;
         });
       } else {
-        cspHtml += `<div class="detail-row"><span class="detail-key">Status</span><span class="detail-val"><span class="badge badge-green">Pendo-compatible</span> All required domains appear to be allowed</span></div>`;
+        cspBody += `<div class="detail-row"><span class="detail-key">Status</span><span class="detail-val"><span class="badge badge-green">Pendo-compatible</span> All required domains appear allowed</span></div>`;
       }
-      container.innerHTML += cspHtml;
+      // Auto-open CSP section if there are issues
+      addSection("Content Security Policy", cspBadge, cspBody, hasErrors || hasWarnings);
     } else {
-      container.innerHTML += `<div class="detail-row"><span class="detail-key">CSP detected</span><span class="detail-val"><span class="badge badge-green">No</span> ${escapeHtml(data.csp.source || "No restrictive CSP found")}</span></div>`;
+      cspBadge = `<span class="badge badge-green">No CSP</span>`;
+      cspBody = `<div class="detail-row"><span class="detail-key">CSP detected</span><span class="detail-val"><span class="badge badge-green">No</span> ${escapeHtml(data.csp.source || "No restrictive CSP found")}</span></div>`;
+      addSection("Content Security Policy", cspBadge, cspBody, false);
     }
   }
 
-  // Visitor Metadata section
+  // 5. Visitor Metadata
   if (data.visitorFields && data.visitorFields.length > 0) {
-    container.innerHTML += `<div class="section-header">Visitor Metadata (${data.visitorFields.length} fields)</div>`;
-    let tableHtml = `<table class="metadata-table"><tr><th>Field</th><th>Type</th><th>Status</th></tr>`;
+    const vWarns = data.visitorFields.filter(f => f.warnings.length > 0).length;
+    const vBadge = vWarns > 0
+      ? `<span class="badge badge-yellow">${data.visitorFields.length} fields · ${vWarns} warn</span>`
+      : `<span class="badge badge-green">${data.visitorFields.length} fields</span>`;
+    let vBody = `<table class="metadata-table"><tr><th>Field</th><th>Type</th><th>Status</th></tr>`;
     data.visitorFields.forEach((f) => {
       const hasWarn = f.warnings.length > 0;
       const cls = hasWarn ? "field-warn" : "field-ok";
       const status = hasWarn ? f.warnings.map(escapeHtml).join(", ") : "OK";
-      tableHtml += `<tr><td>${escapeHtml(f.key)}</td><td>${escapeHtml(f.type)}</td><td class="${cls}">${status}</td></tr>`;
+      vBody += `<tr><td>${escapeHtml(f.key)}</td><td>${escapeHtml(f.type)}</td><td class="${cls}">${status}</td></tr>`;
     });
-    tableHtml += `</table>`;
-    container.innerHTML += tableHtml;
+    vBody += `</table>`;
+    addSection(`Visitor Metadata`, vBadge, vBody, false);
   }
 
-  // Account Metadata section
+  // 6. Account Metadata
   if (data.accountFields && data.accountFields.length > 0) {
-    container.innerHTML += `<div class="section-header">Account Metadata (${data.accountFields.length} fields)</div>`;
-    let tableHtml = `<table class="metadata-table"><tr><th>Field</th><th>Type</th><th>Status</th></tr>`;
+    const aWarns = data.accountFields.filter(f => f.warnings.length > 0).length;
+    const aBadge = aWarns > 0
+      ? `<span class="badge badge-yellow">${data.accountFields.length} fields · ${aWarns} warn</span>`
+      : `<span class="badge badge-green">${data.accountFields.length} fields</span>`;
+    let aBody = `<table class="metadata-table"><tr><th>Field</th><th>Type</th><th>Status</th></tr>`;
     data.accountFields.forEach((f) => {
       const hasWarn = f.warnings.length > 0;
       const cls = hasWarn ? "field-warn" : "field-ok";
       const status = hasWarn ? f.warnings.map(escapeHtml).join(", ") : "OK";
-      tableHtml += `<tr><td>${escapeHtml(f.key)}</td><td>${escapeHtml(f.type)}</td><td class="${cls}">${status}</td></tr>`;
+      aBody += `<tr><td>${escapeHtml(f.key)}</td><td>${escapeHtml(f.type)}</td><td class="${cls}">${status}</td></tr>`;
     });
-    tableHtml += `</table>`;
-    container.innerHTML += tableHtml;
+    aBody += `</table>`;
+    addSection(`Account Metadata`, aBadge, aBody, false);
   }
 
-  // Recommendations section
+  // 7. Recommendations — always open if issues exist
+  let errors = 0, warnings = 0, tips = 0;
   if (data.recommendations && data.recommendations.length > 0) {
-    container.innerHTML += `<div class="section-header">Recommendations (${data.recommendations.length})</div>`;
-    let recHtml = "";
+    data.recommendations.forEach((r) => {
+      if (r.severity === "error") errors++;
+      else if (r.severity === "warning") warnings++;
+      else tips++;
+    });
+    const recBadge = errors > 0
+      ? `<span class="badge badge-red">${errors} error${errors !== 1 ? "s" : ""}</span>`
+      : warnings > 0
+        ? `<span class="badge badge-yellow">${warnings} warning${warnings !== 1 ? "s" : ""}</span>`
+        : `<span class="badge badge-green">${tips} tip${tips !== 1 ? "s" : ""}</span>`;
+
+    let recBody = "";
     data.recommendations.forEach((r) => {
       const icon = r.severity === "error" ? "❌" : r.severity === "warning" ? "⚠️" : "💡";
-      recHtml += `
+      recBody += `
         <div class="recommendation">
           <span class="rec-icon">${icon}</span>
           <div class="rec-text">
@@ -572,15 +595,8 @@ function renderSetup(data) {
           </div>
         </div>`;
     });
-    container.innerHTML += recHtml;
+    addSection(`Recommendations (${data.recommendations.length})`, recBadge, recBody, errors > 0 || warnings > 0);
 
-    // Summary counts
-    let errors = 0, warnings = 0, tips = 0;
-    data.recommendations.forEach((r) => {
-      if (r.severity === "error") errors++;
-      else if (r.severity === "warning") warnings++;
-      else tips++;
-    });
     document.getElementById("setup-summary-counts").innerHTML =
       `<span class="fail">${errors} error${errors !== 1 ? "s" : ""}</span> · ` +
       `<span class="warn">${warnings} warning${warnings !== 1 ? "s" : ""}</span> · ` +

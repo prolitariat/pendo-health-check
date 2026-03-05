@@ -450,7 +450,7 @@
 
     /* === Health Check Grid === */
     #checks-list {
-      margin: 6px 0;
+      margin: 4px 0 2px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0;
@@ -515,10 +515,10 @@
     #setup-summary {
       display: none;
       flex-direction: column;
-      gap: 8px;
-      padding: 10px 0 4px;
+      gap: 6px;
+      padding: 6px 0 2px;
       border-top: 1px solid var(--border);
-      margin-top: 6px;
+      margin-top: 2px;
     }
 
     #summary-counts,
@@ -684,6 +684,54 @@
     .field-warn {
       color: var(--warning);
       font-weight: 500;
+    }
+
+    /* === Collapsible Setup Sections === */
+    .setup-section {
+      border-bottom: 1px solid var(--border);
+    }
+    .setup-section:last-of-type {
+      border-bottom: none;
+    }
+    .setup-section-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 4px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--foreground);
+      letter-spacing: -0.01em;
+      transition: background 0.1s;
+    }
+    .setup-section-header:hover {
+      background: var(--muted);
+    }
+    .setup-chevron {
+      font-size: 9px;
+      color: var(--muted-foreground);
+      transition: transform 0.15s;
+      flex-shrink: 0;
+      width: 12px;
+      text-align: center;
+    }
+    .setup-section.open .setup-chevron {
+      transform: rotate(90deg);
+    }
+    .setup-section-title {
+      flex: 1;
+    }
+    .setup-section-badge {
+      flex-shrink: 0;
+    }
+    .setup-section-body {
+      display: none;
+      padding: 0 4px 6px 18px;
+    }
+    .setup-section.open .setup-section-body {
+      display: block;
     }
 
     /* === Recommendations (shadcn alert-like) === */
