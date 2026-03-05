@@ -723,7 +723,9 @@ document.getElementById("tool-validate-install")?.addEventListener("click", () =
       if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
       if (typeof pendo.validateInstall === "function") {
         pendo.validateInstall();
-        return { message: "✅ validateInstall() launched — a Pendo overlay should appear on the page" };
+        var isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+        var shortcut = isMac ? "Cmd+Option+J" : "F12";
+        return { message: "✅ validateInstall() executed — open DevTools (" + shortcut + ") → Console to see results" };
       }
       return { error: "pendo.validateInstall() not available on this agent version" };
     } catch (e) {
