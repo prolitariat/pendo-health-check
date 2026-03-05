@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Pendo Health Check",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Run diagnostics against the Pendo agent on any page",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "storage"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

@@ -350,6 +350,116 @@
       padding: 48px 16px;
       color: #666;
     }
+  
+    /* Feedback */
+    .feedback-bar {
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      padding: 8px 16px;
+      text-align: center;
+    }
+    .feedback-btn {
+      background: none;
+      border: 1px solid #d0d0d0;
+      padding: 5px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #555;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .feedback-btn:hover {
+      background: #f0f2f5;
+      color: #333;
+      border-color: #bbb;
+    }
+    .feedback-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .feedback-dialog {
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      width: 340px;
+      max-width: 95%;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+    .feedback-dialog h3 {
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #1b2a4a;
+    }
+    .feedback-dialog textarea {
+      width: 100%;
+      height: 80px;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      padding: 8px;
+      font-size: 12px;
+      font-family: inherit;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .feedback-dialog textarea:focus {
+      outline: none;
+      border-color: #1b2a4a;
+    }
+    .feedback-pii-note {
+      font-size: 10px;
+      color: #999;
+      margin: 6px 0 10px;
+      line-height: 1.4;
+    }
+    .feedback-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .feedback-actions button {
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    #feedback-cancel {
+      background: #f0f0f0;
+      border: 1px solid #d0d0d0;
+      color: #555;
+    }
+    #feedback-submit {
+      background: #1b2a4a;
+      border: none;
+      color: #fff;
+    }
+    #feedback-submit:hover {
+      background: #263c66;
+    }
+    #feedback-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .feedback-status {
+      font-size: 11px;
+      margin-top: 8px;
+      text-align: center;
+      min-height: 16px;
+    }
+    .feedback-success {
+      color: #16a34a;
+    }
+    .feedback-error {
+      color: #dc2626;
+    }
   </style>
 </head>
 <body>
@@ -402,6 +512,26 @@
     <div class="summary-bar" id="setup-summary" style="display:none">
       <span class="summary-counts" id="setup-summary-counts"></span>
       <button class="copy-btn" id="copy-setup-btn">Copy Report</button>
+    </div>
+  </div>
+
+  
+  <!-- Feedback -->
+  <div class="feedback-bar" id="feedback-bar">
+    <button class="feedback-btn" id="feedback-btn">Send Feedback</button>
+  </div>
+  <div class="feedback-overlay" id="feedback-modal">
+    <div class="feedback-dialog">
+      <h3>Send Feedback</h3>
+      <textarea id="feedback-text" placeholder="Bug report, feature request, or general feedback..."></textarea>
+      <div class="feedback-pii-note">
+        Personal information (emails, phone numbers, SSNs, credit cards, IPs) is automatically removed before storage.
+      </div>
+      <div class="feedback-actions">
+        <button id="feedback-cancel">Cancel</button>
+        <button id="feedback-submit">Submit</button>
+      </div>
+      <div class="feedback-status" id="feedback-status"></div>
     </div>
   </div>
 

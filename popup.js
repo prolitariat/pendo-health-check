@@ -1184,3 +1184,80 @@ function runPendoSetupAssistant() {
 
   return result;
 }
+
+
+// ---------------------------------------------------------------------------
+// Feedback System
+// ---------------------------------------------------------------------------
+(function initFeedback() {
+  const feedbackBtn = document.getElementById("feedback-btn");
+  const feedbackModal = document.getElementById("feedback-modal");
+  const feedbackTextarea = document.getElementById("feedback-text");
+  const feedbackSubmit = document.getElementById("feedback-submit");
+  const feedbackCancel = document.getElementById("feedback-cancel");
+  const feedbackStatus = document.getElementById("feedback-status");
+
+  if (!feedbackBtn) return;
+
+  feedbackBtn.addEventListener("click", () => {
+    feedbackModal.style.display = "flex";
+    feedbackTextarea.value = "";
+    feedbackStatus.textContent = "";
+    feedbackStatus.className = "feedback-status";
+    feedbackTextarea.focus();
+  });
+
+  feedbackCancel.addEventListener("click", () => {
+    feedbackModal.style.display = "none";
+  });
+
+  feedbackModal.addEventListener("click", (e) => {
+    if (e.target === feedbackModal) {
+      feedbackModal.style.display = "none";
+    }
+  });
+
+  feedbackSubmit.addEventListener("click", () => {
+    const text = feedbackTextarea.value.trim();
+    if (!text) {
+      feedbackStatus.textContent = "Please enter some feedback.";
+      feedbackStatus.className = "feedback-status feedback-error";
+      return;
+    }
+
+    feedbackSubmit.disabled = true;
+    feedbackSubmit.textContent = "Sending…";
+
+    chrome.runtime.sendMessage(
+      {
+        type: "save-feedback",
+        feedback: text,
+        url: document.getElementById("page-url").textContent || "",
+      },
+      (response) => {
+        feedbackSubmit.disabled = false;
+        feedbackSubmit.textContent = "Submit";
+
+        if (response && response.ok) {
+          feedbackStatus.textContent = "Thanks for your feedback!";
+          feedbackStatus.className = "feedback-status feedback-success";
+          feedbackTextarea.value = "";
+          setTimeout(() => {
+            feedbackModal.style.display = "none";
+          }, 1200);
+        } else {
+          feedbackStatus.textContent =
+            "Failed to save: " + ((response && response.error) || "Unknown error");
+          feedbackStatus.className = "feedback-status feedback-error";
+        }
+      }
+    );
+  });
+
+  // Allow Ctrl+Enter / Cmd+Enter to submit
+  feedbackTextarea.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      feedbackSubmit.click();
+    }
+  });
+})();
