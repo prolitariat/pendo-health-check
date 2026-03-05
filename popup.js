@@ -1576,17 +1576,8 @@ function runPendoSetupAssistant() {
   // 5. RECOMMENDATIONS
   // ========================================================================
 
-  // Visitor ID
-  if (!init.hasVisitorId) {
-    recommend("error", "Visitor ID missing or anonymous",
-      "Pendo is running with an anonymous visitor ID. Pass a unique, stable user ID to pendo.initialize() for accurate analytics.");
-  }
-
-  // Account ID
-  if (!init.hasAccountId) {
-    recommend("warning", "Account ID not set",
-      "No account ID detected. If your app is B2B, pass account.id to pendo.initialize() to enable account-level analytics.");
-  }
+  // Visitor ID and Account ID: owned by Health Check tab (runtime state).
+  // Setup Assistant focuses on installation quality — no duplication here.
 
   // Async loading
   if (result.snippet && !result.snippet.isAsync && result.snippet.loadMethod.indexOf("npm") === -1) {
