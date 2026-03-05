@@ -785,17 +785,27 @@ function buildIssuesReport() {
   const checks = window.__lastChecks || [];
   const problems = checks.filter(c => c.status === "fail" || c.status === "warn");
 
+  // Check if CSP issues exist — used to make Network Requests fix context-aware
+  const setup = window.__lastSetup || {};
+  const hasCspIssues = setup.csp && setup.csp.issues && setup.csp.issues.some(i => i.severity === "error" || i.severity === "warning");
+
   if (problems.length > 0) {
     problems.forEach((c) => {
       const severity = c.status === "fail" ? "PROBLEM" : "WARNING";
-      const remap = REMEDIATION_MAP[c.label];
-      const fix = (remap && remap[c.status]) ? remap[c.status].replace(/^FIX:\s*/i, "") : null;
+      let fix;
+
+      if (c.label === "Network Requests" && hasCspIssues) {
+        // CSP is the diagnosed cause — don't list generic possibilities
+        fix = "Your Content-Security-Policy is blocking Pendo requests. See the CSP fix below.";
+      } else {
+        const remap = REMEDIATION_MAP[c.label];
+        fix = (remap && remap[c.status]) ? remap[c.status].replace(/^FIX:\s*/i, "") : null;
+      }
       addIssue(severity, c.label, c.detail, fix);
     });
   }
 
   // --- Setup Assistant issues ---
-  const setup = window.__lastSetup || {};
   let hasSetupIssues = false;
 
   // CSP issues
@@ -806,7 +816,7 @@ function buildIssuesReport() {
       hasSetupIssues = true;
       cspProblems.forEach((issue) => {
         const severity = issue.severity === "error" ? "PROBLEM" : "WARNING";
-        addIssue(severity, `CSP: ${issue.directive}`, issue.detail, null);
+        addIssue(severity, `CSP: ${issue.directive}`, issue.detail, issue.fix || null);
       });
     }
   }
@@ -1398,13 +1408,13 @@ function runPendoSetupAssistant() {
       var scriptSrc = getDirective("script-src");
       if (scriptSrc.length > 0) {
         if (!hostAllowed(scriptSrc) && !valueAllowed(scriptSrc, "'unsafe-inline'") && !valueAllowed(scriptSrc, "'unsafe-eval'")) {
-          csp.issues.push({ directive: "script-src", severity: "error", detail: "Pendo CDN not allowed. Add cdn.pendo.io and app.pendo.io to script-src." });
+          csp.issues.push({ directive: "script-src", severity: "error", detail: "Pendo CDN not allowed in script-src.", fix: "Add to your CSP script-src directive:\n  cdn.pendo.io app.pendo.io" });
         }
         if (!valueAllowed(scriptSrc, "'unsafe-inline'")) {
           var hasNonce = scriptSrc.some(function(v) { return v.indexOf("nonce-") !== -1; });
           var hasHash = scriptSrc.some(function(v) { return v.indexOf("sha256-") !== -1 || v.indexOf("sha384-") !== -1; });
           if (!hasNonce && !hasHash) {
-            csp.issues.push({ directive: "script-src", severity: "warning", detail: "'unsafe-inline' missing and no nonce/hash found. Pendo's inline initialization snippet will be blocked. Add a nonce or hash for the Pendo snippet." });
+            csp.issues.push({ directive: "script-src (inline)", severity: "warning", detail: "'unsafe-inline' missing and no nonce/hash found — Pendo's inline initialization snippet will be blocked.", fix: "Either add 'unsafe-inline' to script-src, or add a nonce attribute to the Pendo snippet and include that nonce in script-src." });
           }
         }
       }
@@ -1412,40 +1422,42 @@ function runPendoSetupAssistant() {
       // connect-src
       var connectSrc = getDirective("connect-src");
       if (connectSrc.length > 0 && !hostAllowed(connectSrc)) {
-        csp.issues.push({ directive: "connect-src", severity: "error", detail: "Pendo data endpoints not allowed. Add data.pendo.io to connect-src — analytics events and guide data won't transmit without this." });
+        csp.issues.push({ directive: "connect-src", severity: "error", detail: "Pendo data endpoints not allowed in connect-src — analytics events and guide data won't transmit.", fix: "Add to your CSP connect-src directive:\n  data.pendo.io" });
       }
 
       // style-src
       var styleSrc = getDirective("style-src");
       if (styleSrc.length > 0 && !valueAllowed(styleSrc, "'unsafe-inline'") && !valueAllowed(styleSrc, "*")) {
-        csp.issues.push({ directive: "style-src", severity: "warning", detail: "'unsafe-inline' missing in style-src. Pendo guides and tooltips inject inline styles — they'll render without styling or not appear at all." });
+        csp.issues.push({ directive: "style-src", severity: "warning", detail: "'unsafe-inline' missing in style-src — Pendo guides and tooltips inject inline styles and will render without styling or not appear.", fix: "Add to your CSP style-src directive:\n  'unsafe-inline'" });
       }
 
       // img-src
       var imgSrc = getDirective("img-src");
       if (imgSrc.length > 0 && !hostAllowed(imgSrc) && !valueAllowed(imgSrc, "*")) {
-        var hasData = valueAllowed(imgSrc, "data:");
-        var detail = "Pendo CDN not in img-src. Guide images and resource center assets won't load.";
-        if (!hasData) detail += " Also missing data: — inline images will be blocked too.";
-        csp.issues.push({ directive: "img-src", severity: "warning", detail: detail });
+        var hasDataUri = valueAllowed(imgSrc, "data:");
+        var imgDetail = "Pendo CDN not in img-src — guide images and resource center assets won't load.";
+        if (!hasDataUri) imgDetail += " Also missing data: — inline images will be blocked too.";
+        var imgFix = "Add to your CSP img-src directive:\n  cdn.pendo.io pendo-static-*.storage.googleapis.com";
+        if (!hasDataUri) imgFix += " data:";
+        csp.issues.push({ directive: "img-src", severity: "warning", detail: imgDetail, fix: imgFix });
       }
 
       // font-src
       var fontSrc = getDirective("font-src");
       if (fontSrc.length > 0 && !hostAllowed(fontSrc) && !valueAllowed(fontSrc, "*")) {
-        csp.issues.push({ directive: "font-src", severity: "tip", detail: "Pendo CDN not in font-src. Custom fonts in guides won't load. Add cdn.pendo.io if your guides use custom typography." });
+        csp.issues.push({ directive: "font-src", severity: "tip", detail: "Pendo CDN not in font-src — custom fonts in guides won't load.", fix: "Add to your CSP font-src directive:\n  cdn.pendo.io" });
       }
 
       // frame-src
       var frameSrc = csp.directives["frame-src"] || csp.directives["child-src"] || csp.directives["default-src"] || [];
       if (frameSrc.length > 0 && !hostAllowed(frameSrc)) {
-        csp.issues.push({ directive: "frame-src", severity: "warning", detail: "Pendo not in frame-src. The resource center and in-app designer use iframes — they'll be blocked." });
+        csp.issues.push({ directive: "frame-src", severity: "warning", detail: "Pendo not in frame-src — the resource center and in-app designer use iframes and will be blocked.", fix: "Add to your CSP frame-src directive:\n  app.pendo.io" });
       }
 
       // worker-src
       var workerSrc = getDirective("worker-src");
       if (workerSrc.length > 0 && !valueAllowed(workerSrc, "'self'") && !valueAllowed(workerSrc, "*") && !valueAllowed(workerSrc, "blob:")) {
-        csp.issues.push({ directive: "worker-src", severity: "tip", detail: "worker-src doesn't allow blob: or 'self'. Pendo may use web workers for guide rendering." });
+        csp.issues.push({ directive: "worker-src", severity: "tip", detail: "worker-src doesn't allow blob: or 'self' — Pendo may use web workers for guide rendering.", fix: "Add to your CSP worker-src directive:\n  blob: 'self'" });
       }
 
       // --- PROACTIVE: check for directives that SHOULD exist but DON'T ---
@@ -1474,8 +1486,18 @@ function runPendoSetupAssistant() {
       if (cspViolations.length > 0) {
         csp.detected = true;
         csp.source = "HTTP header (detected via blocked resources)";
-        // Single grouped issue instead of per-URL spam
-        csp.issues.push({ directive: "CSP (HTTP header)", severity: "error", detail: cspViolations[0] + ". Your server's Content-Security-Policy header needs cdn.pendo.io, data.pendo.io, and pendo-static-*.storage.googleapis.com added to the relevant directives (script-src, connect-src, img-src)." });
+        // Build exact fix instructions based on which domains were blocked
+        var fixLines = [];
+        var domains = Object.keys(blockedByDomain);
+        var hasCdn = domains.some(function(d) { return d.indexOf("cdn.pendo.io") !== -1; });
+        var hasData = domains.some(function(d) { return d.indexOf("data.pendo.io") !== -1; });
+        var hasStorage = domains.some(function(d) { return d.indexOf("storage.googleapis.com") !== -1; });
+        if (hasCdn) fixLines.push("script-src: add cdn.pendo.io app.pendo.io");
+        if (hasData) fixLines.push("connect-src: add data.pendo.io");
+        if (hasStorage || hasCdn) fixLines.push("img-src: add cdn.pendo.io pendo-static-*.storage.googleapis.com data:");
+        fixLines.push("style-src: add 'unsafe-inline' (required for guide styling)");
+        var fixText = "Add these to your Content-Security-Policy HTTP header:\n  " + fixLines.join("\n  ");
+        csp.issues.push({ directive: "CSP (HTTP header)", severity: "error", detail: cspViolations[0] + ".", fix: fixText });
       } else if (pendoAgentLoaded && !dataFlowing && pendoFunctional) {
         // Agent loaded but data isn't flowing — possible connect-src block
         csp.proactiveFindings.push({ directive: "connect-src", severity: "warning", detail: "Pendo agent loaded but no data requests detected. A CSP connect-src restriction (via HTTP header) may be silently blocking analytics data. Check your server's Content-Security-Policy header for connect-src." });
