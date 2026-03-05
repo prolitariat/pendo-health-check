@@ -769,28 +769,19 @@ document.getElementById("tool-validate-env")?.addEventListener("click", () => {
   }, "validateEnvironment() executed");
 });
 
-document.getElementById("debugger-checkbox")?.addEventListener("change", (e) => {
-  const enabling = e.target.checked;
+document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
   runPendoCommand(function () {
     try {
       if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-      if (enabling) {
-        if (typeof pendo.enableDebugging === "function") {
-          pendo.enableDebugging();
-          return { message: "✅ Debugger enabled — overlay should appear on page" };
-        }
-        return { error: "pendo.enableDebugging() not available on this agent version" };
-      } else {
-        if (typeof pendo.disableDebugging === "function") {
-          pendo.disableDebugging();
-          return { message: "✅ Debugger disabled" };
-        }
-        return { error: "pendo.disableDebugging() not available on this agent version" };
+      if (typeof pendo.enableDebugging === "function") {
+        pendo.enableDebugging();
+        return { message: "✅ Debugger launched — use the overlay's ✕ to close" };
       }
+      return { error: "pendo.enableDebugging() not available on this agent version" };
     } catch (e) {
       return { error: e.message };
     }
-  }, enabling ? "Debugger enabled" : "Debugger disabled");
+  }, "Debugger launched");
 });
 
 // ===========================================================================
