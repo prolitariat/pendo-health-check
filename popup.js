@@ -723,7 +723,10 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     tab.url.startsWith("chrome://") ||
     tab.url.startsWith("chrome-extension://") ||
     tab.url.startsWith("chrome-search://") ||
-    tab.url.startsWith("https://chrome.google.com/webstore")
+    tab.url.startsWith("about:") ||
+    tab.url.startsWith("edge://") ||
+    tab.url.startsWith("https://chrome.google.com/webstore") ||
+    tab.status === "unloaded"
   ) {
     showView("error-state");
     return;
@@ -755,8 +758,14 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       }
     })
     .catch((err) => {
-      console.error("Health check failed:", err);
-      document.getElementById("error-message").textContent = err.message || "Unknown error";
+      // "Frame with ID 0 is showing error page" = tab failed to load (DNS, SSL, etc.)
+      const msg = (err.message || "Unknown error");
+      if (msg.includes("error page") || msg.includes("Cannot access")) {
+        document.getElementById("error-message").textContent =
+          "This page didn't load properly — try refreshing it first.";
+      } else {
+        document.getElementById("error-message").textContent = msg;
+      }
       showView("error-state");
     });
 });
