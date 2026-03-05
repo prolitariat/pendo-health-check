@@ -5,8 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pendo Health Check</title>
   <style>
-    /* === shadcn/ui-inspired design tokens === */
+    /* === Design tokens: shadcn/ui structure + Pendo brand === */
     :root {
+      /* Pendo brand */
+      --pendo-pink: #FF4876;
+      --pendo-pink-light: #fff1f4;
+      --pendo-pink-mid: #ffe0e8;
+      --pendo-highlight: #FEF484;
+      --pendo-highlight-light: #fffde6;
+      --pendo-dark: #000000;
+      /* Core tokens */
       --background: #ffffff;
       --foreground: #09090b;
       --card: #ffffff;
@@ -15,13 +23,14 @@
       --muted-foreground: #71717a;
       --border: #e4e4e7;
       --input: #e4e4e7;
-      --ring: #18181b;
-      --primary: #18181b;
+      --ring: var(--pendo-pink);
+      --primary: var(--pendo-dark);
       --primary-foreground: #fafafa;
       --secondary: #f4f4f5;
       --secondary-foreground: #18181b;
-      --accent: #f4f4f5;
-      --accent-foreground: #18181b;
+      --accent: var(--pendo-pink);
+      --accent-foreground: #ffffff;
+      --accent-subtle: var(--pendo-pink-light);
       --destructive: #ef4444;
       --success: #16a34a;
       --warning: #d97706;
@@ -50,12 +59,13 @@
 
     /* === Header === */
     .header {
-      background: var(--primary);
+      background: var(--pendo-dark);
       color: var(--primary-foreground);
       padding: 10px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      border-bottom: 2px solid var(--pendo-pink);
     }
 
     .header-title {
@@ -108,7 +118,7 @@
 
     .tab.active {
       color: var(--foreground);
-      border-bottom-color: var(--foreground);
+      border-bottom-color: var(--pendo-pink);
     }
 
     /* === Tool Buttons (shadcn outline button style) === */
@@ -156,11 +166,11 @@
       line-height: 1.3;
     }
     .tool-btn.active-tool {
-      border-color: var(--success);
-      background: #f0fdf4;
+      border-color: var(--pendo-pink);
+      background: var(--pendo-pink-light);
     }
     .tool-btn.active-tool .tool-label {
-      color: var(--success);
+      color: var(--pendo-pink);
     }
     #tool-status {
       padding: 0 16px 10px;
@@ -169,7 +179,7 @@
       text-align: center;
       min-height: 18px;
     }
-    #tool-status.success { color: var(--success); }
+    #tool-status.success { color: var(--pendo-pink); }
     #tool-status.error { color: var(--destructive); }
 
     /* === Feedback Bar === */
@@ -256,8 +266,8 @@
 
     #feedback-text:focus {
       outline: none;
-      border-color: var(--ring);
-      box-shadow: 0 0 0 3px rgba(24,24,27,0.08);
+      border-color: var(--pendo-pink);
+      box-shadow: 0 0 0 3px rgba(255,72,118,0.12);
     }
 
     .feedback-modal-buttons {
@@ -282,8 +292,8 @@
     #feedback-submit {
       padding: 7px 14px;
       border: 1px solid transparent;
-      background: var(--primary);
-      color: var(--primary-foreground);
+      background: var(--pendo-pink);
+      color: #ffffff;
       border-radius: var(--radius-sm);
       cursor: pointer;
       font-size: 13px;
@@ -332,8 +342,8 @@
       display: inline-block;
       width: 28px;
       height: 28px;
-      border: 2.5px solid var(--border);
-      border-top-color: var(--foreground);
+      border: 2.5px solid var(--pendo-pink-mid);
+      border-top-color: var(--pendo-pink);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin-bottom: 12px;
@@ -410,7 +420,7 @@
 
     .incident-banner {
       padding: 8px 16px;
-      background: #fefce8;
+      background: var(--pendo-highlight-light);
       border-bottom: 1px solid var(--border);
       font-size: 12px;
       color: #854d0e;
@@ -556,9 +566,9 @@
 
     #copy-btn.copied,
     #copy-setup-btn.copied {
-      background: var(--success);
+      background: var(--pendo-pink);
       color: white;
-      border-color: var(--success);
+      border-color: var(--pendo-pink);
     }
 
     /* === Setup Assistant === */
@@ -619,8 +629,8 @@
     }
 
     .badge-yellow {
-      background: #fef9c3;
-      color: #a16207;
+      background: var(--pendo-highlight-light);
+      color: #92600a;
     }
 
     .badge-red {
@@ -631,6 +641,11 @@
     .badge-blue {
       background: #dbeafe;
       color: #1d4ed8;
+    }
+
+    .badge-pink {
+      background: var(--pendo-pink-light);
+      color: #c0274e;
     }
 
     /* === Metadata Table === */
