@@ -6,7 +6,7 @@ const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" 
 
 function showView(id) {
   ["loading", "not-detected", "error-state"].forEach((v) => {
-    document.getElementById(v).style.display = v === id ? "" : "none";
+    document.getElementById(v).style.display = v === id ? "block" : "none";
   });
 }
 
