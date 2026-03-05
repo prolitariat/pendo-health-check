@@ -46,7 +46,37 @@ function fetchPendoStatus() {
     });
 }
 
-function renderPendoStatus(data) {
+// Map dataHost values to Statuspage component name substrings
+const ENV_HOST_MAP = {
+  "app.pendo.io": "US environment",
+  "data.pendo.io": "US environment",
+  "cdn.pendo.io": "US environment",
+  "app.au.pendo.io": "AU environment",
+  "app.eu.pendo.io": "EU environment",
+  "app.jpn.pendo.io": "JPN environment",
+  "us1.app.pendo.io": "US1 environment",
+};
+
+function detectEnvFromChecks(checks) {
+  if (!checks) return null;
+  for (let i = 0; i < checks.length; i++) {
+    if (checks[i].label === "Data Host" && checks[i].status === "pass") {
+      // detail looks like "data.pendo.io (default Pendo CDN)" or "custom.example.com (CNAME / custom)"
+      const host = checks[i].detail.split(" ")[0].trim();
+      for (const [h, env] of Object.entries(ENV_HOST_MAP)) {
+        if (host.includes(h) || h.includes(host)) return env;
+      }
+      // Try partial match on the host for CNAME setups pointing to a region
+      if (host.includes(".au.")) return "AU environment";
+      if (host.includes(".eu.")) return "EU environment";
+      if (host.includes(".jpn.")) return "JPN environment";
+      if (host.includes("us1.")) return "US1 environment";
+    }
+  }
+  return null;
+}
+
+function renderPendoStatus(data, detectedEnv) {
   const statusDiv = document.getElementById("pendo-status");
   const indicator = document.getElementById("status-indicator");
   const componentsDiv = document.getElementById("status-components");
@@ -80,25 +110,50 @@ function renderPendoStatus(data) {
   // Render components — show only top-level groups, not per-region children
   componentsDiv.innerHTML = "";
   if (data.components && Array.isArray(data.components)) {
-    // Collect group-level components (group: true) for display
-    // If a component has group: true, it's a parent group (e.g., "Pendo UI")
-    // Children have group_id set and are the per-region duplicates — skip them
     const groups = data.components.filter((c) => c.group === true);
     const topLevel = groups.length > 0
       ? groups
-      : data.components.filter((c) => !c.group_id); // fallback: no groups, show ungrouped
+      : data.components.filter((c) => !c.group_id);
 
-    topLevel.forEach((comp) => {
+    // If we detected the environment, filter to just that one + any non-operational others
+    let filtered = topLevel;
+    let isFiltered = false;
+    if (detectedEnv) {
+      const matched = topLevel.filter((c) => c.name && c.name.includes(detectedEnv));
+      const problems = topLevel.filter((c) =>
+        c.name && !c.name.includes(detectedEnv) &&
+        c.status && c.status !== "operational"
+      );
+      if (matched.length > 0) {
+        filtered = [...matched, ...problems];
+        isFiltered = true;
+      }
+    }
+
+    filtered.forEach((comp) => {
       const st = (comp.status || "operational").replace(/_/g, " ");
+      const isMatch = detectedEnv && comp.name && comp.name.includes(detectedEnv);
       const row = document.createElement("div");
       row.className = "status-row";
       row.innerHTML = `
         <span class="status-dot ${comp.status || "operational"}"></span>
-        <span class="status-name">${escapeHtml(comp.name || "")}</span>
+        <span class="status-name">${escapeHtml(comp.name || "")}${isMatch ? ' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px;">your env</span>' : ""}</span>
         <span class="status-label">${escapeHtml(st)}</span>
       `;
       componentsDiv.appendChild(row);
     });
+
+    // If filtered, add a "Show all environments" toggle
+    if (isFiltered && filtered.length < topLevel.length) {
+      const toggle = document.createElement("div");
+      toggle.className = "status-toggle";
+      toggle.textContent = `+ ${topLevel.length - filtered.length} other environments (all operational)`;
+      toggle.style.cssText = "font-size:11px;color:#6b7280;cursor:pointer;padding:4px 0 0 22px;";
+      toggle.addEventListener("click", () => {
+        renderPendoStatus(data, null); // re-render with all
+      });
+      componentsDiv.appendChild(toggle);
+    }
   }
 
   // Show incident banner if there are unresolved incidents
@@ -549,6 +604,12 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       window.__lastChecks = data.checks;
       activeTabId = "health";
       renderChecks(data.checks);
+
+      // Re-render status filtered to detected environment
+      const env = detectEnvFromChecks(data.checks);
+      if (env && window.__pendoServiceStatus) {
+        renderPendoStatus(window.__pendoServiceStatus, env);
+      }
     })
     .catch((err) => {
       console.error("Health check failed:", err);
