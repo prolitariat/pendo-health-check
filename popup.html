@@ -543,33 +543,7 @@
       font-weight: 600;
     }
 
-    #copy-btn,
-    #copy-setup-btn {
-      padding: 6px 12px;
-      border: 1px solid var(--border);
-      background: var(--background);
-      color: var(--foreground);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
-      transition: all 0.15s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-      align-self: center;
-    }
-
-    #copy-btn:hover,
-    #copy-setup-btn:hover {
-      background: var(--accent);
-      border-color: #d4d4d8;
-    }
-
-    #copy-btn.copied,
-    #copy-setup-btn.copied {
-      background: var(--pendo-pink);
-      color: white;
-      border-color: var(--pendo-pink);
-    }
+    /* copy buttons removed — now unified in Tools panel */
 
     /* === Setup Assistant === */
     #setup-loading {
@@ -831,7 +805,6 @@
     <div id="checks-list"></div>
     <div id="health-summary">
       <div id="summary-counts"></div>
-      <button id="copy-btn">Copy Results</button>
     </div>
   </div>
 
@@ -844,7 +817,6 @@
     <div id="setup-content"></div>
     <div id="setup-summary">
       <div id="setup-summary-counts"></div>
-      <button id="copy-setup-btn">Copy Report</button>
     </div>
   </div>
 
@@ -881,6 +853,17 @@
       </div>
     </div>
     <div id="tool-status"></div>
+    <!-- Copy Issues -->
+    <div style="padding:10px 4px 4px;border-top:1px solid var(--border);margin-top:4px">
+      <div style="font-size:10px;color:var(--muted-foreground);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Share</div>
+      <button class="tool-btn" id="tool-copy-issues" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
+        <span class="tool-icon" style="font-size:18px">📋</span>
+        <div style="text-align:left;flex:1">
+          <span class="tool-label">Copy Issues to Clipboard</span>
+          <span class="tool-desc" style="display:block">Plain English problems &amp; fixes — paste into Slack, Jira, etc.</span>
+        </div>
+      </button>
+    </div>
   </div>
 
   <!-- Feedback Bar -->
