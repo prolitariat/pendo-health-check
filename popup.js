@@ -768,9 +768,11 @@ function buildIssuesReport() {
   const reported = new Set(); // Track reported topics to avoid duplicates
 
   function addIssue(severity, title, problem, fix) {
-    // Deduplicate by title
+    // Deduplicate by normalized title prefix — "Visitor ID" blocks "Visitor ID missing or anonymous"
     const key = title.toLowerCase().replace(/[^a-z]/g, "");
-    if (reported.has(key)) return;
+    for (const existing of reported) {
+      if (key.startsWith(existing) || existing.startsWith(key)) return;
+    }
     reported.add(key);
     issueCount++;
     lines.push(`${issueCount}. [${severity}] ${title}`);
