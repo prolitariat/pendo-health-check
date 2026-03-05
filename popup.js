@@ -60,16 +60,16 @@ function renderPendoStatus(data) {
   let badgeText = "Unknown";
   let badgeClass = "";
 
-  if (statusValue === "operational") {
+  if (statusValue === "none" || statusValue === "operational") {
     badgeText = "All Operational";
     badgeClass = "badge-green";
-  } else if (statusValue === "degraded_performance" || statusValue === "partial_outage") {
+  } else if (statusValue === "minor" || statusValue === "degraded_performance" || statusValue === "partial_outage") {
     badgeText = "Degraded";
     badgeClass = "badge-yellow";
-  } else if (statusValue === "major_outage") {
+  } else if (statusValue === "major" || statusValue === "major_outage" || statusValue === "critical") {
     badgeText = "Major Outage";
     badgeClass = "badge-red";
-  } else if (statusValue === "under_maintenance") {
+  } else if (statusValue === "maintenance" || statusValue === "under_maintenance") {
     badgeText = "Maintenance";
     badgeClass = "badge-blue";
   }
@@ -77,22 +77,27 @@ function renderPendoStatus(data) {
   indicator.textContent = badgeText;
   indicator.className = "badge " + badgeClass;
 
-  // Render components
+  // Render components — show only top-level groups, not per-region children
   componentsDiv.innerHTML = "";
   if (data.components && Array.isArray(data.components)) {
-    data.components.forEach((comp) => {
-      if (!comp.group) {
-        const statusClass = "status-dot " + (comp.status || "operational");
-        const statusLabel = (comp.status || "operational").replace(/_/g, " ");
-        const row = document.createElement("div");
-        row.className = "status-row";
-        row.innerHTML = `
-          <span class="status-dot ${statusClass}"></span>
-          <span class="status-name">${escapeHtml(comp.name || "")}</span>
-          <span class="status-label">${escapeHtml(statusLabel)}</span>
-        `;
-        componentsDiv.appendChild(row);
-      }
+    // Collect group-level components (group: true) for display
+    // If a component has group: true, it's a parent group (e.g., "Pendo UI")
+    // Children have group_id set and are the per-region duplicates — skip them
+    const groups = data.components.filter((c) => c.group === true);
+    const topLevel = groups.length > 0
+      ? groups
+      : data.components.filter((c) => !c.group_id); // fallback: no groups, show ungrouped
+
+    topLevel.forEach((comp) => {
+      const st = (comp.status || "operational").replace(/_/g, " ");
+      const row = document.createElement("div");
+      row.className = "status-row";
+      row.innerHTML = `
+        <span class="status-dot ${comp.status || "operational"}"></span>
+        <span class="status-name">${escapeHtml(comp.name || "")}</span>
+        <span class="status-label">${escapeHtml(st)}</span>
+      `;
+      componentsDiv.appendChild(row);
     });
   }
 
