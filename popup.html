@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pendo Health Check</title>
   <style>
     * {
       margin: 0;
@@ -13,56 +15,65 @@
       width: 380px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 13px;
-      color: #1a1a1a;
-      background: #f8f9fa;
+      color: #333;
+      background: #fff;
+      line-height: 1.4;
+      overflow-y: auto;
+      max-height: 600px;
     }
 
     .header {
       background: #1b2a4a;
-      color: #fff;
-      padding: 14px 16px;
+      color: white;
+      padding: 12px 16px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: space-between;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .header-icon {
-      font-size: 20px;
+      font-size: 16px;
     }
 
-    .header h1 {
-      font-size: 15px;
+    .header-text {
       font-weight: 600;
+      font-size: 13px;
     }
 
-    .header .url {
+    #page-url {
       font-size: 11px;
-      color: #8fa4c8;
-      margin-top: 2px;
+      max-width: 250px;
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 320px;
+      opacity: 0.9;
+      word-break: break-all;
+      white-space: normal;
     }
 
-    /* Tabs */
-    .tabs {
-      display: flex;
-      background: #fff;
-      border-bottom: 2px solid #e0e0e0;
+    #tab-bar {
+      display: none;
+      background: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 0 16px;
+      gap: 16px;
     }
 
     .tab {
-      flex: 1;
-      padding: 10px 12px;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 500;
-      color: #777;
+      padding: 12px 0;
       cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
       border-bottom: 2px solid transparent;
-      margin-bottom: -2px;
-      transition: color 0.15s, border-color 0.15s;
+      color: #666;
+      transition: all 0.2s;
     }
 
     .tab:hover {
@@ -74,30 +85,142 @@
       border-bottom-color: #1b2a4a;
     }
 
-    .tab-panel {
+    #feedback-bar {
+      padding: 8px 16px;
+      border-top: 1px solid #e0e0e0;
+      text-align: right;
+    }
+
+    #feedback-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      background: white;
+      color: #333;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #feedback-btn:hover {
+      background: #f5f5f5;
+      border-color: #999;
+    }
+
+    #feedback-modal {
       display: none;
-    }
-
-    .tab-panel.active {
-      display: block;
-    }
-
-    #loading {
-      display: flex;
-      flex-direction: column;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
       align-items: center;
       justify-content: center;
-      padding: 48px 16px;
-      color: #666;
     }
 
-    .spinner {
-      width: 28px;
-      height: 28px;
+    .feedback-modal-content {
+      background: white;
+      border-radius: 6px;
+      padding: 20px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .feedback-modal-content h3 {
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .feedback-modal-content p {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 12px;
+    }
+
+    #feedback-text {
+      width: 100%;
+      height: 100px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 12px;
+      resize: none;
+      margin-bottom: 12px;
+    }
+
+    #feedback-text:focus {
+      outline: none;
+      border-color: #1b2a4a;
+    }
+
+    .feedback-modal-buttons {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    #feedback-submit,
+    #feedback-cancel {
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      background: white;
+      color: #333;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    #feedback-submit:hover {
+      background: #1b2a4a;
+      color: white;
+      border-color: #1b2a4a;
+    }
+
+    #feedback-cancel:hover {
+      background: #f5f5f5;
+    }
+
+    #feedback-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .feedback-status {
+      margin-top: 12px;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .feedback-status.feedback-error {
+      color: #dc2626;
+    }
+
+    .feedback-status.feedback-success {
+      color: #16a34a;
+    }
+
+    /* Views */
+    #loading,
+    #not-detected,
+    #error-state {
+      display: none;
+      padding: 40px 16px;
+      text-align: center;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
       border: 3px solid #e0e0e0;
       border-top-color: #1b2a4a;
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      animation: spin 1s linear infinite;
       margin-bottom: 12px;
     }
 
@@ -105,39 +228,123 @@
       to { transform: rotate(360deg); }
     }
 
-    #not-detected {
-      display: none;
-      padding: 40px 16px;
-      text-align: center;
+    .empty-state {
       color: #666;
-    }
-
-    #not-detected .nd-icon {
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
-
-    #not-detected h2 {
-      font-size: 15px;
-      color: #333;
-      margin-bottom: 6px;
-    }
-
-    #not-detected p {
       font-size: 12px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
-    .checks {
+    .empty-state-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    /* Tab panels */
+    .tab-panel {
+      display: none;
+      padding: 16px;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Pendo Status Section */
+    #pendo-status {
+      display: none;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 12px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      padding: 5px 16px;
+      gap: 8px;
+      font-size: 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .status-row:last-child {
+      border-bottom: none;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-dot.operational {
+      background: #16a34a;
+    }
+
+    .status-dot.degraded_performance {
+      background: #d97706;
+    }
+
+    .status-dot.partial_outage {
+      background: #d97706;
+    }
+
+    .status-dot.major_outage {
+      background: #dc2626;
+    }
+
+    .status-dot.under_maintenance {
+      background: #2563eb;
+    }
+
+    .status-name {
+      flex: 1;
+      color: #333;
+    }
+
+    .status-label {
+      font-size: 11px;
+      color: #777;
+    }
+
+    .incident-banner {
+      padding: 8px 16px;
+      background: #fef9c3;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 12px;
+      color: #854d0e;
+    }
+
+    .incident-banner strong {
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 12px;
+      color: #333;
+      margin: 12px 0 8px 0;
       padding: 8px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    #status-indicator {
+      font-size: 11px;
+    }
+
+    /* Health Check specific */
+    #checks-list {
+      margin: 12px 0;
     }
 
     .check-row {
       display: flex;
-      align-items: flex-start;
-      padding: 8px 16px;
-      gap: 10px;
-      border-bottom: 1px solid #eee;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
     }
 
     .check-row:last-child {
@@ -145,9 +352,9 @@
     }
 
     .check-status {
-      font-size: 16px;
       flex-shrink: 0;
-      line-height: 1.2;
+      font-size: 16px;
+      width: 20px;
     }
 
     .check-info {
@@ -162,80 +369,86 @@
     }
 
     .check-detail {
-      font-size: 11px;
-      color: #777;
-      word-break: break-all;
-    }
-
-    .summary-bar {
-      background: #fff;
-      border-top: 2px solid #e0e0e0;
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .summary-counts {
       font-size: 12px;
-      color: #555;
+      color: #666;
+      word-break: break-word;
     }
 
-    .summary-counts .pass { color: #16a34a; }
-    .summary-counts .warn { color: #d97706; }
-    .summary-counts .fail { color: #dc2626; }
+    #health-summary,
+    #setup-summary {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid #e0e0e0;
+      margin-top: 12px;
+    }
 
-    .copy-btn {
-      background: #1b2a4a;
-      color: #fff;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 4px;
+    #summary-counts,
+    #setup-summary-counts {
       font-size: 12px;
-      cursor: pointer;
+      text-align: center;
+    }
+
+    .pass {
+      color: #16a34a;
       font-weight: 500;
     }
 
-    .copy-btn:hover {
-      background: #263c66;
+    .warn {
+      color: #d97706;
+      font-weight: 500;
     }
 
-    .copy-btn.copied {
-      background: #16a34a;
-    }
-
-    #error-state {
-      display: none;
-      padding: 32px 16px;
-      text-align: center;
+    .fail {
       color: #dc2626;
+      font-weight: 500;
     }
 
-    #error-state p {
+    #copy-btn,
+    #copy-setup-btn {
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      background: white;
+      color: #333;
+      border-radius: 4px;
+      cursor: pointer;
       font-size: 12px;
-      margin-top: 8px;
-      color: #666;
+      transition: all 0.2s;
     }
 
-    /* Setup Assistant styles */
-    .section-header {
-      padding: 10px 16px 4px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #1b2a4a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      background: #f0f2f5;
-      border-bottom: 1px solid #e0e0e0;
+    #copy-btn:hover,
+    #copy-setup-btn:hover {
+      background: #f5f5f5;
+      border-color: #999;
+    }
+
+    #copy-btn.copied,
+    #copy-setup-btn.copied {
+      background: #16a34a;
+      color: white;
+      border-color: #16a34a;
+    }
+
+    /* Setup Assistant */
+    #setup-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 40px 16px;
+      text-align: center;
+    }
+
+    #setup-content {
+      display: none;
     }
 
     .detail-row {
       display: flex;
-      align-items: flex-start;
-      padding: 6px 16px;
-      gap: 8px;
+      padding: 8px 0;
       border-bottom: 1px solid #f0f0f0;
-      font-size: 12px;
+      gap: 12px;
     }
 
     .detail-row:last-child {
@@ -243,35 +456,88 @@
     }
 
     .detail-key {
-      color: #555;
-      min-width: 100px;
+      font-weight: 500;
+      color: #333;
+      min-width: 120px;
       flex-shrink: 0;
     }
 
     .detail-val {
-      color: #1a1a1a;
-      word-break: break-all;
-      font-family: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 11px;
+      flex: 1;
+      color: #666;
+      word-break: break-word;
     }
 
-    .detail-val.mono {
-      background: #f5f5f5;
-      padding: 1px 5px;
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
       border-radius: 3px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .badge-green {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-yellow {
+      background: #fef08a;
+      color: #854d0e;
+    }
+
+    .badge-red {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .badge-blue {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .metadata-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0;
+      font-size: 12px;
+    }
+
+    .metadata-table th,
+    .metadata-table td {
+      padding: 6px;
+      text-align: left;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .metadata-table th {
+      background: #f5f5f5;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .metadata-table td {
+      color: #666;
+    }
+
+    .field-ok {
+      color: #16a34a;
+      font-weight: 500;
+    }
+
+    .field-warn {
+      color: #d97706;
+      font-weight: 500;
     }
 
     .recommendation {
       display: flex;
       gap: 8px;
-      padding: 8px 16px;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 12px;
-      line-height: 1.4;
-    }
-
-    .recommendation:last-child {
-      border-bottom: none;
+      padding: 8px;
+      background: #f9fafb;
+      border-radius: 4px;
+      margin-bottom: 8px;
     }
 
     .rec-icon {
@@ -280,261 +546,119 @@
     }
 
     .rec-text {
-      color: #333;
+      flex: 1;
+      min-width: 0;
     }
 
     .rec-text strong {
       display: block;
+      color: #333;
       margin-bottom: 2px;
     }
 
-    .rec-text .rec-detail {
-      color: #777;
-      font-size: 11px;
-    }
-
-    .metadata-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
-    }
-
-    .metadata-table th {
-      text-align: left;
-      padding: 5px 16px;
-      color: #555;
-      font-weight: 500;
-      background: #fafafa;
-      border-bottom: 1px solid #eee;
-    }
-
-    .metadata-table td {
-      padding: 4px 16px;
-      border-bottom: 1px solid #f5f5f5;
-      font-family: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-    }
-
-    .metadata-table .field-warn {
-      color: #d97706;
-    }
-
-    .metadata-table .field-ok {
-      color: #16a34a;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 1px 6px;
-      border-radius: 3px;
-      font-size: 10px;
-      font-weight: 500;
-    }
-
-    .badge-green { background: #dcfce7; color: #166534; }
-    .badge-yellow { background: #fef9c3; color: #854d0e; }
-    .badge-red { background: #fee2e2; color: #991b1b; }
-    .badge-blue { background: #dbeafe; color: #1e40af; }
-
-    .empty-state {
-      padding: 24px 16px;
-      text-align: center;
-      color: #999;
+    .rec-detail {
       font-size: 12px;
-    }
-
-    #setup-loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 48px 16px;
       color: #666;
-    }
-  
-    /* Feedback */
-    .feedback-bar {
-      background: #fff;
-      border-top: 1px solid #e0e0e0;
-      padding: 8px 16px;
-      text-align: center;
-    }
-    .feedback-btn {
-      background: none;
-      border: 1px solid #d0d0d0;
-      padding: 5px 14px;
-      border-radius: 4px;
-      font-size: 12px;
-      color: #555;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    .feedback-btn:hover {
-      background: #f0f2f5;
-      color: #333;
-      border-color: #bbb;
-    }
-    .feedback-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.4);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-    }
-    .feedback-dialog {
-      background: #fff;
-      border-radius: 8px;
-      padding: 16px;
-      width: 340px;
-      max-width: 95%;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    }
-    .feedback-dialog h3 {
-      font-size: 14px;
-      margin-bottom: 8px;
-      color: #1b2a4a;
-    }
-    .feedback-dialog textarea {
-      width: 100%;
-      height: 80px;
-      border: 1px solid #d0d0d0;
-      border-radius: 4px;
-      padding: 8px;
-      font-size: 12px;
-      font-family: inherit;
-      resize: vertical;
-      box-sizing: border-box;
-    }
-    .feedback-dialog textarea:focus {
-      outline: none;
-      border-color: #1b2a4a;
-    }
-    .feedback-pii-note {
-      font-size: 10px;
-      color: #999;
-      margin: 6px 0 10px;
-      line-height: 1.4;
-    }
-    .feedback-actions {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-    .feedback-actions button {
-      padding: 6px 14px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-    #feedback-cancel {
-      background: #f0f0f0;
-      border: 1px solid #d0d0d0;
-      color: #555;
-    }
-    #feedback-submit {
-      background: #1b2a4a;
-      border: none;
-      color: #fff;
-    }
-    #feedback-submit:hover {
-      background: #263c66;
-    }
-    #feedback-submit:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    .feedback-status {
-      font-size: 11px;
-      margin-top: 8px;
-      text-align: center;
-      min-height: 16px;
-    }
-    .feedback-success {
-      color: #16a34a;
-    }
-    .feedback-error {
-      color: #dc2626;
+      word-break: break-word;
     }
   </style>
 </head>
 <body>
+  <!-- Header -->
   <div class="header">
-    <span class="header-icon">🩺</span>
-    <div>
-      <h1>Pendo Health Check</h1>
-      <div class="url" id="page-url"></div>
+    <div class="header-title">
+      <span class="header-icon">🩺</span>
+      <span class="header-text">Pendo Health Check</span>
     </div>
   </div>
 
-  <div class="tabs" id="tab-bar" style="display:none">
-    <div class="tab active" data-tab="health">Health Check</div>
+  <!-- Page URL -->
+  <div style="padding: 8px 16px; background: #f9fafb; border-bottom: 1px solid #e0e0e0; font-size: 11px; color: #666; word-break: break-all; white-space: normal;">
+    <div id="page-url"></div>
+  </div>
+
+  <!-- Pendo Status Section -->
+  <div id="pendo-status" style="display:none">
+    <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;margin:0;border-bottom:1px solid #e0e0e0">
+      <span>Pendo Service Status</span>
+      <span id="status-indicator" class="badge" style="font-size:11px"></span>
+    </div>
+    <div id="status-components"></div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div id="tab-bar">
+    <div class="tab" data-tab="health">Health Check</div>
     <div class="tab" data-tab="setup">Setup Assistant</div>
   </div>
 
+  <!-- Loading View -->
   <div id="loading">
-    <div class="spinner"></div>
-    Running diagnostics…
+    <div class="loading-spinner"></div>
+    <p>Running diagnostics…</p>
   </div>
 
+  <!-- Not Detected View -->
   <div id="not-detected">
-    <div class="nd-icon">🔍</div>
-    <h2>Pendo Not Detected</h2>
-    <p>No Pendo agent was found on this page.<br>Make sure Pendo is installed and the page has fully loaded.</p>
-  </div>
-
-  <div id="error-state">
-    <div style="font-size:28px">⚠️</div>
-    <strong>Unable to run checks</strong>
-    <p id="error-message">Could not access this page. Chrome system pages and the web store are restricted.</p>
-  </div>
-
-  <!-- Health Check Tab -->
-  <div id="panel-health" class="tab-panel active">
-    <div class="checks" id="checks-list"></div>
-    <div class="summary-bar" id="health-summary" style="display:none">
-      <span class="summary-counts" id="summary-counts"></span>
-      <button class="copy-btn" id="copy-btn">Copy Results</button>
+    <div class="empty-state-icon">🔍</div>
+    <div class="empty-state">
+      <strong>Pendo Not Detected</strong>
+      <p style="margin-top: 8px;">The Pendo agent is not loaded on this page. Install the Pendo snippet and try again.</p>
     </div>
   </div>
 
-  <!-- Setup Assistant Tab -->
+  <!-- Error State View -->
+  <div id="error-state">
+    <div class="empty-state-icon">⛔</div>
+    <div class="empty-state">
+      <strong>Page Cannot Be Inspected</strong>
+      <p style="margin-top: 8px;">This extension cannot run on restricted pages (Chrome internal pages, Web Store, etc.).</p>
+      <p id="error-message" style="margin-top: 8px; color: #dc2626;"></p>
+    </div>
+  </div>
+
+  <!-- Health Check Panel -->
+  <div id="panel-health" class="tab-panel active">
+    <div id="checks-list"></div>
+    <div id="health-summary">
+      <div id="summary-counts"></div>
+      <button id="copy-btn">Copy Results</button>
+    </div>
+  </div>
+
+  <!-- Setup Assistant Panel -->
   <div id="panel-setup" class="tab-panel">
     <div id="setup-loading">
-      <div class="spinner"></div>
-      Analyzing setup…
+      <div class="loading-spinner"></div>
+      <p>Analyzing setup…</p>
     </div>
-    <div id="setup-content" style="display:none"></div>
-    <div class="summary-bar" id="setup-summary" style="display:none">
-      <span class="summary-counts" id="setup-summary-counts"></span>
-      <button class="copy-btn" id="copy-setup-btn">Copy Report</button>
+    <div id="setup-content"></div>
+    <div id="setup-summary">
+      <div id="setup-summary-counts"></div>
+      <button id="copy-setup-btn">Copy Report</button>
     </div>
   </div>
 
-  
-  <!-- Feedback -->
-  <div class="feedback-bar" id="feedback-bar">
-    <button class="feedback-btn" id="feedback-btn">Send Feedback</button>
+  <!-- Feedback Bar -->
+  <div id="feedback-bar">
+    <button id="feedback-btn">Feedback</button>
   </div>
-  <div class="feedback-overlay" id="feedback-modal">
-    <div class="feedback-dialog">
+
+  <!-- Feedback Modal -->
+  <div id="feedback-modal">
+    <div class="feedback-modal-content">
       <h3>Send Feedback</h3>
-      <textarea id="feedback-text" placeholder="Bug report, feature request, or general feedback..."></textarea>
-      <div class="feedback-pii-note">
-        Personal information (emails, phone numbers, SSNs, credit cards, IPs) is automatically removed before storage.
-      </div>
-      <div class="feedback-actions">
+      <p>Help us improve by sharing your feedback:</p>
+      <textarea id="feedback-text" placeholder="Your feedback here..."></textarea>
+      <div class="feedback-modal-buttons">
         <button id="feedback-cancel">Cancel</button>
         <button id="feedback-submit">Submit</button>
       </div>
-      <div class="feedback-status" id="feedback-status"></div>
+      <div id="feedback-status"></div>
     </div>
   </div>
 
+  <!-- Scripts -->
   <script src="popup.js"></script>
 </body>
 </html>

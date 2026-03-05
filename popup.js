@@ -21,6 +21,87 @@ function escapeHtml(str) {
 }
 
 // ---------------------------------------------------------------------------
+// Pendo Status Page Integration (Feature 1)
+// ---------------------------------------------------------------------------
+
+function fetchPendoStatus() {
+  fetch("https://status.pendo.io/api/v2/summary.json")
+    .then((res) => res.json())
+    .then((data) => {
+      window.__pendoServiceStatus = data;
+      renderPendoStatus(data);
+    })
+    .catch((err) => {
+      // Silently fail — don't break anything
+      console.debug("Could not fetch Pendo status:", err);
+    });
+}
+
+function renderPendoStatus(data) {
+  const statusDiv = document.getElementById("pendo-status");
+  const indicator = document.getElementById("status-indicator");
+  const componentsDiv = document.getElementById("status-components");
+
+  if (!statusDiv || !indicator || !componentsDiv) return;
+
+  // Determine overall status and badge
+  const overallStatus = data.status && data.status.description ? data.status.description : "Unknown";
+  const statusValue = data.status && data.status.indicator ? data.status.indicator : "";
+
+  let badgeText = "Unknown";
+  let badgeClass = "";
+
+  if (statusValue === "operational") {
+    badgeText = "All Operational";
+    badgeClass = "badge-green";
+  } else if (statusValue === "degraded_performance" || statusValue === "partial_outage") {
+    badgeText = "Degraded";
+    badgeClass = "badge-yellow";
+  } else if (statusValue === "major_outage") {
+    badgeText = "Major Outage";
+    badgeClass = "badge-red";
+  } else if (statusValue === "under_maintenance") {
+    badgeText = "Maintenance";
+    badgeClass = "badge-blue";
+  }
+
+  indicator.textContent = badgeText;
+  indicator.className = "badge " + badgeClass;
+
+  // Render components
+  componentsDiv.innerHTML = "";
+  if (data.components && Array.isArray(data.components)) {
+    data.components.forEach((comp) => {
+      if (!comp.group) {
+        const statusClass = "status-dot " + (comp.status || "operational");
+        const statusLabel = (comp.status || "operational").replace(/_/g, " ");
+        const row = document.createElement("div");
+        row.className = "status-row";
+        row.innerHTML = `
+          <span class="status-dot ${statusClass}"></span>
+          <span class="status-name">${escapeHtml(comp.name || "")}</span>
+          <span class="status-label">${escapeHtml(statusLabel)}</span>
+        `;
+        componentsDiv.appendChild(row);
+      }
+    });
+  }
+
+  // Show incident banner if there are unresolved incidents
+  if (data.incidents && Array.isArray(data.incidents) && data.incidents.length > 0) {
+    const incident = data.incidents[0];
+    const banner = document.createElement("div");
+    banner.className = "incident-banner";
+    const updates = incident.updates && incident.updates.length > 0 ? incident.updates[0] : null;
+    const updateText = updates ? updates.body : "No updates yet";
+    banner.innerHTML = `<strong>⚠️ ${escapeHtml(incident.name)}</strong>${updateText ? " — " + escapeHtml(updateText.substring(0, 60)) : ""}`;
+    statusDiv.insertBefore(banner, componentsDiv);
+  }
+
+  statusDiv.style.display = "block";
+}
+
+// ---------------------------------------------------------------------------
 // Tab switching
 // ---------------------------------------------------------------------------
 
@@ -82,14 +163,52 @@ function renderChecks(checks) {
 }
 
 // ---------------------------------------------------------------------------
-// Health Check — copy
+// Health Check — copy (Feature 4: Smart Remediation)
 // ---------------------------------------------------------------------------
 
+const REMEDIATION_MAP = {
+  "Pendo Agent Loaded": {
+    fail: "FIX: Ensure the Pendo snippet is installed on this page. Add the Pendo install script to your <head> tag, or verify your npm package imports pendo-io correctly. See: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
+  },
+  "Pendo Ready": {
+    warn: "FIX: The agent loaded but isn't ready. This usually means pendo.initialize() hasn't been called yet, or it was called before the agent script finished loading. Ensure initialize() runs AFTER the Pendo script loads.",
+    fail: "FIX: pendo.isReady() threw an error. The Pendo agent may be corrupted or an incompatible version. Try clearing the cache and reloading."
+  },
+  "Visitor ID": {
+    warn: "FIX: You're sending an anonymous/auto-generated visitor ID. Update your pendo.initialize() call to pass a stable, unique user identifier:\n  pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })",
+    fail: "FIX: No visitor ID found at all. Ensure pendo.initialize() is called with a visitor.id parameter after the user authenticates."
+  },
+  "Account ID": {
+    warn: "FIX: No account ID set. If your app is B2B, pass the account ID:\n  pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } })"
+  },
+  "Pendo Instances": {
+    warn: "FIX: Multiple Pendo instances or script tags detected. Remove duplicate <script> tags that load the Pendo agent. Check your build system for duplicate imports."
+  },
+  "Content Security Policy": {
+    warn: "FIX: Update your Content-Security-Policy to include Pendo domains. Minimum required:\n  script-src: cdn.pendo.io app.pendo.io 'unsafe-inline'\n  connect-src: data.pendo.io\n  style-src: 'unsafe-inline'\n  img-src: cdn.pendo.io app.pendo.io data:\n  frame-src: app.pendo.io",
+    fail: "FIX: Your CSP is actively blocking Pendo. Add these domains to your CSP header or meta tag:\n  script-src: cdn.pendo.io app.pendo.io\n  connect-src: data.pendo.io\n  style-src: 'unsafe-inline'\n  img-src: cdn.pendo.io app.pendo.io\n  frame-src: app.pendo.io"
+  },
+  "Network Requests": {
+    warn: "FIX: Pendo network requests are failing or absent. Check for:\n  1. Ad blockers or privacy extensions blocking *.pendo.io\n  2. Corporate proxy/firewall rules blocking pendo.io domains\n  3. CSP connect-src not allowing data.pendo.io\n  4. DNS issues resolving pendo.io domains"
+  },
+  "Feature Flags": {
+    warn: "FIX: One or more Pendo features are disabled via configuration. If unintentional, check your pendo.initialize() options object and remove disableGuides, disableAnalytics, or other disable* flags."
+  }
+};
+
 function buildPlainTextReport(url, checks) {
-  const lines = [`Pendo Health Check — ${url}`, ""];
+  const lines = [`PENDO HEALTH CHECK REPORT`, `========================`, `Page: ${url}`, `Time: ${new Date().toISOString()}`, ""];
+
   checks.forEach((c) => {
     lines.push(`${STATUS_ICONS[c.status]} ${c.label}: ${c.detail}`);
+    // Add remediation if available
+    const remap = REMEDIATION_MAP[c.label];
+    if (remap && remap[c.status]) {
+      lines.push(`   ${remap[c.status]}`);
+      lines.push("");
+    }
   });
+
   let pass = 0, warn = 0, fail = 0;
   checks.forEach((c) => {
     if (c.status === "pass") pass++;
@@ -97,7 +216,30 @@ function buildPlainTextReport(url, checks) {
     else fail++;
   });
   lines.push("");
-  lines.push(`${pass} passed · ${warn} warnings · ${fail} failed`);
+  lines.push(`SUMMARY: ${pass} passed · ${warn} warnings · ${fail} failed`);
+
+  // Add Pendo status if available
+  if (window.__pendoServiceStatus) {
+    lines.push("");
+    lines.push("── Pendo Service Status ──");
+    const st = window.__pendoServiceStatus;
+    lines.push(`Overall: ${st.status ? st.status.description : "Unknown"}`);
+    if (st.components) {
+      st.components.forEach((comp) => {
+        if (!comp.group) {
+          lines.push(`  ${comp.name}: ${comp.status.replace(/_/g, " ")}`);
+        }
+      });
+    }
+    if (st.incidents && st.incidents.length > 0) {
+      lines.push("");
+      lines.push("Active Incidents:");
+      st.incidents.forEach((inc) => {
+        lines.push(`  ⚠️ ${inc.name} (${inc.status})`);
+      });
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -381,6 +523,9 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     showView("error-state");
     return;
   }
+
+  // Fetch Pendo service status (Feature 1)
+  fetchPendoStatus();
 
   chrome.scripting
     .executeScript({
@@ -690,6 +835,77 @@ function runPendoHealthCheck() {
     // We can't retroactively detect past violations, but we note the meta-tag analysis
   } catch (e) {
     add("warn", "Content Security Policy", "Error checking CSP: " + e.message);
+  }
+
+  // 12. Network request validation (Feature 2)
+  try {
+    var perfEntries = performance.getEntriesByType ? performance.getEntriesByType("resource") : [];
+    var pendoRequests = perfEntries.filter(function(e) {
+      return e.name && (e.name.indexOf("pendo.io") !== -1 || e.name.indexOf("pendo-") !== -1);
+    });
+
+    if (pendoRequests.length === 0) {
+      add("warn", "Network Requests", "No Pendo network requests detected. Data may not be transmitting, or requests completed before page load.");
+    } else {
+      var failed = pendoRequests.filter(function(e) { return e.transferSize === 0 && e.decodedBodySize === 0; });
+      var categories = {};
+      pendoRequests.forEach(function(e) {
+        var host = "unknown";
+        try { host = new URL(e.name).hostname; } catch(_) {}
+        if (!categories[host]) categories[host] = 0;
+        categories[host]++;
+      });
+      var summary = Object.keys(categories).map(function(h) { return h + " (" + categories[h] + ")"; }).join(", ");
+
+      if (failed.length > 0) {
+        add("warn", "Network Requests", pendoRequests.length + " request(s) to Pendo — " + failed.length + " may have failed (0 bytes). Hosts: " + summary);
+      } else {
+        add("pass", "Network Requests", pendoRequests.length + " successful request(s). Hosts: " + summary);
+      }
+    }
+  } catch (e) {
+    add("warn", "Network Requests", "Could not analyze network requests: " + e.message);
+  }
+
+  // 13. Feature flags (Feature 3)
+  try {
+    var flags = [];
+    var opts = null;
+
+    if (typeof pendo.getOptions === "function") {
+      opts = pendo.getOptions();
+    } else if (pendo.options) {
+      opts = pendo.options;
+    } else if (pendo.get && typeof pendo.get === "function") {
+      try { opts = pendo.get("options"); } catch(_) {}
+    }
+
+    if (opts) {
+      if (opts.disableGuides === true) flags.push("disableGuides=true");
+      if (opts.disableAnalytics === true) flags.push("disableAnalytics=true");
+      if (opts.disablePersistence === true) flags.push("disablePersistence=true");
+      if (opts.disableFeedback === true) flags.push("disableFeedback=true");
+      if (opts.guides && opts.guides.disabled === true) flags.push("guides.disabled=true");
+      if (opts.excludeAllText === true) flags.push("excludeAllText=true");
+      if (opts.xhrTimings === false) flags.push("xhrTimings=false");
+      if (opts.xhrWhitelist) flags.push("xhrWhitelist configured");
+      if (opts.htmlAttributeBlacklist) flags.push("htmlAttributeBlacklist configured");
+      if (opts.htmlAttributes) flags.push("htmlAttributes configured");
+    }
+
+    // Also check for Pendo debugging/testing mode
+    if (pendo.enableDebugging || (pendo.get && pendo.get("enableDebugging"))) {
+      flags.push("debugging enabled");
+    }
+
+    if (flags.length > 0) {
+      var hasDisable = flags.some(function(f) { return f.indexOf("disable") !== -1; });
+      add(hasDisable ? "warn" : "info", "Feature Flags", flags.join(", "));
+    } else {
+      add("pass", "Feature Flags", "No feature flags detected — all Pendo features appear enabled");
+    }
+  } catch (e) {
+    add("info", "Feature Flags", "Could not inspect feature flags: " + e.message);
   }
 
   return { pendoDetected: true, checks: checks };

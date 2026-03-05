@@ -1,6 +1,8 @@
 # Pendo Health Check — Chrome Extension
 
-A Manifest V3 Chrome extension that runs real-time diagnostics against the [Pendo](https://www.pendo.io/) analytics agent on any web page. Click the toolbar icon to get instant pass/warn/fail results across 11 health checks, plus a deep-dive Setup Assistant with framework detection, metadata validation, and actionable recommendations.
+A Manifest V3 Chrome extension that runs real-time diagnostics against the [Pendo](https://www.pendo.io/) analytics agent on any web page. Click the toolbar icon to get instant pass/warn/fail results across 13 health checks, plus a deep-dive Setup Assistant with framework detection, metadata validation, and actionable recommendations.
+
+**New in v1.2:** Live Pendo service status monitoring, network request validation, feature flag detection, and smart remediation guidance in copied reports.
 
 Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-setup-assistant) — the ai-setup-assistant helps developers **install** Pendo into a codebase, while this extension **validates** the running installation from the browser.
 
@@ -10,10 +12,12 @@ Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-s
 
 - [Installation](#installation)
 - [Usage](#usage)
+- [What's New in v1.2](#whats-new-in-v12)
 - [Extension Architecture](#extension-architecture)
 - [File Reference](#file-reference)
 - [Tab 1: Health Check](#tab-1-health-check)
 - [Tab 2: Setup Assistant](#tab-2-setup-assistant)
+- [Pendo Service Status](#pendo-service-status)
 - [Feedback System](#feedback-system)
 - [Permissions](#permissions)
 - [Extending the Extension](#extending-the-extension)
@@ -28,6 +32,8 @@ Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-s
 4. Click **Load unpacked** and select the project directory
 5. Pin the extension icon in the toolbar for quick access
 
+**From the Chrome Web Store:** [Pendo Health Check](https://chromewebstore.google.com/detail/pendo-health-check/clcjdjkhbhigpbcfliedfdielpjfjcmo)
+
 ## Usage
 
 **Pendo Detected** — Navigate to any page with Pendo installed and click the icon. The Health Check tab runs automatically. Switch to the Setup Assistant tab for deeper analysis.
@@ -36,9 +42,25 @@ Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-s
 
 **Restricted Pages** — On `chrome://` pages, `chrome-extension://` pages, and the Chrome Web Store, the extension shows an error state explaining the restriction.
 
-**Copy Results** — Both tabs include a "Copy Results" / "Copy Report" button that generates a plain-text diagnostic report for pasting into tickets, Slack, or docs.
+**Copy Results** — Both tabs include a "Copy Results" / "Copy Report" button that generates a plain-text diagnostic report with smart remediation suggestions for pasting into tickets, Slack, or docs.
 
-**Send Feedback** — A feedback button at the bottom of the popup opens a text prompt. Submitted feedback is PII-scrubbed and stored locally in `feedback.json` within the extension directory.
+**Send Feedback** — A feedback button at the bottom of the popup opens a text prompt. Submitted feedback is PII-scrubbed and stored locally in `chrome.storage.local`.
+
+---
+
+## What's New in v1.2
+
+### Pendo Service Status
+The extension now polls the Pendo public status page (`status.pendo.io`) and displays a live service status banner at the top of the popup. Each Pendo component (App, Data Pipeline, Guides, Integrations, etc.) is shown with a colored status dot (green/amber/red/blue). Active incidents are highlighted with a yellow banner. The status is also included in copied reports.
+
+### Network Request Validation (Check #12)
+Uses the browser's `performance.getEntriesByType('resource')` API to inspect actual network requests to Pendo domains (`pendo.io`, `pendo-io`, `pendo-static`). Reports pass/warn/fail based on whether Pendo network traffic is detected, which validates that the agent is actively communicating with Pendo servers beyond just being loaded.
+
+### Feature Flag Detection (Check #13)
+Inspects `pendo.getOptions()` or `pendo.options` for feature flag configuration (`guidesDisabled`, `disableGuides`, `disablePersistence`, `blockAgentMetadata`, `blockLogAgent`, `cookieDomain`, `htmlApplications`, `htmlAttributes`). Flags any non-default settings that could affect Pendo behavior.
+
+### Smart Remediation
+The "Copy Results" and "Copy Report" buttons now include a remediation section in the generated text. Each check that returned `warn` or `fail` gets an actionable fix suggestion appended to the report, drawn from a curated `REMEDIATION_MAP` covering all 13 checks. This makes copied reports self-contained troubleshooting guides.
 
 ---
 
@@ -56,51 +78,49 @@ Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-s
 │  │   Header    │  │  Tab Bar  │  │  Feedback   │  │
 │  │  (🩺 + URL) │  │ HC | Setup│  │   Button    │  │
 │  └─────────────┘  └─────┬─────┘  └─────┬──────┘  │
-│                         │               │         │
-│  ┌──────────────────────▼─────────────┐ │         │
-│  │         popup.js (UI logic)        │ │         │
-│  │  ┌──────────┐  ┌───────────────┐   │ │         │
-│  │  │renderChk │  │ renderSetup   │   │ │         │
-│  │  │ s()      │  │ ()            │   │ │         │
-│  │  └────┬─────┘  └──────┬────────┘   │ │         │
-│  │       │               │            │ │         │
-│  │  chrome.scripting.executeScript     │ │         │
-│  │       │ world: "MAIN"│             │ │         │
-│  └───────┼───────────────┼────────────┘ │         │
-└──────────┼───────────────┼──────────────┼─────────┘
-           │               │              │
-┌──────────▼───────────────▼──────────┐   │
-│         Target Page (MAIN world)     │   │
-│  ┌─────────────────────────────┐    │   │
-│  │ runPendoHealthCheck()       │    │   │
-│  │ → reads window.pendo        │    │   │
-│  │ → returns {checks[]}         │    │   │
-│  └─────────────────────────────┘    │   │
-│  ┌─────────────────────────────┐    │   │
-│  │ runPendoSetupAssistant()    │    │   │
-│  │ → detects framework         │    │   │
-│  │ → analyzes snippet, CSP     │    │   │
-│  │ → validates metadata        │    │   │
-│  │ → generates recommendations │    │   │
-│  └─────────────────────────────┘    │   │
-└─────────────────────────────────────┘   │
-                                           │
-┌─────────────────────────────────────────▼─────┐
-│                 background.js                     │
-│  Service worker — lifecycle events, feedback    │
-│  storage via chrome.runtime messages           │
-└────────────────────────────────────────────────┘
-                      │
-                      ▼
-              feedback.json (local)
+│  ┌──────────────┐       │               │         │
+│  │Pendo Status  │       │               │         │
+│  │(live API)    │       │               │         │
+│  └──────┬───────┘       │               │         │
+│         │  ┌────────────▼─────────────┐ │         │
+│         │  │     popup.js (UI logic)  │ │         │
+│         │  │  ┌──────────┐ ┌────────┐ │ │         │
+│         │  │  │renderChks│ │render  │ │ │         │
+│         │  │  │()        │ │Setup() │ │ │         │
+│         │  │  └────┬─────┘ └───┬────┘ │ │         │
+│         │  │       │           │      │ │         │
+│         │  │  chrome.scripting.executeScript       │
+│         │  │       │ world: "MAIN"    │ │         │
+│         │  └───────┼───────────┼──────┘ │         │
+└──────────┼─────────┼───────────┼────────┼─────────┘
+           │         │           │        │
+     fetch │    ┌────▼───────────▼────┐   │
+  status.  │    │  Target Page (MAIN) │   │
+  pendo.io │    │  ┌────────────────┐ │   │
+           │    │  │runPendoHealth  │ │   │
+           │    │  │Check()         │ │   │
+           │    │  │→ 13 checks     │ │   │
+           │    │  └────────────────┘ │   │
+           │    │  ┌────────────────┐ │   │
+           │    │  │runPendoSetup   │ │   │
+           │    │  │Assistant()     │ │   │
+           │    │  └────────────────┘ │   │
+           │    └─────────────────────┘   │
+           │                              │
+┌──────────▼──────────────────────────────▼─────┐
+│  status.pendo.io     │     background.js       │
+│  (Atlassian          │  Service worker —       │
+│   Statuspage API)    │  feedback storage       │
+└──────────────────────┴────────────────────────┘
 ```
 
 **Key design decisions:**
 
 - **No content script relay.** Both diagnostic functions are injected directly via `chrome.scripting.executeScript` with `world: "MAIN"`, giving them access to the page's `window.pendo` object without message-passing overhead.
 - **Lazy-loaded Setup Assistant.** The Setup Assistant only runs when the user switches to its tab, avoiding unnecessary page injection on every popup open.
+- **Live service status.** Fetches from Pendo's public Atlassian Statuspage API (`status.pendo.io/api/v2/summary.json`) on popup open. No authentication required.
 - **Zero external dependencies.** Pure vanilla JS with inline CSS. No build step, no npm, no bundler.
-- **Minimal permissions.** Only `activeTab` (access current tab on click) and `scripting` (inject diagnostic functions).
+- **Minimal permissions.** Only `activeTab` (access current tab on click), `scripting` (inject diagnostic functions), and `storage` (persist feedback).
 
 ---
 
@@ -114,9 +134,9 @@ Chrome Extension Manifest V3 configuration.
 |-------|-------|---------|
 | `manifest_version` | `3` | Required for Chrome Manifest V3 extensions |
 | `name` | `"Pendo Health Check"` | Display name in Chrome toolbar and extensions page |
-| `version` | `"1.0.0"` | Extension version (semver) |
-| `description` | `"Run diagnostics against the Pendo agent on any page"` | Shown on `chrome://extensions` |
-| `permissions` | `["activeTab", "scripting"]` | Grants access to the current tab and script injection |
+| `version` | `"1.2.0"` | Extension version (semver) |
+| `description` | `"Run diagnostics against the Pendo agent — health checks, setup analysis, service status, network validation, and smart remediation."` | Shown on `chrome://extensions` |
+| `permissions` | `["activeTab", "scripting", "storage"]` | Grants access to the current tab, script injection, and local storage |
 | `action.default_popup` | `"popup.html"` | The HTML file rendered when the icon is clicked |
 | `action.default_icon` | `16/48/128px PNGs` | Toolbar icon at various resolutions |
 | `icons` | `16/48/128px PNGs` | Extension management page icons |
@@ -128,164 +148,44 @@ The popup UI rendered when the user clicks the extension icon. Contains all CSS 
 
 | Element ID | Type | Purpose |
 |------------|------|---------|
-| `.header` | `div` | Dark blue header bar with 🩺 icon, extension title, and current page URL |
+| `.header` | `div` | Dark blue header bar with 🩺 icon and extension title |
 | `#page-url` | `div` | Displays the URL of the active tab being inspected |
+| `#pendo-status` | `div` | **NEW v1.2** — Live Pendo service status section with per-component status dots and incident banners |
 | `#tab-bar` | `div` | Tab switcher with "Health Check" and "Setup Assistant" tabs. Hidden until results load. |
 | `#loading` | `div` | Spinner + "Running diagnostics…" shown during initial script injection |
 | `#not-detected` | `div` | "Pendo Not Detected" view with 🔍 icon and guidance text |
 | `#error-state` | `div` | Error view for restricted pages (chrome://, webstore, etc.) |
 | `#panel-health` | `div` | Health Check tab panel — contains `#checks-list` and `#health-summary` |
-| `#checks-list` | `div` | Container for dynamically rendered health check rows |
-| `#health-summary` | `div` | Summary bar with pass/warn/fail counts and Copy Results button |
-| `#copy-btn` | `button` | Copies health check results as plain text to clipboard |
 | `#panel-setup` | `div` | Setup Assistant tab panel — contains `#setup-content` and `#setup-summary` |
-| `#setup-loading` | `div` | Spinner shown while Setup Assistant analyzes the page |
-| `#setup-content` | `div` | Container for dynamically rendered setup analysis sections |
-| `#setup-summary` | `div` | Summary bar with error/warning/tip counts and Copy Report button |
-| `#copy-setup-btn` | `button` | Copies setup report as plain text to clipboard |
 | `#feedback-bar` | `div` | Footer bar with feedback button |
 | `#feedback-modal` | `div` | Modal overlay with textarea, PII warning, submit/cancel buttons |
 
-**CSS Design System:**
-
-- Width: `380px` fixed
-- Font: System font stack (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial`)
-- Base font size: `13px`
-- Header background: `#1b2a4a` (dark navy)
-- Status colors: Pass `#16a34a` (green), Warn `#d97706` (amber), Fail `#dc2626` (red), Info `#2563eb` (blue)
-- Badge variants: `.badge-green`, `.badge-yellow`, `.badge-red`, `.badge-blue`
-
 ### `popup.js`
 
-All UI logic, event handling, and the two injected diagnostic functions. Organized into these sections:
+All UI logic, event handling, and the two injected diagnostic functions (~1,479 lines).
 
-**Constants & Helpers (lines 1–18)**
+**Key sections:**
 
-| Symbol | Purpose |
-|--------|---------|
-| `STATUS_ICONS` | Maps status strings to emoji: `pass→✅`, `warn→⚠️`, `fail→❌`, `info→ℹ️` |
-| `showView(id)` | Shows one of the three state views (`loading`, `not-detected`, `error-state`) by setting `display: block` on the target and `display: none` on the others |
-| `showTabs()` | Makes the tab bar visible (`display: flex`) |
-| `escapeHtml(str)` | Sanitizes strings for safe innerHTML insertion via `textContent` trick |
-
-**Tab Switching (lines 20–36)**
-
-Attaches click handlers to `.tab` elements. Tracks `activeTabId` and `setupLoaded` to ensure the Setup Assistant only runs once (lazy loading). Clicking "Setup" for the first time triggers `runSetup()`.
-
-**Health Check Rendering (lines 38–70)**
-
-| Function | Purpose |
-|----------|---------|
-| `renderChecks(checks)` | Iterates the checks array from `runPendoHealthCheck()`, builds DOM rows with status icon + label + detail, counts pass/warn/fail, populates the summary bar, hides the loading spinner, and shows tabs |
-
-**Copy Functionality (lines 72–130)**
-
-| Function | Purpose |
-|----------|---------|
-| `buildPlainTextReport(url, checks)` | Generates a multi-line plain-text health check report with emoji status icons and summary counts |
-| `buildSetupPlainText(url, data)` | Generates a multi-line plain-text setup assistant report covering framework, snippet, initialization, CSP, metadata fields, and recommendations |
-| Copy button handlers | Use `navigator.clipboard.writeText()` with visual feedback (button turns green, shows "Copied!", reverts after 1.5s) |
-
-**Setup Assistant Rendering (lines 132–280)**
-
-| Function | Purpose |
-|----------|---------|
-| `renderSetup(data)` | Renders the full setup analysis into `#setup-content`: Framework Detection, Snippet Analysis, Initialization, CSP Analysis, Visitor Metadata table, Account Metadata table, and Recommendations. Uses section headers, detail rows, badge components, and the metadata table. |
-
-**Main Entry Point (lines 282–320)**
-
-On popup open, `chrome.tabs.query` gets the active tab, sets the URL display, checks for restricted pages (redirects to error-state), then calls `chrome.scripting.executeScript` with `runPendoHealthCheck` in MAIN world. Results are either rendered (Pendo detected) or trigger the not-detected view.
-
-**Setup Runner (lines 322–350)**
-
-| Function | Purpose |
-|----------|---------|
-| `runSetup()` | Called on first Setup tab click. Injects `runPendoSetupAssistant` into the page's MAIN world, renders results or shows an error empty state. |
-
-**Injected Function: `runPendoHealthCheck()` (lines 352–560)**
-
-Runs in the target page's MAIN world. Returns `{ pendoDetected: boolean, checks: Array<{status, label, detail}> }`.
-
-| Check # | Name | What It Inspects |
-|---------|------|-----------------|
-| 1 | **Pendo Agent Loaded** | `typeof window.pendo !== "undefined"` |
-| 2 | **Pendo Ready** | `pendo.isReady()` return value |
-| 3 | **Visitor ID** | `pendo.getVisitorId()`, `pendo.get("visitor").id`, `pendo.visitorId` — flags anonymous IDs (`VISITOR-*`, `_PENDO_T_*`) |
-| 4 | **Account ID** | `pendo.getAccountId()`, `pendo.get("account").id`, `pendo.accountId` |
-| 5 | **Visitor Metadata** | `pendo.metadata.auto.visitor` — counts and lists field names |
-| 6 | **Active Guides** | `pendo.guides` array length |
-| 7 | **Pendo Instances** | Detects `window.pendo_` (dual init) and counts `<script src="*pendo*">` tags |
-| 8 | **Agent Version** | `pendo.getVersion()` or `pendo.VERSION` |
-| 9 | **API Key** | `pendo.get("apiKey")` or `pendo.apiKey` |
-| 10 | **Data Host** | `pendo.get("options").dataHost`, script tag hostname, or `pendo.HOST` — flags default CDN vs CNAME |
-| 11 | **Content Security Policy** | Parses `<meta http-equiv="Content-Security-Policy">` tags, checks `script-src`, `connect-src`, `style-src`, `img-src`, `frame-src` for Pendo domains |
-
-**Injected Function: `runPendoSetupAssistant()` (lines 562–end)**
-
-Runs in the target page's MAIN world. Returns a rich analysis object:
-
-```javascript
-{
-  framework: { name, version, renderer, mode },
-  snippet: { loadMethod, isAsync, placement, scriptCount },
-  initialization: { method, timing, hasVisitorId, hasAccountId },
-  csp: { detected, source, directives, issues[] },
-  visitorFields: [{ key, type, warnings[] }],
-  accountFields: [{ key, type, warnings[] }],
-  recommendations: [{ severity, title, detail }]
-}
-```
-
-**Framework Detection** — Checks for React (`window.React`, `__REACT_DEVTOOLS_GLOBAL_HOOK__`), Next.js (`__NEXT_DATA__`), Vue (`window.Vue`, `__VUE__`), Nuxt (`__NUXT__`), Angular (`window.ng`, `[ng-version]`), AngularJS (`window.angular`), Svelte (class selectors), Ember (`window.Ember`), jQuery (`window.jQuery`).
-
-**Snippet Analysis** — Inspects `<script src="*pendo*">` tags for load method (static agent, bundled, inline, npm/dynamic), async attribute, DOM placement, and tag count.
-
-**Initialization Analysis** — Checks `pendo.isReady()`, detects `pendo.initialize()`/`pendo.identify()`, validates visitor ID (non-anonymous) and account ID presence.
-
-**CSP Analysis** — Parses CSP meta tags, extracts directives, checks `script-src`, `connect-src`, `style-src`, `img-src`, `font-src`, `frame-src`, `worker-src` for Pendo CDN domains (`cdn.pendo.io`, `data.pendo.io`, `app.pendo.io`, `*.pendo.io`). Falls back to performance API resource entries to heuristically determine if HTTP-header CSP is blocking anything.
-
-**Metadata Validation** — `validateFields(obj)` inspects each field in `pendo.metadata.auto.visitor` and `pendo.metadata.auto.account`:
-
-| Rule | Flagged As |
-|------|-----------|
-| Field name matches sensitive pattern (`password`, `token`, `ssn`, `credit_card`, etc.) | "Possibly sensitive field name" |
-| Field name has invalid characters (not matching `^[a-zA-Z_][a-zA-Z0-9_]*$`) | Warning |
-| String value exceeds 1024 characters | Warning |
-| Null/undefined value | Warning |
-| Nested object (non-array) | "Nested object — Pendo only supports flat fields" |
-| Array value | "Array value — consider converting to comma-separated string" |
-| Function value | "Function value — will not be sent to Pendo" |
-
-**Recommendations Engine** — Generates prioritized suggestions:
-
-| Condition | Severity | Recommendation |
-|-----------|----------|----------------|
-| Missing/anonymous visitor ID | Error | Pass a unique, stable user ID |
-| Missing account ID | Warning | Pass account.id for B2B analytics |
-| Synchronous script loading | Warning | Add async attribute |
-| Multiple script tags | Warning | Ensure only one snippet loads |
-| Dual Pendo instance (`window.pendo_`) | Warning | Verify intentional |
-| Sensitive metadata fields detected | Error | Review and exclude PII |
-| Complex (nested/array) metadata values | Warning | Flatten for Pendo compatibility |
-| Framework-specific timing (React/Vue/Angular) | Tip | Hook-specific initialization guidance |
-| Payload size > 50KB | Warning | Approaching 64KB limit |
-| Agent version < 2.x | Tip | Check for updates |
-| CSP errors | Error | Update CSP directives |
-| CSP warnings | Warning | Review directive compatibility |
-| No metadata at all | Tip | Add fields for richer segmentation |
+| Section | Description |
+|---------|-------------|
+| Constants & Helpers | `STATUS_ICONS`, `showView()`, `showTabs()`, `escapeHtml()` |
+| Pendo Service Status | `fetchPendoStatus()` fetches from `status.pendo.io/api/v2/summary.json`, `renderPendoStatus()` renders component status dots and incident banners |
+| Tab Switching | Click handlers for Health Check / Setup Assistant tabs with lazy loading |
+| Health Check Rendering | `renderChecks()` builds DOM rows with status icons and summary counts |
+| Remediation Map | `REMEDIATION_MAP` — curated fix suggestions keyed by check label substring |
+| Copy Functionality | `buildPlainTextReport()` and `buildSetupPlainText()` now include remediation tips and service status in generated reports |
+| Setup Assistant Rendering | `renderSetup()` — framework, snippet, init, CSP, metadata, recommendations |
+| Injected: `runPendoHealthCheck()` | 13 checks run in MAIN world (see table below) |
+| Injected: `runPendoSetupAssistant()` | Framework detection, snippet analysis, CSP, metadata validation, recommendations |
+| Feedback IIFE | Modal handling, PII scrubbing, submission via `chrome.runtime.sendMessage` |
 
 ### `background.js`
 
-Minimal Manifest V3 service worker. Currently handles:
-
+Minimal Manifest V3 service worker. Handles:
 - `chrome.runtime.onInstalled` — Logs installation for debugging
-- `chrome.runtime.onMessage` — Listens for `"save-feedback"` messages from the popup, PII-scrubs the text, and appends to `feedback.json` via the extension's local storage
-
-Reserved for future enhancements: badge updates, context menu actions, cross-tab result caching.
+- `chrome.runtime.onMessage` — Listens for `"save-feedback"` messages, PII-scrubs, and persists to `chrome.storage.local`
 
 ### `icons/`
-
-Extension icons at three sizes:
 
 | File | Size | Used For |
 |------|------|----------|
@@ -293,30 +193,33 @@ Extension icons at three sizes:
 | `icon48.png` | 48×48 | Extensions management page |
 | `icon128.png` | 128×128 | Chrome Web Store, install dialog |
 
-### `feedback.json`
-
-Auto-created on first feedback submission. Stores PII-scrubbed feedback entries as a JSON array:
-
-```json
-[
-  {
-    "timestamp": "2026-03-04T23:15:00.000Z",
-    "url": "https://app.example.com/dashboard",
-    "feedback": "[REDACTED_EMAIL] said the health check was helpful but missed checking for guide throttling",
-    "extensionVersion": "1.0.0"
-  }
-]
-```
-
-PII patterns automatically scrubbed before storage: email addresses, phone numbers, SSNs, credit card numbers, IP addresses, and US zip+4 codes.
-
 ---
 
 ## Tab 1: Health Check
 
 Runs automatically when the popup opens. Injects `runPendoHealthCheck()` into the page's MAIN world and renders results as a list of pass/warn/fail rows with a summary bar.
 
-11 checks are run in sequence. If Pendo is not detected at check #1, the function returns early with `pendoDetected: false` and the UI shows the not-detected view.
+13 checks are run in sequence:
+
+| Check # | Name | What It Inspects |
+|---------|------|-----------------|
+| 1 | **Pendo Agent Loaded** | `typeof window.pendo !== "undefined"` |
+| 2 | **Pendo Ready** | `pendo.isReady()` return value |
+| 3 | **Visitor ID** | `pendo.getVisitorId()` — flags anonymous IDs (`VISITOR-*`, `_PENDO_T_*`) |
+| 4 | **Account ID** | `pendo.getAccountId()` |
+| 5 | **Visitor Metadata** | `pendo.metadata.auto.visitor` — counts and lists field names |
+| 6 | **Active Guides** | `pendo.guides` array length |
+| 7 | **Pendo Instances** | Detects `window.pendo_` (dual init) and counts `<script src="*pendo*">` tags |
+| 8 | **Agent Version** | `pendo.getVersion()` or `pendo.VERSION` |
+| 9 | **API Key** | `pendo.get("apiKey")` or `pendo.apiKey` |
+| 10 | **Data Host** | `pendo.get("options").dataHost` — flags default CDN vs CNAME |
+| 11 | **Content Security Policy** | Parses CSP meta tags, checks directives for Pendo domains |
+| 12 | **Network Requests** | **NEW v1.2** — `performance.getEntriesByType('resource')` for Pendo domain traffic |
+| 13 | **Feature Flags** | **NEW v1.2** — `pendo.getOptions()` for non-default agent configuration flags |
+
+If Pendo is not detected at check #1, the function returns early with `pendoDetected: false` and the UI shows the not-detected view.
+
+---
 
 ## Tab 2: Setup Assistant
 
@@ -331,31 +234,42 @@ Runs on first click of the "Setup Assistant" tab (lazy-loaded). Injects `runPend
 
 ---
 
+## Pendo Service Status
+
+**New in v1.2.** On popup open, the extension fetches the Pendo public status page API at `https://status.pendo.io/api/v2/summary.json`. This displays:
+
+- **Per-component status** — Each Pendo service component (App, Data Pipeline, Guides, Integrations, etc.) shown with a colored status dot: green (operational), amber (degraded/partial outage), red (major outage), or blue (maintenance).
+- **Overall status indicator** — A badge in the section header summarizing the overall system state.
+- **Active incident banner** — If any unresolved incidents exist, a yellow banner displays the incident name and latest update.
+- **Report inclusion** — Service status is appended to copied reports, so support tickets include the system state at time of diagnosis.
+
+The status fetch is fire-and-forget — if it fails (network error, timeout), the section simply stays hidden and health checks proceed normally.
+
+---
+
 ## Feedback System
 
 A built-in feedback mechanism lets users submit comments, bug reports, or feature requests directly from the extension popup.
 
 **How it works:**
 
-1. User clicks "Send Feedback" in the footer bar
-2. A modal overlay appears with a textarea and a note about PII scrubbing
-3. User types feedback and clicks "Submit"
+1. User clicks "Feedback" in the footer bar
+2. A modal overlay appears with a textarea
+3. User types feedback and clicks "Submit" (or Cmd/Ctrl+Enter)
 4. The popup sends the text to `background.js` via `chrome.runtime.sendMessage`
 5. `background.js` runs PII scrubbing (regex-based removal of emails, phones, SSNs, credit cards, IPs)
-6. The scrubbed entry is appended to `feedback.json` in `chrome.storage.local`
+6. The scrubbed entry is appended to `chrome.storage.local`
 7. User sees a confirmation message
 
 **PII Patterns Scrubbed:**
 
 | Pattern | Replaced With |
 |---------|--------------|
-| Email addresses (`user@domain.com`) | `[REDACTED_EMAIL]` |
-| Phone numbers (US formats: `(555) 123-4567`, `555-123-4567`, `+1 555 123 4567`) | `[REDACTED_PHONE]` |
-| Social Security Numbers (`123-45-6789`) | `[REDACTED_SSN]` |
-| Credit card numbers (13–19 digit sequences) | `[REDACTED_CC]` |
-| IPv4 addresses (`192.168.1.1`) | `[REDACTED_IP]` |
-
-**Storage:** Feedback is stored in `chrome.storage.local` under the key `"pendoHealthCheckFeedback"` and can be exported by reading that key from the extension's background context.
+| Email addresses | `[REDACTED_EMAIL]` |
+| Phone numbers (US formats) | `[REDACTED_PHONE]` |
+| Social Security Numbers | `[REDACTED_SSN]` |
+| Credit card numbers (13–19 digits) | `[REDACTED_CC]` |
+| IPv4 addresses | `[REDACTED_IP]` |
 
 ---
 
@@ -367,7 +281,7 @@ A built-in feedback mechanism lets users submit comments, bug reports, or featur
 | `scripting` | Inject `runPendoHealthCheck()` and `runPendoSetupAssistant()` into the page's MAIN world | Only the active tab, only on click |
 | `storage` | Persist feedback entries in `chrome.storage.local` | Extension-local only, no sync |
 
-No host permissions, no background network access, no persistent content scripts, no cross-origin requests.
+No host permissions, no background network access, no persistent content scripts, no cross-origin requests. The status page fetch uses `fetch()` from the popup context, which does not require additional permissions.
 
 ---
 
@@ -378,7 +292,7 @@ No host permissions, no background network access, no persistent content scripts
 In `popup.js`, find `runPendoHealthCheck()` and add before the `return` statement:
 
 ```javascript
-// 12. My New Check
+// 14. My New Check
 try {
   var myValue = pendo.someProperty;
   if (myValue) {
@@ -389,6 +303,12 @@ try {
 } catch (e) {
   add("fail", "My New Check", "Error: " + e.message);
 }
+```
+
+Don't forget to add a remediation entry in `REMEDIATION_MAP`:
+
+```javascript
+"My New Check": "Actionable fix suggestion for this check."
 ```
 
 ### Adding a new Setup Recommendation
@@ -410,6 +330,27 @@ if (someCondition) {
   warnings.push("Description of the issue");
 }
 ```
+
+---
+
+## Changelog
+
+### v1.2.0 (2026-03-05)
+- **Added** Pendo service status monitoring via `status.pendo.io` API
+- **Added** Check #12: Network Request Validation (performance API)
+- **Added** Check #13: Feature Flag Detection (`pendo.getOptions()`)
+- **Added** Smart remediation tips in copied reports (`REMEDIATION_MAP`)
+- **Added** Service status included in copied reports
+- **Updated** Professional icon design (Pendo red with medical cross)
+- **Updated** Manifest description to reflect new capabilities
+
+### v1.0.1 (2026-03-04)
+- Initial Chrome Web Store release
+- 11 health checks + Setup Assistant
+- Feedback system with PII scrubbing
+
+### v1.0.0 (2026-03-04)
+- Initial release
 
 ---
 
