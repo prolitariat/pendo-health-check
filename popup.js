@@ -60,17 +60,22 @@ const ENV_HOST_MAP = {
 function detectEnvFromChecks(checks) {
   if (!checks) return null;
   for (let i = 0; i < checks.length; i++) {
-    if (checks[i].label === "Data Host" && checks[i].status === "pass") {
-      // detail looks like "data.pendo.io (default Pendo CDN)" or "custom.example.com (CNAME / custom)"
-      const host = checks[i].detail.split(" ")[0].trim();
-      for (const [h, env] of Object.entries(ENV_HOST_MAP)) {
-        if (host.includes(h) || h.includes(host)) return env;
-      }
-      // Try partial match on the host for CNAME setups pointing to a region
-      if (host.includes(".au.")) return "AU environment";
-      if (host.includes(".eu.")) return "EU environment";
-      if (host.includes(".jpn.")) return "JPN environment";
+    if (checks[i].label === "Data Host") {
+      const detail = checks[i].detail || "";
+      const host = detail.split(" ")[0].trim().toLowerCase();
+      if (!host) continue;
+
+      // Check for regional subdomains first (most specific)
+      if (host.includes(".au.") || host.includes("au.pendo")) return "AU environment";
+      if (host.includes(".eu.") || host.includes("eu.pendo")) return "EU environment";
+      if (host.includes(".jpn.") || host.includes("jpn.pendo")) return "JPN environment";
       if (host.includes("us1.")) return "US1 environment";
+
+      // Default US environment for any pendo.io domain without regional qualifier
+      if (host.includes("pendo.io")) return "US environment";
+
+      // CNAME — can't determine region, return null
+      return null;
     }
   }
   return null;
@@ -168,7 +173,33 @@ function renderPendoStatus(data, detectedEnv) {
   }
 
   statusDiv.style.display = "block";
+
+  // Auto-expand if there's a problem (non-operational or incidents)
+  const hasProblems = (statusValue !== "none" && statusValue !== "operational" && statusValue !== "") ||
+    (data.incidents && data.incidents.length > 0);
+  const compsEl = document.getElementById("status-components");
+  const chevron = document.getElementById("status-chevron");
+  if (hasProblems && compsEl) {
+    compsEl.style.display = "block";
+    if (chevron) chevron.style.transform = "rotate(90deg)";
+  }
 }
+
+// Status section toggle
+document.addEventListener("DOMContentLoaded", () => {
+  const header = document.getElementById("status-header");
+  if (header) {
+    header.addEventListener("click", () => {
+      const comps = document.getElementById("status-components");
+      const chevron = document.getElementById("status-chevron");
+      if (comps) {
+        const isHidden = comps.style.display === "none";
+        comps.style.display = isHidden ? "block" : "none";
+        if (chevron) chevron.style.transform = isHidden ? "rotate(90deg)" : "";
+      }
+    });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Tab switching
