@@ -1,0 +1,62 @@
+=== CHROME WEB STORE LISTING CONTENT (v1.2.0) ===
+
+--- EXTENSION NAME ---
+Pendo Health Check
+
+--- SHORT DESCRIPTION (132 chars max) ---
+Diagnose Pendo agent health with 11 runtime checks, setup audits, live service status, interactive tools, and smart remediation.
+
+--- DETAILED DESCRIPTION ---
+Pendo Health Check is a three-tab diagnostic suite for the Pendo agent. Each tab has a clear purpose: Health Check monitors runtime state, Setup Assistant audits implementation, and Tools provides interactive Pendo commands.
+
+HEALTH CHECK TAB — "Is Pendo working right now?" (11 Checks)
+• Agent Detection — confirms pendo.js is loaded
+• Initialization — verifies the agent initialized via pendo.isReady()
+• Visitor ID — checks that a non-anonymous visitor ID is set
+• Account ID — validates account-level identity
+• Active Guides — reports loaded guides count and state
+• Pendo Instances — detects dual installations and multiple script tags
+• Agent Version — reports the running Pendo agent version
+• API Key — validates the Pendo API key is present
+• Data Host — checks CNAME configuration vs default CDN
+• Network Requests — validates active network traffic to Pendo servers
+• Feature Flags — detects non-default agent configuration flags
+
+SETUP ASSISTANT TAB — "Is Pendo installed correctly?"
+• Framework detection (React, Angular, Vue, Ember, Svelte, Next.js, Nuxt, jQuery)
+• Snippet installation analysis (install method, placement, async loading)
+• Initialization method and timing analysis
+• CSP header and meta tag compatibility check (directive-by-directive)
+• Visitor and account metadata validation (PII detection, data types, field naming)
+• Actionable recommendations prioritized by severity
+
+TOOLS TAB — "Run Pendo diagnostics directly"
+• Validate Install — runs pendo.validateInstall()
+• Validate Environment — runs pendo.validateEnvironment()
+• Enable Debugger — turns on pendo.enableDebugging()
+• Disable Debugger — turns off pendo.disableDebugging()
+
+PENDO SERVICE STATUS
+• Live status monitoring from status.pendo.io
+• Per-component health indicators (App, Data Pipeline, Guides, Integrations)
+• Active incident banners with latest updates
+• Service status included in copied diagnostic reports
+
+FEATURES
+• One-click copy of diagnostic reports with smart remediation suggestions
+• Each warn/fail check includes an actionable fix recommendation
+• Feedback system with automatic PII scrubbing
+• Version displayed in-app (syncs from manifest)
+• Works on any page with Pendo installed
+• No data leaves your browser — all checks run locally
+
+Built for Pendo admins, implementation engineers, and customer success teams who need fast answers about agent health.
+
+--- CATEGORY ---
+Developer Tools
+
+--- LANGUAGE ---
+English
+
+--- SINGLE PURPOSE DESCRIPTION ---
+Diagnose and report on the health, configuration, and service status of the Pendo analytics agent on any webpage, with interactive console tools.
