@@ -1375,18 +1375,32 @@ function runPendoSetupAssistant() {
 
     // --- D. Parse meta-tag CSP directives ---
     // Pendo-documented required domains (support.pendo.io/hc/en-us/articles/360032209131)
+    // Includes US default + regional variants (US1, EU, JP, AU)
     var pendoHosts = [
-      "cdn.pendo.io", "app.pendo.io", "adopt.pendo.io", "data.pendo.io",
-      "*.pendo.io", "pendo.io",
+      // Core US domains
+      "cdn.pendo.io", "app.pendo.io", "data.pendo.io", "portal.pendo.io",
+      // Regional variants
+      "us1.app.pendo.io", "us1.cdn.pendo.io", "us1.data.pendo.io",
+      "app.eu.pendo.io", "cdn.eu.pendo.io", "data.eu.pendo.io",
+      "app.jpn.pendo.io", "cdn.jpn.pendo.io", "data.jpn.pendo.io",
+      "app.au.pendo.io", "cdn.au.pendo.io", "data.au.pendo.io",
+      // GCS buckets
       "pendo-io-static.storage.googleapis.com",
-      "pendo-static-5763789454311424.storage.googleapis.com",
-      "pendo-io-bucket.storage.googleapis.com",
-      "*.storage.googleapis.com"
+      // Wildcards for subscription-specific buckets
+      "*.storage.googleapis.com",
+      // Wildcard for pendo.io subdomains
+      "*.pendo.io", "pendo.io"
     ];
 
     function hostAllowed(sources) {
       return sources.some(function(v) {
-        return v === "*" || pendoHosts.some(function(h) { return v.indexOf(h) !== -1; });
+        if (v === "*") return true;
+        // Check static host list
+        if (pendoHosts.some(function(h) { return v.indexOf(h) !== -1; })) return true;
+        // Check new content-SUB_ID.static.pendo.io pattern (Oct 2025+)
+        if (v.indexOf(".static.pendo.io") !== -1) return true;
+        if (v.indexOf("static.pendo.io") !== -1) return true;
+        return false;
       });
     }
 
@@ -1410,94 +1424,121 @@ function runPendoSetupAssistant() {
         }
       });
 
-      // -- Directive-level checks (per Pendo docs: support.pendo.io/hc/en-us/articles/360032209131) --
+      // =================================================================
+      // Directive-level checks — exact domains per Pendo official docs
+      // Ref: support.pendo.io/hc/en-us/articles/360032209131
+      //
+      // Note: SUB_ID = customer's Pendo subscription ID.
+      // Domains ending in pendo-static-{{ SUB_ID }}.storage.googleapis.com
+      // or content-{{ SUB_ID }}.static.pendo.io are subscription-specific.
+      // We can't know the SUB_ID, so fix text uses the template format.
+      // =================================================================
 
-      // script-src — Pendo needs: cdn.pendo.io, app.pendo.io, pendo-io-static.storage.googleapis.com, 'unsafe-inline', 'unsafe-eval'
+      // script-src
+      // Required: cdn.pendo.io, pendo-io-static.storage.googleapis.com,
+      //   pendo-static-{{SUB_ID}}.storage.googleapis.com OR content-{{SUB_ID}}.static.pendo.io,
+      //   app.pendo.io (designer only), 'unsafe-inline' + 'unsafe-eval' (code blocks/designer only)
       var scriptSrc = getDirective("script-src");
       if (scriptSrc.length > 0) {
         if (!hostAllowed(scriptSrc)) {
           csp.issues.push({ directive: "script-src", severity: "error",
-            detail: "Pendo CDN not allowed in script-src — agent scripts can't load.",
-            fix: "Add to your CSP script-src directive:\n  cdn.pendo.io app.pendo.io pendo-io-static.storage.googleapis.com" });
+            detail: "Pendo domains not allowed in script-src — the Pendo agent and guide code can't load.",
+            fix: "Add to your CSP script-src directive:\n  cdn.pendo.io pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io\n  (Replace SUB_ID with your Pendo subscription ID from app.pendo.io/s/[SUB_ID]/)" });
         }
         if (!valueAllowed(scriptSrc, "'unsafe-inline'")) {
           var hasNonce = scriptSrc.some(function(v) { return v.indexOf("nonce-") !== -1; });
           var hasHash = scriptSrc.some(function(v) { return v.indexOf("sha256-") !== -1 || v.indexOf("sha384-") !== -1; });
           if (!hasNonce && !hasHash) {
             csp.issues.push({ directive: "script-src (inline)", severity: "warning",
-              detail: "'unsafe-inline' missing and no nonce/hash — Pendo's inline initialization snippet will be blocked.",
-              fix: "Add 'unsafe-inline' to script-src, or add a nonce to the Pendo snippet:\n  script-src ... 'nonce-YOUR_NONCE'" });
+              detail: "'unsafe-inline' not in script-src and no nonce/hash found — Pendo's inline snippet and guide code blocks won't run.",
+              fix: "Add 'unsafe-inline' to script-src (required for code blocks and classic guides).\n  Or use a nonce: script-src ... 'nonce-YOUR_NONCE'" });
           }
         }
         if (!valueAllowed(scriptSrc, "'unsafe-eval'") && !valueAllowed(scriptSrc, "*")) {
           csp.issues.push({ directive: "script-src (eval)", severity: "warning",
-            detail: "'unsafe-eval' missing — some Pendo guide features (e.g., guide code blocks) may not execute.",
-            fix: "Add 'unsafe-eval' to script-src (required for guide JavaScript):\n  script-src ... 'unsafe-eval'" });
+            detail: "'unsafe-eval' not in script-src — guide code blocks and Resource Center integrations may not execute.",
+            fix: "Add 'unsafe-eval' to script-src (required for code blocks and Resource Center):\n  script-src ... 'unsafe-eval'" });
         }
       }
 
-      // connect-src — Pendo needs: app.pendo.io, data.pendo.io, pendo-io-static.storage.googleapis.com
+      // connect-src
+      // Required: data.pendo.io, pendo-static-{{SUB_ID}}.storage.googleapis.com OR
+      //   content-{{SUB_ID}}.static.pendo.io, app.pendo.io (designer only)
       var connectSrc = getDirective("connect-src");
       if (connectSrc.length > 0 && !hostAllowed(connectSrc)) {
         csp.issues.push({ directive: "connect-src", severity: "error",
-          detail: "Pendo data endpoints not allowed in connect-src — analytics events and guide data won't transmit.",
-          fix: "Add to your CSP connect-src directive:\n  app.pendo.io data.pendo.io pendo-io-static.storage.googleapis.com" });
+          detail: "Pendo data endpoints not in connect-src — analytics events, guide data, and Session Replay won't transmit.",
+          fix: "Add to your CSP connect-src directive:\n  data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io" });
       }
 
-      // style-src — Pendo needs: app.pendo.io, cdn.pendo.io, 'unsafe-inline'
+      // style-src
+      // Required: pendo-io-static.storage.googleapis.com (default guide CSS),
+      //   pendo-static-{{SUB_ID}}.storage.googleapis.com OR content-{{SUB_ID}}.static.pendo.io,
+      //   'unsafe-inline', app.pendo.io (designer only)
       var styleSrc = getDirective("style-src");
       if (styleSrc.length > 0) {
+        if (!hostAllowed(styleSrc) && !valueAllowed(styleSrc, "*")) {
+          csp.issues.push({ directive: "style-src (hosts)", severity: "warning",
+            detail: "Pendo style hosts not in style-src — guide CSS and global styles won't load.",
+            fix: "Add to your CSP style-src directive:\n  pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io" });
+        }
         if (!valueAllowed(styleSrc, "'unsafe-inline'") && !valueAllowed(styleSrc, "*")) {
           var hasStyleNonce = styleSrc.some(function(v) { return v.indexOf("nonce-") !== -1; });
-          csp.issues.push({ directive: "style-src", severity: "warning",
-            detail: "'unsafe-inline' missing in style-src — Pendo guides inject inline styles and won't render correctly.",
+          csp.issues.push({ directive: "style-src (inline)", severity: "warning",
+            detail: "'unsafe-inline' not in style-src — Pendo guide pseudo styles (hover, carets, number scale) won't render.",
             fix: hasStyleNonce
               ? "Pass your nonce to Pendo via the inlineStyleNonce option:\n  pendo.initialize({ inlineStyleNonce: 'YOUR_NONCE' })"
-              : "Add to your CSP style-src directive:\n  app.pendo.io cdn.pendo.io 'unsafe-inline'" });
+              : "Add 'unsafe-inline' to your CSP style-src directive." });
         }
       }
 
-      // img-src — Pendo needs: cdn.pendo.io, app.pendo.io, pendo-io-static.storage.googleapis.com, data:
+      // img-src
+      // Required: cdn.pendo.io (classic badge images), data.pendo.io (events sent via img src!),
+      //   pendo-static-{{SUB_ID}}.storage.googleapis.com OR content-{{SUB_ID}}.static.pendo.io,
+      //   app.pendo.io (designer only), data: (default badge images)
       var imgSrc = getDirective("img-src");
       if (imgSrc.length > 0 && !hostAllowed(imgSrc) && !valueAllowed(imgSrc, "*")) {
         var hasDataUri = valueAllowed(imgSrc, "data:");
-        var imgFix = "Add to your CSP img-src directive:\n  cdn.pendo.io app.pendo.io pendo-io-static.storage.googleapis.com";
+        var imgFix = "Add to your CSP img-src directive:\n  cdn.pendo.io data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io";
         if (!hasDataUri) imgFix += " data:";
         csp.issues.push({ directive: "img-src", severity: "warning",
-          detail: "Pendo CDN not in img-src — guide images and resource center assets won't load." + (!hasDataUri ? " Also missing data: for inline images." : ""),
+          detail: "Pendo not in img-src — guide images won't load and analytics events won't send (Pendo uses img src for event transmission)." + (!hasDataUri ? " Also missing data: for default badge images." : ""),
           fix: imgFix });
       }
 
-      // font-src — Pendo needs: cdn.pendo.io, app.pendo.io
+      // font-src
+      // Required: cdn.pendo.io (designer fonts, debugger, guide preview)
       var fontSrc = getDirective("font-src");
       if (fontSrc.length > 0 && !hostAllowed(fontSrc) && !valueAllowed(fontSrc, "*")) {
         csp.issues.push({ directive: "font-src", severity: "warning",
-          detail: "Pendo not in font-src — guide custom fonts won't load.",
-          fix: "Add to your CSP font-src directive:\n  cdn.pendo.io app.pendo.io" });
+          detail: "Pendo not in font-src — Visual Design Studio fonts, debugger, and guide preview fonts won't load.",
+          fix: "Add to your CSP font-src directive:\n  cdn.pendo.io" });
       }
 
-      // frame-src / child-src — Pendo needs: app.pendo.io (resource center + designer)
+      // frame-src / child-src
+      // Required: app.pendo.io (Visual Design Studio), portal.pendo.io (Listen ideas portal)
       var frameSrc = csp.directives["frame-src"] || csp.directives["child-src"] || csp.directives["default-src"] || [];
       if (frameSrc.length > 0 && !hostAllowed(frameSrc)) {
         csp.issues.push({ directive: "frame-src", severity: "warning",
-          detail: "Pendo not in frame-src — the resource center and visual designer use iframes and will be blocked.",
-          fix: "Add to your CSP frame-src (or child-src) directive:\n  app.pendo.io" });
+          detail: "Pendo not in frame-src — the Visual Design Studio and Listen ideas portal use iframes and will be blocked.",
+          fix: "Add to your CSP frame-src directive:\n  app.pendo.io portal.pendo.io" });
       }
 
-      // worker-src — Pendo may use web workers
+      // worker-src
+      // Required: blob: (Session Replay web worker for data compression)
       var workerSrc = getDirective("worker-src");
-      if (workerSrc.length > 0 && !valueAllowed(workerSrc, "'self'") && !valueAllowed(workerSrc, "*") && !valueAllowed(workerSrc, "blob:")) {
-        csp.issues.push({ directive: "worker-src", severity: "tip",
-          detail: "worker-src doesn't allow blob: or 'self' — Pendo web workers for performance optimization may be blocked.",
-          fix: "Add to your CSP worker-src directive:\n  blob: 'self'" });
+      if (workerSrc.length > 0 && !valueAllowed(workerSrc, "*") && !valueAllowed(workerSrc, "blob:")) {
+        csp.issues.push({ directive: "worker-src", severity: "warning",
+          detail: "blob: not in worker-src — Session Replay's web worker for data compression can't start, impacting replay capture and page performance.",
+          fix: "Add to your CSP worker-src directive:\n  blob:" });
       }
 
-      // trusted-types — if present, Pendo needs its policy name
+      // trusted-types (Chromium only, requires SDK ≥ 2.184.0)
       var trustedTypes = csp.directives["trusted-types"] || csp.directives["require-trusted-types-for"] || [];
       if (trustedTypes.length > 0 && !valueAllowed(trustedTypes, "pendo")) {
         csp.issues.push({ directive: "trusted-types", severity: "warning",
           detail: "Trusted Types policy active but 'pendo' not listed — Pendo DOM operations will be blocked.",
-          fix: "Add the Pendo policy name to your trusted-types directive:\n  trusted-types pendo" });
+          fix: "Add to your CSP trusted-types directive:\n  trusted-types pendo" });
       }
 
       // --- PROACTIVE: check for directives that SHOULD exist but DON'T ---
@@ -1522,6 +1563,8 @@ function runPendoSetupAssistant() {
     }
 
     // --- E. Runtime blocked-resource detection (runs ALWAYS — catches blocks even when CSP parsed OK) ---
+    // This catches cases where CSP was readable but resources are still blocked
+    // (e.g., multiple CSP headers, browser extensions, report-only policies)
     if (cspViolations.length > 0) {
       if (!csp.detected) {
         csp.detected = true;
@@ -1533,23 +1576,18 @@ function runPendoSetupAssistant() {
       var hasCdn = blockedDomains.some(function(d) { return d.indexOf("cdn.pendo.io") !== -1; });
       var hasData = blockedDomains.some(function(d) { return d.indexOf("data.pendo.io") !== -1; });
       var hasStorage = blockedDomains.some(function(d) { return d.indexOf("storage.googleapis.com") !== -1; });
-      var hasApp = blockedDomains.some(function(d) { return d.indexOf("app.pendo.io") !== -1; });
       var fixLines = [];
-      if (hasCdn || hasStorage) {
-        fixLines.push("script-src: add cdn.pendo.io app.pendo.io pendo-io-static.storage.googleapis.com 'unsafe-inline' 'unsafe-eval'");
-      }
-      if (hasData) {
-        fixLines.push("connect-src: add app.pendo.io data.pendo.io pendo-io-static.storage.googleapis.com");
-      }
-      if (hasCdn || hasStorage || hasData) {
-        fixLines.push("img-src: add cdn.pendo.io app.pendo.io pendo-io-static.storage.googleapis.com data:");
-      }
-      fixLines.push("style-src: add app.pendo.io cdn.pendo.io 'unsafe-inline'");
-      fixLines.push("font-src: add cdn.pendo.io app.pendo.io");
-      fixLines.push("frame-src / child-src: add app.pendo.io");
+      // Always output the complete set of required directives so devs can fix in one pass
+      fixLines.push("script-src: cdn.pendo.io pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io 'unsafe-inline' 'unsafe-eval'");
+      fixLines.push("connect-src: data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io");
+      fixLines.push("style-src: pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io 'unsafe-inline'");
+      fixLines.push("img-src: cdn.pendo.io data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io data:");
+      fixLines.push("font-src: cdn.pendo.io");
+      fixLines.push("frame-src: app.pendo.io portal.pendo.io");
+      fixLines.push("worker-src: blob:");
       var domainSummary = blockedDomains.map(function(d) { return d + " (" + blockedByDomain[d] + ")"; }).join(", ");
       var detail = blockedPendo.length + " Pendo resource" + (blockedPendo.length !== 1 ? "s" : "") + " blocked: " + domainSummary + ".";
-      var fixText = "Add these domains to your Content-Security-Policy header:\n  " + fixLines.join("\n  ");
+      var fixText = "Add these to your Content-Security-Policy header (replace SUB_ID with your Pendo subscription ID from app.pendo.io/s/[SUB_ID]/):\n  " + fixLines.join("\n  ");
       csp.issues.push({ directive: "Blocked resources", severity: "error", detail: detail, fix: fixText });
     } else if (!csp.detected && pendoAgentLoaded && !dataFlowing && pendoFunctional) {
       // Agent loaded but data isn't flowing — possible silent connect-src block
@@ -1557,7 +1595,7 @@ function runPendoSetupAssistant() {
       csp.source = "Possible HTTP header restriction";
       csp.issues.push({ directive: "connect-src (silent block)", severity: "warning",
         detail: "Pendo agent loaded but no data requests detected — a CSP connect-src restriction may be silently blocking analytics.",
-        fix: "Add to your CSP connect-src directive:\n  app.pendo.io data.pendo.io pendo-io-static.storage.googleapis.com" });
+        fix: "Add to your CSP connect-src directive:\n  data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io" });
     }
 
     if (!csp.detected) {
