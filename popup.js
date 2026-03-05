@@ -631,7 +631,7 @@ document.getElementById("tool-validate-install")?.addEventListener("click", () =
       if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
       if (typeof pendo.validateInstall === "function") {
         pendo.validateInstall();
-        return { message: "✅ validateInstall() executed — check browser console (F12)" };
+        return { message: "✅ validateInstall() launched — a Pendo overlay should appear on the page" };
       }
       return { error: "pendo.validateInstall() not available on this agent version" };
     } catch (e) {
@@ -645,8 +645,28 @@ document.getElementById("tool-validate-env")?.addEventListener("click", () => {
     try {
       if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
       if (typeof pendo.validateEnvironment === "function") {
-        pendo.validateEnvironment();
-        return { message: "✅ validateEnvironment() executed — check browser console (F12)" };
+        var result = pendo.validateEnvironment();
+        // Try to capture and return meaningful output
+        if (result && typeof result === "object") {
+          var summary = [];
+          var keys = Object.keys(result);
+          for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            var v = result[k];
+            if (typeof v === "boolean") {
+              summary.push(k + ": " + (v ? "✅" : "❌"));
+            } else if (typeof v === "string" || typeof v === "number") {
+              summary.push(k + ": " + v);
+            }
+          }
+          if (summary.length > 0) {
+            return { message: "✅ " + summary.join(" · ") };
+          }
+        }
+        // Fallback — result wasn't a parseable object (output went to console)
+        var isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+        var shortcut = isMac ? "Cmd+Option+J" : "F12";
+        return { message: "✅ validateEnvironment() executed — open DevTools (" + shortcut + ") → Console to see results" };
       }
       return { error: "pendo.validateEnvironment() not available on this agent version" };
     } catch (e) {
