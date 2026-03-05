@@ -235,27 +235,83 @@ function renderChecks(checks) {
 
   let pass = 0, warn = 0, fail = 0;
 
-  checks.forEach((c) => {
-    if (c.status === "pass") pass++;
-    else if (c.status === "warn") warn++;
-    else fail++;
+  // Sort: problems first (fail → warn → info → pass)
+  const ORDER = { fail: 0, warn: 1, info: 2, pass: 3 };
+  const sorted = [...checks].sort((a, b) => (ORDER[a.status] ?? 2) - (ORDER[b.status] ?? 2));
 
-    const row = document.createElement("div");
-    row.className = "check-row";
-    row.innerHTML = `
-      <span class="check-status">${STATUS_ICONS[c.status]}</span>
-      <div class="check-info">
-        <div class="check-label">${escapeHtml(c.label)}</div>
-        <div class="check-detail">${escapeHtml(c.detail)}</div>
-      </div>
-    `;
-    list.appendChild(row);
+  // Separate into problem checks vs passing checks
+  const problemChecks = [];
+  const passingChecks = [];
+
+  sorted.forEach((c) => {
+    if (c.status === "pass") { pass++; passingChecks.push(c); }
+    else if (c.status === "warn") { warn++; problemChecks.push(c); }
+    else if (c.status === "fail") { fail++; problemChecks.push(c); }
+    else problemChecks.push(c); // info counts as noteworthy
   });
 
-  document.getElementById("summary-counts").innerHTML =
-    `<span class="pass">${pass} passed</span> · ` +
-    `<span class="warn">${warn} warning${warn !== 1 ? "s" : ""}</span> · ` +
-    `<span class="fail">${fail} failed</span>`;
+  // Render problem checks at full opacity
+  if (problemChecks.length > 0) {
+    problemChecks.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "check-row";
+      row.innerHTML = `
+        <span class="check-status">${STATUS_ICONS[c.status]}</span>
+        <div class="check-info">
+          <div class="check-label">${escapeHtml(c.label)}</div>
+          <div class="check-detail">${escapeHtml(c.detail)}</div>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+  } else {
+    const allGood = document.createElement("div");
+    allGood.style.cssText = "text-align:center;padding:12px 8px;color:var(--success);font-weight:600;font-size:13px";
+    allGood.textContent = "✅ All checks passed";
+    list.appendChild(allGood);
+  }
+
+  // "What's Good" drawer for passing checks — collapsed by default
+  if (passingChecks.length > 0) {
+    const drawer = document.createElement("div");
+    drawer.className = "setup-section";
+    drawer.id = "health-whats-good";
+    drawer.style.cssText = "border-top:1px solid var(--border);margin-top:4px";
+
+    let drawerRows = "";
+    passingChecks.forEach((c) => {
+      drawerRows += `
+        <div class="check-row" style="opacity:0.7">
+          <span class="check-status">${STATUS_ICONS[c.status]}</span>
+          <div class="check-info">
+            <div class="check-label">${escapeHtml(c.label)}</div>
+            <div class="check-detail">${escapeHtml(c.detail)}</div>
+          </div>
+        </div>`;
+    });
+
+    drawer.innerHTML = `
+      <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')" style="color:var(--muted-foreground)">
+        <span class="setup-chevron">▶</span>
+        <span class="setup-section-title">What's Good (${passingChecks.length})</span>
+        <span class="setup-section-badge"><span class="badge badge-green">${passingChecks.length} passed</span></span>
+      </div>
+      <div class="setup-section-body" style="padding-left:0">${drawerRows}</div>
+    `;
+    list.appendChild(drawer);
+  }
+
+  // Summary: lead with problems if any exist
+  const issues = fail + warn;
+  if (issues > 0) {
+    document.getElementById("summary-counts").innerHTML =
+      (fail > 0 ? `<span class="fail">${fail} failed</span> · ` : "") +
+      (warn > 0 ? `<span class="warn">${warn} warning${warn !== 1 ? "s" : ""}</span> · ` : "") +
+      `<span class="pass">${pass} passed</span>`;
+  } else {
+    document.getElementById("summary-counts").innerHTML =
+      `<span class="pass">All ${pass} checks passed</span>`;
+  }
 
   document.getElementById("health-summary").style.display = "flex";
   showView("__none__");
@@ -456,10 +512,13 @@ function renderSetup(data) {
   const container = document.getElementById("setup-content");
   container.innerHTML = "";
 
-  // Helper: create a collapsible section
-  function addSection(title, badgeHtml, bodyHtml, startOpen) {
-    container.innerHTML += `
-      <div class="setup-section${startOpen ? " open" : ""}">
+  // Collect sections into problem vs healthy buckets
+  const problemSections = [];
+  const healthySections = [];
+
+  function makeSection(title, badgeHtml, bodyHtml, hasIssue) {
+    const html = `
+      <div class="setup-section open">
         <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')">
           <span class="setup-chevron">▶</span>
           <span class="setup-section-title">${title}</span>
@@ -467,21 +526,24 @@ function renderSetup(data) {
         </div>
         <div class="setup-section-body">${bodyHtml}</div>
       </div>`;
+    if (hasIssue) problemSections.push(html);
+    else healthySections.push({ title, badge: badgeHtml, body: bodyHtml });
   }
 
   // 1. Framework Detection
+  let fwHasIssue = false;
   let fwBadge, fwBody;
   if (data.framework && data.framework.name !== "Unknown") {
-    const ver = data.framework.version ? ` ${escapeHtml(data.framework.version)}` : "";
-    fwBadge = `<span class="badge badge-blue">${escapeHtml(data.framework.name)}${ver}</span>`;
+    fwBadge = `<span class="badge badge-blue">${escapeHtml(data.framework.name)}${data.framework.version ? ` ${escapeHtml(data.framework.version)}` : ""}</span>`;
     fwBody = `<div class="detail-row"><span class="detail-key">Framework</span><span class="detail-val">${escapeHtml(data.framework.name)}${data.framework.version ? ` <span class="badge badge-blue">${escapeHtml(data.framework.version)}</span>` : ""}</span></div>`;
     if (data.framework.renderer) fwBody += `<div class="detail-row"><span class="detail-key">Renderer</span><span class="detail-val">${escapeHtml(data.framework.renderer)}</span></div>`;
     if (data.framework.mode) fwBody += `<div class="detail-row"><span class="detail-key">Mode</span><span class="detail-val">${escapeHtml(data.framework.mode)}</span></div>`;
   } else {
+    fwHasIssue = true;
     fwBadge = `<span class="badge badge-yellow">Unknown</span>`;
     fwBody = `<div class="detail-row"><span class="detail-key">Framework</span><span class="detail-val">Could not detect — may be vanilla JS or server-rendered</span></div>`;
   }
-  addSection("Framework", fwBadge, fwBody, false);
+  makeSection("Framework", fwBadge, fwBody, fwHasIssue);
 
   // 2. Snippet Analysis
   if (data.snippet) {
@@ -494,7 +556,7 @@ function renderSetup(data) {
       <div class="detail-row"><span class="detail-key">Async</span><span class="detail-val">${asyncOk ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-yellow">No</span>'}</span></div>`;
     if (data.snippet.placement) snipBody += `<div class="detail-row"><span class="detail-key">Placement</span><span class="detail-val">${escapeHtml(data.snippet.placement)}</span></div>`;
     if (data.snippet.scriptCount !== undefined) snipBody += `<div class="detail-row"><span class="detail-key">Script tags</span><span class="detail-val">${data.snippet.scriptCount}</span></div>`;
-    addSection("Snippet", snipBadge, snipBody, false);
+    makeSection("Snippet", snipBadge, snipBody, !asyncOk);
   }
 
   // 3. Initialization
@@ -502,12 +564,13 @@ function renderSetup(data) {
     const initBadge = `<span class="badge badge-green">${escapeHtml(data.initialization.method)}</span>`;
     let initBody = `<div class="detail-row"><span class="detail-key">Method</span><span class="detail-val">${escapeHtml(data.initialization.method)}</span></div>`;
     if (data.initialization.timing) initBody += `<div class="detail-row"><span class="detail-key">Timing</span><span class="detail-val">${escapeHtml(data.initialization.timing)}</span></div>`;
-    addSection("Initialization", initBadge, initBody, false);
+    makeSection("Initialization", initBadge, initBody, false);
   }
 
   // 4. CSP Analysis
   if (data.csp) {
     let cspBadge, cspBody;
+    const cspHasIssues = data.csp.detected && data.csp.issues && data.csp.issues.length > 0;
     if (data.csp.detected) {
       const hasErrors = data.csp.issues && data.csp.issues.some(i => i.severity === "error");
       const hasWarnings = data.csp.issues && data.csp.issues.some(i => i.severity === "warning");
@@ -518,7 +581,7 @@ function renderSetup(data) {
       cspBody = `<div class="detail-row"><span class="detail-key">CSP detected</span><span class="detail-val"><span class="badge badge-yellow">Yes</span> (${escapeHtml(data.csp.source || "meta tag")})</span></div>`;
       const dirNames = Object.keys(data.csp.directives || {});
       if (dirNames.length > 0) cspBody += `<div class="detail-row"><span class="detail-key">Directives</span><span class="detail-val">${escapeHtml(dirNames.join(", "))}</span></div>`;
-      if (data.csp.issues && data.csp.issues.length > 0) {
+      if (cspHasIssues) {
         data.csp.issues.forEach((issue) => {
           const icon = issue.severity === "error" ? "❌" : issue.severity === "warning" ? "⚠️" : "💡";
           cspBody += `<div class="detail-row"><span class="detail-key">${icon} ${escapeHtml(issue.directive)}</span><span class="detail-val">${escapeHtml(issue.detail)}</span></div>`;
@@ -526,13 +589,11 @@ function renderSetup(data) {
       } else {
         cspBody += `<div class="detail-row"><span class="detail-key">Status</span><span class="detail-val"><span class="badge badge-green">Pendo-compatible</span> All required domains appear allowed</span></div>`;
       }
-      // Auto-open CSP section if there are issues
-      addSection("Content Security Policy", cspBadge, cspBody, hasErrors || hasWarnings);
     } else {
       cspBadge = `<span class="badge badge-green">No CSP</span>`;
       cspBody = `<div class="detail-row"><span class="detail-key">CSP detected</span><span class="detail-val"><span class="badge badge-green">No</span> ${escapeHtml(data.csp.source || "No restrictive CSP found")}</span></div>`;
-      addSection("Content Security Policy", cspBadge, cspBody, false);
     }
+    makeSection("Content Security Policy", cspBadge, cspBody, cspHasIssues);
   }
 
   // 5. Visitor Metadata
@@ -549,7 +610,7 @@ function renderSetup(data) {
       vBody += `<tr><td>${escapeHtml(f.key)}</td><td>${escapeHtml(f.type)}</td><td class="${cls}">${status}</td></tr>`;
     });
     vBody += `</table>`;
-    addSection(`Visitor Metadata`, vBadge, vBody, false);
+    makeSection(`Visitor Metadata`, vBadge, vBody, vWarns > 0);
   }
 
   // 6. Account Metadata
@@ -566,10 +627,10 @@ function renderSetup(data) {
       aBody += `<tr><td>${escapeHtml(f.key)}</td><td>${escapeHtml(f.type)}</td><td class="${cls}">${status}</td></tr>`;
     });
     aBody += `</table>`;
-    addSection(`Account Metadata`, aBadge, aBody, false);
+    makeSection(`Account Metadata`, aBadge, aBody, aWarns > 0);
   }
 
-  // 7. Recommendations — always open if issues exist
+  // 7. Recommendations
   let errors = 0, warnings = 0, tips = 0;
   if (data.recommendations && data.recommendations.length > 0) {
     data.recommendations.forEach((r) => {
@@ -595,15 +656,50 @@ function renderSetup(data) {
           </div>
         </div>`;
     });
-    addSection(`Recommendations (${data.recommendations.length})`, recBadge, recBody, errors > 0 || warnings > 0);
+    makeSection(`Recommendations (${data.recommendations.length})`, recBadge, recBody, errors > 0 || warnings > 0);
+  }
 
+  // === Render: problems first, then "What's Good" drawer ===
+  if (problemSections.length > 0) {
+    container.innerHTML += problemSections.join("");
+  } else {
+    container.innerHTML += `<div style="text-align:center;padding:16px 8px;color:var(--success);font-weight:600;font-size:13px">✅ No issues detected</div>`;
+  }
+
+  // "What's Good" drawer — collapsed by default
+  if (healthySections.length > 0) {
+    let drawerBody = "";
+    healthySections.forEach((s) => {
+      drawerBody += `
+        <div class="setup-section">
+          <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')">
+            <span class="setup-chevron">▶</span>
+            <span class="setup-section-title">${s.title}</span>
+            <span class="setup-section-badge">${s.badge}</span>
+          </div>
+          <div class="setup-section-body">${s.body}</div>
+        </div>`;
+    });
+    container.innerHTML += `
+      <div class="setup-section" id="whats-good-drawer" style="border-top:1px solid var(--border);margin-top:4px">
+        <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')" style="color:var(--muted-foreground)">
+          <span class="setup-chevron">▶</span>
+          <span class="setup-section-title">What's Good (${healthySections.length})</span>
+          <span class="setup-section-badge"><span class="badge badge-green">${healthySections.length} passed</span></span>
+        </div>
+        <div class="setup-section-body" style="padding-left:4px">${drawerBody}</div>
+      </div>`;
+  }
+
+  // Summary
+  if (errors + warnings > 0) {
     document.getElementById("setup-summary-counts").innerHTML =
-      `<span class="fail">${errors} error${errors !== 1 ? "s" : ""}</span> · ` +
-      `<span class="warn">${warnings} warning${warnings !== 1 ? "s" : ""}</span> · ` +
+      (errors > 0 ? `<span class="fail">${errors} error${errors !== 1 ? "s" : ""}</span> · ` : "") +
+      (warnings > 0 ? `<span class="warn">${warnings} warning${warnings !== 1 ? "s" : ""}</span> · ` : "") +
       `<span style="color:#2563eb">${tips} tip${tips !== 1 ? "s" : ""}</span>`;
   } else {
     document.getElementById("setup-summary-counts").innerHTML =
-      `<span class="pass">No issues found</span>`;
+      `<span class="pass">All areas healthy</span>`;
   }
 
   document.getElementById("setup-loading").style.display = "none";
