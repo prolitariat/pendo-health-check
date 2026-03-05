@@ -88,7 +88,14 @@
     #feedback-bar {
       padding: 8px 16px;
       border-top: 1px solid #e0e0e0;
-      text-align: right;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #version-label {
+      font-size: 11px;
+      color: #999;
+      user-select: text;
     }
 
     #feedback-btn {
@@ -641,6 +648,7 @@
 
   <!-- Feedback Bar -->
   <div id="feedback-bar">
+    <span id="version-label"></span>
     <button id="feedback-btn">Feedback</button>
   </div>
 

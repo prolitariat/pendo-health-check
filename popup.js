@@ -1,5 +1,14 @@
 const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" };
 
+// Version display
+try {
+  const v = chrome.runtime.getManifest().version;
+  document.addEventListener("DOMContentLoaded", () => {
+    const el = document.getElementById("version-label");
+    if (el) el.textContent = "v" + v;
+  });
+} catch (_) {}
+
 // ---------------------------------------------------------------------------
 // View helpers
 // ---------------------------------------------------------------------------
