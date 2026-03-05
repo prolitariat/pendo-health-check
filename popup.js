@@ -596,6 +596,102 @@ function runSetup() {
     });
 }
 
+// ---------------------------------------------------------------------------
+// Tools — Pendo console commands
+// ---------------------------------------------------------------------------
+
+function setToolStatus(msg, cls) {
+  const el = document.getElementById("tool-status");
+  if (!el) return;
+  el.textContent = msg;
+  el.className = cls || "";
+}
+
+function runPendoCommand(funcToInject, successMsg) {
+  if (!currentTabId) {
+    setToolStatus("No active tab", "error");
+    return;
+  }
+  setToolStatus("Running…", "");
+  chrome.scripting
+    .executeScript({
+      target: { tabId: currentTabId },
+      func: funcToInject,
+      world: "MAIN",
+    })
+    .then((results) => {
+      const r = results?.[0]?.result;
+      if (r && r.error) {
+        setToolStatus(r.error, "error");
+      } else {
+        setToolStatus(r?.message || successMsg, "success");
+      }
+    })
+    .catch((err) => {
+      setToolStatus("Error: " + (err.message || "Unknown"), "error");
+    });
+}
+
+document.getElementById("tool-validate-install")?.addEventListener("click", () => {
+  runPendoCommand(function () {
+    try {
+      if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
+      if (typeof pendo.validateInstall === "function") {
+        pendo.validateInstall();
+        return { message: "✅ validateInstall() executed — check browser console (F12)" };
+      }
+      return { error: "pendo.validateInstall() not available on this agent version" };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }, "validateInstall() executed");
+});
+
+document.getElementById("tool-validate-env")?.addEventListener("click", () => {
+  runPendoCommand(function () {
+    try {
+      if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
+      if (typeof pendo.validateEnvironment === "function") {
+        pendo.validateEnvironment();
+        return { message: "✅ validateEnvironment() executed — check browser console (F12)" };
+      }
+      return { error: "pendo.validateEnvironment() not available on this agent version" };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }, "validateEnvironment() executed");
+});
+
+document.getElementById("tool-enable-debug")?.addEventListener("click", () => {
+  runPendoCommand(function () {
+    try {
+      if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
+      if (typeof pendo.enableDebugging === "function") {
+        pendo.enableDebugging();
+        return { message: "✅ Debugger enabled — overlay should appear on page" };
+      }
+      return { error: "pendo.enableDebugging() not available on this agent version" };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }, "Debugger enabled");
+});
+
+document.getElementById("tool-disable-debug")?.addEventListener("click", () => {
+  runPendoCommand(function () {
+    try {
+      if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
+      if (typeof pendo.disableDebugging === "function") {
+        pendo.disableDebugging();
+        return { message: "✅ Debugger disabled" };
+      }
+      return { error: "pendo.disableDebugging() not available on this agent version" };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }, "Debugger disabled");
+});
+
 // ===========================================================================
 // INJECTED FUNCTION: Health Check (runs in page MAIN world)
 // ===========================================================================
