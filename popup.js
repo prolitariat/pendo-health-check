@@ -1859,33 +1859,41 @@ function runPendoSetupAssistant() {
       return;
     }
 
-    feedbackSubmit.disabled = true;
-    feedbackSubmit.textContent = "Sending…";
+    // PII scrubbing before it leaves the extension
+    function scrubPII(str) {
+      if (!str) return str;
+      str = str.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, "[REDACTED_EMAIL]");
+      str = str.replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[REDACTED_SSN]");
+      str = str.replace(/\b(?:\d[ \-]?){13,19}\b/g, "[REDACTED_CC]");
+      str = str.replace(/(?:\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}\b/g, "[REDACTED_PHONE]");
+      str = str.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[REDACTED_IP]");
+      return str;
+    }
 
-    chrome.runtime.sendMessage(
-      {
-        type: "save-feedback",
-        feedback: text,
-        url: document.getElementById("page-url").textContent || "",
-      },
-      (response) => {
-        feedbackSubmit.disabled = false;
-        feedbackSubmit.textContent = "Submit";
+    const pageUrl = document.getElementById("page-url").textContent || "(no URL)";
+    const version = chrome.runtime.getManifest().version;
+    const scrubbedFeedback = scrubPII(text);
+    const scrubbedUrl = scrubPII(pageUrl);
 
-        if (response && response.ok) {
-          feedbackStatus.textContent = "Thanks for your feedback!";
-          feedbackStatus.className = "feedback-status feedback-success";
-          feedbackTextarea.value = "";
-          setTimeout(() => {
-            feedbackModal.style.display = "none";
-          }, 1200);
-        } else {
-          feedbackStatus.textContent =
-            "Failed to save: " + ((response && response.error) || "Unknown error");
-          feedbackStatus.className = "feedback-status feedback-error";
-        }
-      }
+    const title = encodeURIComponent("Feedback: " + scrubbedFeedback.slice(0, 80) + (scrubbedFeedback.length > 80 ? "…" : ""));
+    const body = encodeURIComponent(
+      "## Feedback\n\n" + scrubbedFeedback +
+      "\n\n---\n" +
+      "**Page tested:** " + scrubbedUrl + "\n" +
+      "**Extension version:** v" + version + "\n" +
+      "**Submitted:** " + new Date().toISOString()
     );
+
+    const issueUrl = "https://github.com/prolitariat/pendo-health-check/issues/new?labels=feedback&title=" + title + "&body=" + body;
+
+    chrome.tabs.create({ url: issueUrl });
+
+    feedbackStatus.textContent = "Opening GitHub — thanks!";
+    feedbackStatus.className = "feedback-status feedback-success";
+    feedbackTextarea.value = "";
+    setTimeout(() => {
+      feedbackModal.style.display = "none";
+    }, 1200);
   });
 
   // Allow Ctrl+Enter / Cmd+Enter to submit
