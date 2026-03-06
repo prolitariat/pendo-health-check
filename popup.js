@@ -83,13 +83,9 @@ function detectEnvFromChecks(checks) {
 
 function renderPendoStatus(data, detectedEnv) {
   const statusDiv = document.getElementById("pendo-status");
-  const indicator = document.getElementById("status-indicator");
-  const componentsDiv = document.getElementById("status-components");
+  if (!statusDiv) return;
 
-  if (!statusDiv || !indicator || !componentsDiv) return;
-
-  // Determine overall status and badge
-  const overallStatus = data.status && data.status.description ? data.status.description : "Unknown";
+  // Determine overall status
   const statusValue = data.status && data.status.indicator ? data.status.indicator : "";
 
   let badgeText = "Unknown";
@@ -109,96 +105,42 @@ function renderPendoStatus(data, detectedEnv) {
     badgeClass = "badge-blue";
   }
 
-  indicator.textContent = badgeText;
-  indicator.className = "badge " + badgeClass;
+  // Build realm label if detected
+  const realmLabel = detectedEnv ? detectedEnv.replace(" environment", "") : null;
 
-  // Render components — show only top-level groups, not per-region children
-  componentsDiv.innerHTML = "";
-  if (data.components && Array.isArray(data.components)) {
-    const groups = data.components.filter((c) => c.group === true);
-    const topLevel = groups.length > 0
-      ? groups
-      : data.components.filter((c) => !c.group_id);
-
-    // If we detected the environment, filter to just that one + any non-operational others
-    let filtered = topLevel;
-    let isFiltered = false;
-    if (detectedEnv) {
-      const matched = topLevel.filter((c) => c.name && c.name.includes(detectedEnv));
-      const problems = topLevel.filter((c) =>
-        c.name && !c.name.includes(detectedEnv) &&
-        c.status && c.status !== "operational"
-      );
-      if (matched.length > 0) {
-        filtered = [...matched, ...problems];
-        isFiltered = true;
-      }
-    }
-
-    filtered.forEach((comp) => {
-      const st = (comp.status || "operational").replace(/_/g, " ");
-      const isMatch = detectedEnv && comp.name && comp.name.includes(detectedEnv);
-      const row = document.createElement("div");
-      row.className = "status-row";
-      row.innerHTML = `
-        <span class="status-dot ${comp.status || "operational"}"></span>
-        <span class="status-name">${escapeHtml(comp.name || "")}${isMatch ? ' <span class="badge badge-blue" style="font-size:9px;padding:1px 5px;">your env</span>' : ""}</span>
-        <span class="status-label">${escapeHtml(st)}</span>
-      `;
-      componentsDiv.appendChild(row);
-    });
-
-    // If filtered, add a "Show all environments" toggle
-    if (isFiltered && filtered.length < topLevel.length) {
-      const toggle = document.createElement("div");
-      toggle.className = "status-toggle";
-      toggle.textContent = `+ ${topLevel.length - filtered.length} other environments (all operational)`;
-      toggle.style.cssText = "font-size:11px;color:#6b7280;cursor:pointer;padding:4px 0 0 22px;";
-      toggle.addEventListener("click", () => {
-        renderPendoStatus(data, null); // re-render with all
-      });
-      componentsDiv.appendChild(toggle);
-    }
+  // Check for active incidents
+  const hasIncident = data.incidents && Array.isArray(data.incidents) && data.incidents.length > 0;
+  let incidentHtml = "";
+  if (hasIncident) {
+    const inc = data.incidents[0];
+    const updates = inc.updates && inc.updates.length > 0 ? inc.updates[0] : null;
+    const updateText = updates ? updates.body : "";
+    incidentHtml = `<div class="incident-banner" style="margin:4px 16px 0;padding:6px 8px;border-radius:4px;background:var(--destructive-bg, #fef2f2);color:var(--destructive, #dc2626);font-size:11px"><strong>⚠️ ${escapeHtml(inc.name)}</strong>${updateText ? " — " + escapeHtml(updateText.substring(0, 80)) : ""}</div>`;
   }
 
-  // Show incident banner if there are unresolved incidents
-  if (data.incidents && Array.isArray(data.incidents) && data.incidents.length > 0) {
-    const incident = data.incidents[0];
-    const banner = document.createElement("div");
-    banner.className = "incident-banner";
-    const updates = incident.updates && incident.updates.length > 0 ? incident.updates[0] : null;
-    const updateText = updates ? updates.body : "No updates yet";
-    banner.innerHTML = `<strong>⚠️ ${escapeHtml(incident.name)}</strong>${updateText ? " — " + escapeHtml(updateText.substring(0, 60)) : ""}`;
-    statusDiv.insertBefore(banner, componentsDiv);
-  }
-
+  // Simple: badge + link to status page — no dropdown needed
+  statusDiv.innerHTML = `
+    <a href="https://status.pendo.io" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px;text-decoration:none;color:inherit;cursor:pointer" title="View Pendo Status Page">
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-foreground)">Pendo Service Status${realmLabel ? ` <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">${escapeHtml(realmLabel)}</span>` : ""}</span>
+      <span class="badge ${badgeClass}" style="font-size:11px">${badgeText}</span>
+    </a>${incidentHtml}`;
   statusDiv.style.display = "block";
-
-  // Auto-expand if there's a problem (non-operational or incidents)
-  const hasProblems = (statusValue !== "none" && statusValue !== "operational" && statusValue !== "") ||
-    (data.incidents && data.incidents.length > 0);
-  const compsEl = document.getElementById("status-components");
-  const chevron = document.getElementById("status-chevron");
-  if (hasProblems && compsEl) {
-    compsEl.style.display = "block";
-    if (chevron) chevron.style.transform = "rotate(90deg)";
-  }
 }
 
-// Status section toggle
+// Click delegation and status setup
 document.addEventListener("DOMContentLoaded", () => {
-  const header = document.getElementById("status-header");
-  if (header) {
-    header.addEventListener("click", () => {
-      const comps = document.getElementById("status-components");
-      const chevron = document.getElementById("status-chevron");
-      if (comps) {
-        const isHidden = comps.style.display === "none";
-        comps.style.display = isHidden ? "block" : "none";
-        if (chevron) chevron.style.transform = isHidden ? "rotate(90deg)" : "";
+
+  // Event delegation for all .setup-section-header clicks (inline onclick is
+  // blocked by Manifest V3 CSP, so we delegate from the document instead)
+  document.addEventListener("click", (e) => {
+    const header = e.target.closest(".setup-section-header");
+    if (header) {
+      const section = header.parentElement;
+      if (section && section.classList.contains("setup-section")) {
+        section.classList.toggle("open");
       }
-    });
-  }
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -291,7 +233,7 @@ function renderChecks(checks) {
     });
 
     drawer.innerHTML = `
-      <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')" style="color:var(--muted-foreground)">
+      <div class="setup-section-header" style="color:var(--muted-foreground)">
         <span class="setup-chevron">▶</span>
         <span class="setup-section-title">What's Good (${passingChecks.length})</span>
         <span class="setup-section-badge"><span class="badge badge-green">${passingChecks.length} passed</span></span>
@@ -367,7 +309,7 @@ function renderSetup(data) {
   function makeSection(title, badgeHtml, bodyHtml, hasIssue) {
     const html = `
       <div class="setup-section open">
-        <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="setup-section-header">
           <span class="setup-chevron">▶</span>
           <span class="setup-section-title">${title}</span>
           <span class="setup-section-badge">${badgeHtml}</span>
@@ -520,7 +462,7 @@ function renderSetup(data) {
     healthySections.forEach((s) => {
       drawerBody += `
         <div class="setup-section">
-          <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')">
+          <div class="setup-section-header">
             <span class="setup-chevron">▶</span>
             <span class="setup-section-title">${s.title}</span>
             <span class="setup-section-badge">${s.badge}</span>
@@ -530,7 +472,7 @@ function renderSetup(data) {
     });
     container.innerHTML += `
       <div class="setup-section" id="whats-good-drawer" style="border-top:1px solid var(--border);margin-top:4px">
-        <div class="setup-section-header" onclick="this.parentElement.classList.toggle('open')" style="color:var(--muted-foreground)">
+        <div class="setup-section-header" style="color:var(--muted-foreground)">
           <span class="setup-chevron">▶</span>
           <span class="setup-section-title">What's Good (${healthySections.length})</span>
           <span class="setup-section-badge"><span class="badge badge-green">${healthySections.length} passed</span></span>
@@ -1335,10 +1277,20 @@ function runPendoSetupAssistant() {
     // --- B. Detect CSP violations already fired (works for BOTH meta and header CSP) ---
     var cspViolations = [];
     var blockedByDomain = {};
+    var detectedSubId = null; // Will hold the actual Pendo subscription ID if found
     try {
       // Check Performance API for blocked resources (transferSize=0 + no decodedBodySize)
       var perfEntries = performance.getEntriesByType && performance.getEntriesByType("resource") || [];
       var pendoResources = perfEntries.filter(function(e) { return e.name && e.name.indexOf("pendo") !== -1; });
+
+      // Extract SUB_ID from any Pendo resource URL (blocked or not)
+      // Pattern: pendo-static-{SUB_ID}.storage.googleapis.com or content-{SUB_ID}.static.pendo.io
+      pendoResources.forEach(function(e) {
+        if (detectedSubId) return;
+        var m = e.name.match(/pendo-static-(\d+)\.storage/) || e.name.match(/content-(\d+)\.static\.pendo/);
+        if (m) detectedSubId = m[1];
+      });
+
       var blockedPendo = pendoResources.filter(function(e) { return e.transferSize === 0 && e.decodedBodySize === 0; });
 
       if (blockedPendo.length > 0) {
@@ -1359,6 +1311,13 @@ function runPendoSetupAssistant() {
         cspViolations.push(blockedPendo.length + " Pendo resource" + (blockedPendo.length !== 1 ? "s" : "") + " blocked: " + domainSummary);
       }
     } catch (perfErr) {}
+
+    // Helper: replace {{SUB_ID}} template with actual subscription ID if detected
+    function subIdFix(text) {
+      if (!detectedSubId || !text) return text;
+      return text.replace(/\{\{SUB_ID\}\}/g, detectedSubId)
+                 .replace(/\s*\(replace SUB_ID with your Pendo subscription ID from app\.pendo\.io\/s\/\[SUB_ID\]\/\)/gi, "");
+    }
 
     // --- C. Proactive: check what Pendo needs vs what's actually working ---
     var pendoFunctional = typeof window.pendo !== "undefined" && window.pendo;
@@ -1608,6 +1567,12 @@ function runPendoSetupAssistant() {
 
     // Merge proactive findings into issues array
     csp.issues = csp.issues.concat(csp.proactiveFindings);
+
+    // Replace {{SUB_ID}} template with actual subscription ID if detected
+    csp.issues.forEach(function(issue) {
+      if (issue.fix) issue.fix = subIdFix(issue.fix);
+    });
+    if (detectedSubId) csp.detectedSubId = detectedSubId;
   } catch (e) {
     csp.issues.push({ directive: "parse-error", severity: "warning", detail: "Error analyzing CSP: " + e.message });
   }
@@ -1701,17 +1666,8 @@ function runPendoSetupAssistant() {
       "The Pendo snippet is loaded synchronously, which may impact page load performance. Add the async attribute to the script tag.");
   }
 
-  // Duplicate scripts
-  if (result.snippet && result.snippet.scriptCount > 1) {
-    recommend("warning", "Multiple Pendo script tags",
-      result.snippet.scriptCount + " Pendo script tags found. This can cause duplicate event tracking or conflicts. Ensure only one snippet is loaded.");
-  }
-
-  // Dual initialization
-  if (window.pendo_) {
-    recommend("warning", "Dual Pendo instance detected",
-      "Both window.pendo and window.pendo_ exist. This may indicate Pendo Guard or duplicate initialization. Verify this is intentional.");
-  }
+  // Duplicate scripts and dual initialization: owned by Health Check tab
+  // (runtime state — "Pendo Instances" check covers script count + object count)
 
   // Sensitive metadata fields
   var allFields = (result.visitorFields || []).concat(result.accountFields || []);

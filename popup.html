@@ -381,43 +381,6 @@
       margin-bottom: 0;
     }
 
-    .status-row {
-      display: flex;
-      align-items: center;
-      padding: 6px 16px;
-      gap: 8px;
-      font-size: 12px;
-      border-bottom: 1px solid var(--muted);
-    }
-
-    .status-row:last-child {
-      border-bottom: none;
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .status-dot.operational { background: var(--success); }
-    .status-dot.degraded_performance { background: var(--warning); }
-    .status-dot.partial_outage { background: var(--warning); }
-    .status-dot.major_outage { background: var(--destructive); }
-    .status-dot.under_maintenance { background: #2563eb; }
-
-    .status-name {
-      flex: 1;
-      color: var(--foreground);
-      font-size: 12px;
-    }
-
-    .status-label {
-      font-size: 11px;
-      color: var(--muted-foreground);
-    }
-
     .incident-banner {
       padding: 8px 16px;
       background: var(--pendo-highlight-light);
@@ -429,23 +392,6 @@
     .incident-banner strong {
       display: block;
       margin-bottom: 2px;
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-weight: 600;
-      font-size: 12px;
-      color: var(--foreground);
-      margin: 12px 0 8px 0;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-      letter-spacing: -0.01em;
-    }
-
-    #status-indicator {
-      font-size: 11px;
     }
 
     /* === Health Check Grid === */
@@ -760,13 +706,7 @@
   </div>
 
   <!-- Pendo Status Section -->
-  <div id="pendo-status" style="display:none">
-    <div id="status-header" class="section-header" style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px;margin:0;cursor:pointer;user-select:none" title="Click to expand">
-      <span style="display:flex;align-items:center;gap:6px"><span id="status-chevron" style="font-size:10px;color:#6b7280;transition:transform 0.2s">▶</span> Pendo Service Status</span>
-      <span id="status-indicator" class="badge" style="font-size:11px"></span>
-    </div>
-    <div id="status-components" style="display:none"></div>
-  </div>
+  <div id="pendo-status" style="display:none"></div>
 
   <!-- Tab Bar -->
   <div id="tab-bar">
