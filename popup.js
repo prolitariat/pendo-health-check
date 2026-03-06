@@ -546,6 +546,23 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       if (env && window.__pendoServiceStatus) {
         renderPendoStatus(window.__pendoServiceStatus, env);
       }
+
+      // Pre-run Setup analysis in background so copy report always has CSP data
+      if (!setupLoaded) {
+        chrome.scripting
+          .executeScript({
+            target: { tabId: tab.id },
+            func: runPendoSetupAssistant,
+            world: "MAIN",
+          })
+          .then((setupResults) => {
+            const setupData = setupResults?.[0]?.result;
+            if (setupData) {
+              window.__lastSetup = setupData;
+            }
+          })
+          .catch(() => {}); // silently fail — Setup tab click will retry
+      }
     })
     .catch((err) => {
       // "Frame with ID 0 is showing error page" = tab failed to load (DNS, SSL, etc.)
