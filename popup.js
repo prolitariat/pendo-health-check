@@ -420,19 +420,34 @@ function renderSetup(data) {
     makeSection(`Account Metadata`, aBadge, aBody, aWarns > 0);
   }
 
-  // 7. Recommendations
+  // Summary counters — track ALL issues across all sections
   let errors = 0, warnings = 0, tips = 0;
-  if (data.recommendations && data.recommendations.length > 0) {
-    data.recommendations.forEach((r) => {
-      if (r.severity === "error") errors++;
-      else if (r.severity === "warning") warnings++;
-      else tips++;
+
+  // Count CSP issues
+  if (data.csp && data.csp.issues) {
+    data.csp.issues.forEach((i) => {
+      if (i.severity === "error") errors++;
+      else if (i.severity === "warning") warnings++;
     });
-    const recBadge = errors > 0
-      ? `<span class="badge badge-red">${errors} error${errors !== 1 ? "s" : ""}</span>`
-      : warnings > 0
-        ? `<span class="badge badge-yellow">${warnings} warning${warnings !== 1 ? "s" : ""}</span>`
-        : `<span class="badge badge-green">${tips} tip${tips !== 1 ? "s" : ""}</span>`;
+  }
+
+  // Count metadata warnings
+  if (data.visitorFields) data.visitorFields.forEach(f => { if (f.warnings.length > 0) warnings++; });
+  if (data.accountFields) data.accountFields.forEach(f => { if (f.warnings.length > 0) warnings++; });
+
+  // 7. Recommendations
+  if (data.recommendations && data.recommendations.length > 0) {
+    let recErrors = 0, recWarnings = 0, recTips = 0;
+    data.recommendations.forEach((r) => {
+      if (r.severity === "error") { errors++; recErrors++; }
+      else if (r.severity === "warning") { warnings++; recWarnings++; }
+      else { tips++; recTips++; }
+    });
+    const recBadge = recErrors > 0
+      ? `<span class="badge badge-red">${recErrors} error${recErrors !== 1 ? "s" : ""}</span>`
+      : recWarnings > 0
+        ? `<span class="badge badge-yellow">${recWarnings} warning${recWarnings !== 1 ? "s" : ""}</span>`
+        : `<span class="badge badge-green">${recTips} tip${recTips !== 1 ? "s" : ""}</span>`;
 
     let recBody = "";
     data.recommendations.forEach((r) => {
@@ -446,7 +461,7 @@ function renderSetup(data) {
           </div>
         </div>`;
     });
-    makeSection(`Recommendations (${data.recommendations.length})`, recBadge, recBody, errors > 0 || warnings > 0);
+    makeSection(`Recommendations (${data.recommendations.length})`, recBadge, recBody, recErrors > 0 || recWarnings > 0);
   }
 
   // === Render: problems first, then "What's Good" drawer ===
