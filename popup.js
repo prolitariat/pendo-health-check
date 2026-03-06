@@ -755,7 +755,7 @@ function buildIssuesReport() {
 
       if (c.label === "Network Requests" && hasCspIssues) {
         // CSP is the diagnosed cause — don't list generic possibilities
-        fix = "Your Content-Security-Policy is blocking Pendo requests. See the CSP fix below.";
+        fix = "Your Content-Security-Policy is blocking Pendo requests. See the CSP directive fixes below.";
       } else {
         const remap = REMEDIATION_MAP[c.label];
         fix = (remap && remap[c.status]) ? remap[c.status].replace(/^FIX:\s*/i, "") : null;
@@ -1546,25 +1546,62 @@ function runPendoSetupAssistant() {
         csp.detected = true;
         csp.source = "HTTP header (detected via blocked resources)";
       }
-      // Build exact fix instructions per Pendo docs
-      // (support.pendo.io/hc/en-us/articles/360032209131)
+
+      // Map blocked domains to affected CSP directives per Pendo docs
       var blockedDomains = Object.keys(blockedByDomain);
       var hasCdn = blockedDomains.some(function(d) { return d.indexOf("cdn.pendo.io") !== -1; });
       var hasData = blockedDomains.some(function(d) { return d.indexOf("data.pendo.io") !== -1; });
       var hasStorage = blockedDomains.some(function(d) { return d.indexOf("storage.googleapis.com") !== -1; });
-      var fixLines = [];
-      // Always output the complete set of required directives so devs can fix in one pass
-      fixLines.push("script-src: cdn.pendo.io pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io 'unsafe-inline' 'unsafe-eval'");
-      fixLines.push("connect-src: data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io");
-      fixLines.push("style-src: pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io 'unsafe-inline'");
-      fixLines.push("img-src: cdn.pendo.io data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io data:");
-      fixLines.push("font-src: cdn.pendo.io");
-      fixLines.push("frame-src: app.pendo.io portal.pendo.io");
-      fixLines.push("worker-src: blob:");
+      var hasStatic = blockedDomains.some(function(d) { return d.indexOf(".static.pendo.io") !== -1; });
+      var hasApp = blockedDomains.some(function(d) { return d.indexOf("app.pendo.io") !== -1; });
+
+      // Build per-directive issues — only for directives actually affected by blocked resources
       var domainSummary = blockedDomains.map(function(d) { return d + " (" + blockedByDomain[d] + ")"; }).join(", ");
-      var detail = blockedPendo.length + " Pendo resource" + (blockedPendo.length !== 1 ? "s" : "") + " blocked: " + domainSummary + ".";
-      var fixText = "Add these to your Content-Security-Policy header (replace SUB_ID with your Pendo subscription ID from app.pendo.io/s/[SUB_ID]/):\n  " + fixLines.join("\n  ");
-      csp.issues.push({ directive: "Blocked resources", severity: "error", detail: detail, fix: fixText });
+      var baseDetail = blockedPendo.length + " Pendo resource" + (blockedPendo.length !== 1 ? "s" : "") + " blocked: " + domainSummary + ".";
+
+      // script-src: cdn.pendo.io loads the agent, storage loads guide code
+      if (hasCdn || hasStorage || hasStatic) {
+        var scriptDomains = ["cdn.pendo.io", "pendo-io-static.storage.googleapis.com",
+          "pendo-static-{{SUB_ID}}.storage.googleapis.com", "content-{{SUB_ID}}.static.pendo.io",
+          "'unsafe-inline'"];
+        csp.issues.push({ directive: "script-src", severity: "error",
+          detail: "Pendo scripts blocked" + (hasCdn ? " (cdn.pendo.io)" : "") + (hasStorage ? " (storage.googleapis.com)" : "") + ".",
+          fix: "Add to script-src:\n  " + scriptDomains.join(" ") });
+      }
+
+      // connect-src: data.pendo.io sends analytics, storage serves content
+      if (hasData || hasStorage || hasStatic || hasApp) {
+        var connectDomains = ["data.pendo.io",
+          "pendo-static-{{SUB_ID}}.storage.googleapis.com", "content-{{SUB_ID}}.static.pendo.io",
+          "app.pendo.io"];
+        csp.issues.push({ directive: "connect-src", severity: "error",
+          detail: "Pendo data transmission blocked" + (hasData ? " (data.pendo.io)" : "") + (hasStorage ? " (storage.googleapis.com)" : "") + ".",
+          fix: "Add to connect-src:\n  " + connectDomains.join(" ") });
+      }
+
+      // img-src: data.pendo.io sends events via img src, cdn serves images
+      if (hasData || hasCdn || hasStorage || hasStatic) {
+        var imgDomains = ["cdn.pendo.io", "data.pendo.io",
+          "pendo-static-{{SUB_ID}}.storage.googleapis.com", "content-{{SUB_ID}}.static.pendo.io",
+          "app.pendo.io", "data:"];
+        csp.issues.push({ directive: "img-src", severity: "warning",
+          detail: "Pendo images/events may be blocked" + (hasData ? " (data.pendo.io sends analytics via img src)" : "") + ".",
+          fix: "Add to img-src:\n  " + imgDomains.join(" ") });
+      }
+
+      // style-src: only if storage/static domains are blocked (serve guide CSS)
+      if (hasStorage || hasStatic) {
+        csp.issues.push({ directive: "style-src", severity: "warning",
+          detail: "Pendo guide styles may be blocked (served from storage/static domains).",
+          fix: "Add to style-src:\n  pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io 'unsafe-inline'" });
+      }
+
+      // font-src: only if cdn.pendo.io is blocked
+      if (hasCdn) {
+        csp.issues.push({ directive: "font-src", severity: "warning",
+          detail: "Pendo fonts may be blocked (served from cdn.pendo.io).",
+          fix: "Add to font-src:\n  cdn.pendo.io" });
+      }
     } else if (!csp.detected && pendoAgentLoaded && !dataFlowing && pendoFunctional) {
       // Agent loaded but data isn't flowing — possible silent connect-src block
       csp.detected = true;
