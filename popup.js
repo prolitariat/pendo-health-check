@@ -2366,6 +2366,16 @@ function runPendoSetupAssistant() {
 // ---------------------------------------------------------------------------
 // Feedback System
 // ---------------------------------------------------------------------------
+// Help Tour Button — manual tour launch
+(function initHelpTourBtn() {
+  const btn = document.getElementById("help-tour-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    if (typeof startTour === "function") startTour();
+  });
+})();
+
+// ---------------------------------------------------------------------------
 (function initFeedback() {
   const feedbackBtn = document.getElementById("feedback-btn");
   const feedbackModal = document.getElementById("feedback-modal");
