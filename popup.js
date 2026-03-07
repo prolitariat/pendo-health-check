@@ -1,5 +1,27 @@
 const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" };
 
+// ---------------------------------------------------------------------------
+// Analytics — lightweight, privacy-first, fire-and-forget
+// Set to "" to disable. Deploy Worker from /analytics directory.
+// ---------------------------------------------------------------------------
+const ANALYTICS_URL = ""; // e.g., "https://phc-analytics.your-subdomain.workers.dev"
+
+function trackEvent(event, data) {
+  if (!ANALYTICS_URL) return;
+  try {
+    const payload = {
+      event: event,
+      version: chrome.runtime.getManifest().version,
+      ...data,
+    };
+    fetch(ANALYTICS_URL + "/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {}); // silently fail — never block UX
+  } catch (_) {}
+}
+
 // Version display
 try {
   const v = chrome.runtime.getManifest().version;
@@ -160,6 +182,8 @@ document.querySelectorAll(".tab").forEach((tab) => {
     document.getElementById("panel-" + id).classList.add("active");
     activeTabId = id;
 
+    trackEvent("tab_switch", { tab: id });
+
     if (id === "setup" && !setupLoaded) {
       setupLoaded = true;
       runSetup();
@@ -258,6 +282,14 @@ function renderChecks(checks) {
   document.getElementById("health-summary").style.display = "flex";
   showView("__none__");
   showTabs();
+
+  // Track popup open with check results
+  trackEvent("popup_open", {
+    has_pendo: 1,
+    checks_pass: pass,
+    checks_warn: warn,
+    checks_fail: fail,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +319,9 @@ const REMEDIATION_MAP = {
   },
   "Feature Flags": {
     warn: "FIX: One or more Pendo features are disabled via configuration. If unintentional, check your pendo.initialize() options object and remove disableGuides, disableAnalytics, or other disable* flags."
+  },
+  "Ad Blocker": {
+    warn: "FIX: An ad blocker is interfering with Pendo. Disable your ad blocker for this domain or add *.pendo.io, *.pendo-static.storage.googleapis.com to your allowlist. Ad blockers commonly break Visual Design Studio, guide rendering, and analytics data collection."
   }
 };
 
@@ -501,7 +536,7 @@ function renderSetup(data) {
     document.getElementById("setup-summary-counts").innerHTML =
       (errors > 0 ? `<span class="fail">${errors} error${errors !== 1 ? "s" : ""}</span> · ` : "") +
       (warnings > 0 ? `<span class="warn">${warnings} warning${warnings !== 1 ? "s" : ""}</span> · ` : "") +
-      `<span style="color:#2563eb">${tips} tip${tips !== 1 ? "s" : ""}</span>`;
+      `<span style="color:var(--muted-foreground)">${tips} tip${tips !== 1 ? "s" : ""}</span>`;
   } else {
     document.getElementById("setup-summary-counts").innerHTML =
       `<span class="pass">All areas healthy</span>`;
@@ -550,6 +585,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       const data = results?.[0]?.result;
       if (!data || !data.pendoDetected) {
         showView("not-detected");
+        trackEvent("popup_open", { has_pendo: 0 });
         return;
       }
       window.__lastChecks = data.checks;
@@ -856,6 +892,7 @@ document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
   const label = btn.querySelector(".tool-label");
   const text = buildIssuesReport();
   navigator.clipboard.writeText(text).then(() => {
+    trackEvent("copy_report");
     if (label) {
       label.textContent = "Copied!";
       setTimeout(() => { label.textContent = "Copy Issues to Clipboard"; }, 1500);
@@ -1087,6 +1124,53 @@ function runPendoHealthCheck() {
     }
   } catch (e) {
     add("info", "Feature Flags", "Could not inspect feature flags: " + e.message);
+  }
+
+  // 12. Ad Blocker Detection
+  try {
+    var adBlockDetected = false;
+    var adBlockSignals = [];
+
+    // Technique 1: Bait element — adblockers hide elements with ad-related class names
+    var bait = document.createElement("div");
+    bait.className = "adsbox ad-placement ad-banner pub_300x250";
+    bait.style.cssText = "position:absolute;top:-10px;left:-10px;width:1px;height:1px;overflow:hidden;pointer-events:none;";
+    bait.innerHTML = "&nbsp;";
+    document.body.appendChild(bait);
+
+    // Give adblocker CSS rules a moment to apply (they're usually synchronous)
+    var baitStyle = window.getComputedStyle(bait);
+    if (baitStyle.display === "none" || baitStyle.visibility === "hidden" || bait.offsetHeight === 0) {
+      adBlockDetected = true;
+      adBlockSignals.push("ad-class elements hidden");
+    }
+    document.body.removeChild(bait);
+
+    // Technique 2: Check if Pendo CDN/data domains are missing from network traffic
+    // despite the agent being loaded (agent could have been cached or bundled)
+    var resources = performance.getEntriesByType("resource");
+    var hasPendoCdn = resources.some(function(r) { return r.name.indexOf("cdn.pendo.io") !== -1; });
+    var hasPendoData = resources.some(function(r) { return r.name.indexOf("data.pendo.io") !== -1; });
+    var hasPendoStatic = resources.some(function(r) { return r.name.indexOf("pendo-static") !== -1; });
+
+    if (!hasPendoData && !hasPendoStatic && checks.length >= 10) {
+      // Pendo is loaded but no data traffic — something is blocking it
+      var netCheck = checks.find(function(c) { return c.label === "Network Requests"; });
+      if (netCheck && (netCheck.status === "warn" || netCheck.status === "fail")) {
+        adBlockSignals.push("Pendo network traffic blocked");
+        adBlockDetected = true;
+      }
+    }
+
+    if (adBlockDetected) {
+      add("warn", "Ad Blocker", "Ad blocker detected (" + adBlockSignals.join("; ") + "). " +
+        "Ad blockers can block Pendo CDN/data requests, break Visual Design Studio, and prevent guides from rendering. " +
+        "Disable your ad blocker for this domain or allowlist *.pendo.io to ensure full functionality.");
+    } else {
+      add("pass", "Ad Blocker", "No ad blocker interference detected");
+    }
+  } catch (e) {
+    add("info", "Ad Blocker", "Could not check for ad blockers: " + e.message);
   }
 
   return { pendoDetected: true, checks: checks };
@@ -1894,6 +1978,7 @@ function runPendoSetupAssistant() {
     );
     const issueUrl = "https://github.com/prolitariat/pendo-health-check/issues/new?labels=feedback&title=" + title + "&body=" + body;
     chrome.tabs.create({ url: issueUrl });
+    trackEvent("feedback_submit", { method: "github" });
 
     feedbackStatus.textContent = "Opening GitHub — thanks!";
     feedbackStatus.className = "feedback-status feedback-success";
@@ -1920,6 +2005,7 @@ function runPendoSetupAssistant() {
         "\nSubmitted: " + p.timestamp
       );
       chrome.tabs.create({ url: "mailto:pendohealthcheck@gmail.com?subject=" + subject + "&body=" + mailBody });
+      trackEvent("feedback_submit", { method: "email" });
 
       feedbackStatus.textContent = "Opening email — thanks!";
       feedbackStatus.className = "feedback-status feedback-success";
