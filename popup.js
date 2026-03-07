@@ -973,15 +973,30 @@ document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
   runPendoCommand(function () {
     try {
       if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
+
+      // Toggle: check if debugger overlay is already open
+      var overlay = document.getElementById("pendo-debug-bar") ||
+                    document.querySelector("[id*='pendo-debug']") ||
+                    document.querySelector("[class*='pendo-debug']");
+      if (overlay) {
+        if (typeof pendo.disableDebugging === "function") {
+          pendo.disableDebugging();
+          return { message: "🔒 Debugger closed" };
+        }
+        // Fallback: try removing the overlay directly
+        overlay.remove();
+        return { message: "🔒 Debugger overlay removed" };
+      }
+
       if (typeof pendo.enableDebugging === "function") {
         pendo.enableDebugging();
-        return { message: "✅ Debugger launched — use the overlay's ✕ to close" };
+        return { message: "✅ Debugger launched — click again to close" };
       }
       return { error: "pendo.enableDebugging() not available on this agent version" };
     } catch (e) {
       return { error: e.message };
     }
-  }, "Debugger launched");
+  }, "Debugger toggled");
 });
 
 // ---------------------------------------------------------------------------
