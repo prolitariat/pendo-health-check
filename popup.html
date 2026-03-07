@@ -486,6 +486,14 @@
       flex-direction: column;
     }
 
+    /* === Health Check copy bar === */
+    #health-copy-bar {
+      padding: 10px 0 2px;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+      flex-shrink: 0;
+    }
+
     /* === Pendo Status Section === */
     #pendo-status {
       display: none;
@@ -975,6 +983,16 @@
     <div id="health-summary">
       <div id="summary-counts"></div>
     </div>
+    <!-- Copy Issues — primary action, always visible on first tab -->
+    <div id="health-copy-bar">
+      <button class="tool-btn" id="tool-copy-issues" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
+        <span class="tool-icon" style="font-size:18px">📋</span>
+        <div style="text-align:left;flex:1">
+          <span class="tool-label">Copy Issues to Clipboard</span>
+          <span class="tool-desc" style="display:block">Plain English problems &amp; fixes — paste into Slack, Jira, etc.</span>
+        </div>
+      </button>
+    </div>
   </div>
 
   <!-- Setup Assistant Panel -->
@@ -1022,17 +1040,6 @@
       </div>
     </div>
     <div id="tool-status"></div>
-    <!-- Copy Issues -->
-    <div style="padding:10px 4px 4px;border-top:1px solid var(--border);margin-top:4px">
-      <div style="font-size:10px;color:var(--muted-foreground);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Share</div>
-      <button class="tool-btn" id="tool-copy-issues" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
-        <span class="tool-icon" style="font-size:18px">📋</span>
-        <div style="text-align:left;flex:1">
-          <span class="tool-label">Copy Issues to Clipboard</span>
-          <span class="tool-desc" style="display:block">Plain English problems &amp; fixes — paste into Slack, Jira, etc.</span>
-        </div>
-      </button>
-    </div>
   </div>
 
   <!-- Feedback Bar -->

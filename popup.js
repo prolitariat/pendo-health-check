@@ -196,21 +196,16 @@ const TOUR_STEPS = [
     arrow: "top",
   },
   {
-    target: '[data-tab="tools"]',
-    title: "Tools",
-    body: "Developer console, Pendo debugger launcher, and the Copy Issues button.",
-    arrow: "top",
-  },
-  {
     target: "#tool-copy-issues",
     title: "Copy Issues to Clipboard",
     body: "One click copies every problem and fix as plain text — ready to paste into Slack, Jira, or a support ticket. No follow-up questions needed.",
     arrow: "bottom",
-    preAction: () => {
-      // Switch to tools tab so the button is visible
-      const toolsTab = document.querySelector('[data-tab="tools"]');
-      if (toolsTab) activateTab(toolsTab);
-    },
+  },
+  {
+    target: '[data-tab="tools"]',
+    title: "Tools",
+    body: "Developer console and Pendo debugger launcher for deeper troubleshooting.",
+    arrow: "top",
   },
 ];
 
