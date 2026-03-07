@@ -179,10 +179,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const TOUR_STEPS = [
   {
-    target: "#tab-bar",
+    target: null,
     title: "Welcome to Pendo Health Check",
     body: "This extension runs diagnostics on any page with Pendo installed. Let's take a quick look at what's here.",
-    arrow: "top",
   },
   {
     target: '[data-tab="health"]',
@@ -242,51 +241,66 @@ function showTourStep(idx) {
 
   // Wait for DOM to settle after tab switch (needs more than 80ms for paint)
   setTimeout(() => {
-    const targetEl = document.querySelector(step.target);
-    if (!targetEl) { showTourStep(idx + 1); return; }
+    const targetEl = step.target ? document.querySelector(step.target) : null;
+    if (step.target && !targetEl) { showTourStep(idx + 1); return; }
 
-    const rect = targetEl.getBoundingClientRect();
-    const pad = 4; // padding around spotlight
+    const popupW = document.documentElement.clientWidth || 380;
+    const popupH = document.documentElement.clientHeight || 540;
+    const tipW = Math.min(280, popupW - 32);
 
     // Overlay — transparent click-catcher (spotlight handles dimming via box-shadow)
     const overlay = document.createElement("div");
     overlay.className = "tour-overlay";
     document.body.appendChild(overlay);
 
-    // Spotlight — fixed position, box-shadow creates the dim effect
-    const spot = document.createElement("div");
-    spot.className = "tour-spotlight";
-    spot.style.top = (rect.top - pad) + "px";
-    spot.style.left = (rect.left - pad) + "px";
-    spot.style.width = (rect.width + pad * 2) + "px";
-    spot.style.height = (rect.height + pad * 2) + "px";
-    document.body.appendChild(spot);
+    if (targetEl) {
+      // Spotlight — fixed position, box-shadow creates the dim effect
+      const rect = targetEl.getBoundingClientRect();
+      const pad = 4;
+      const spot = document.createElement("div");
+      spot.className = "tour-spotlight";
+      spot.style.top = (rect.top - pad) + "px";
+      spot.style.left = (rect.left - pad) + "px";
+      spot.style.width = (rect.width + pad * 2) + "px";
+      spot.style.height = (rect.height + pad * 2) + "px";
+      document.body.appendChild(spot);
+    } else {
+      // No target — full-screen dim via overlay background instead of spotlight
+      overlay.style.background = "rgba(0,0,0,0.5)";
+    }
 
     // Tooltip — fixed position, clamped to viewport
     const tip = document.createElement("div");
-    const arrowDir = step.arrow || "top";
-    tip.className = "tour-tooltip arrow-" + arrowDir;
+    const arrowDir = step.arrow || null;
+    tip.className = "tour-tooltip" + (arrowDir ? " arrow-" + arrowDir : "");
 
-    // Horizontal: center under target, clamped to 8px from edges
-    const popupW = document.documentElement.clientWidth || 380;
-    const tipW = Math.min(280, popupW - 32);
-    let tipLeft = Math.round(rect.left + rect.width / 2 - tipW / 2);
-    tipLeft = Math.max(8, Math.min(tipLeft, popupW - tipW - 8));
-    tip.style.left = tipLeft + "px";
-    tip.style.width = tipW + "px";
+    if (targetEl) {
+      const rect = targetEl.getBoundingClientRect();
+      const pad = 4;
 
-    // Vertical: below target (arrow-top) or above target (arrow-bottom)
-    const gap = 12;
-    if (arrowDir === "top") {
-      tip.style.top = (rect.bottom + gap) + "px";
-    } else if (arrowDir === "bottom") {
-      // Position above the target
-      tip.style.bottom = (document.documentElement.clientHeight - rect.top + gap) + "px";
+      // Horizontal: center under target, clamped to 8px from edges
+      let tipLeft = Math.round(rect.left + rect.width / 2 - tipW / 2);
+      tipLeft = Math.max(8, Math.min(tipLeft, popupW - tipW - 8));
+      tip.style.left = tipLeft + "px";
+      tip.style.width = tipW + "px";
+
+      // Vertical: below target (arrow-top) or above target (arrow-bottom)
+      const gap = 12;
+      if (arrowDir === "top") {
+        tip.style.top = (rect.bottom + gap) + "px";
+      } else if (arrowDir === "bottom") {
+        tip.style.bottom = (popupH - rect.top + gap) + "px";
+      }
+
+      // Arrow position: point toward center of target
+      const arrowLeft = Math.max(16, Math.min(rect.left + rect.width / 2 - tipLeft, tipW - 16));
+      tip.style.setProperty("--arrow-left", arrowLeft + "px");
+    } else {
+      // Centered modal — no arrow, vertically centered
+      tip.style.left = Math.round((popupW - tipW) / 2) + "px";
+      tip.style.width = tipW + "px";
+      tip.style.top = Math.round(popupH * 0.3) + "px";
     }
-
-    // Arrow position: point toward center of target
-    const arrowLeft = Math.max(16, Math.min(rect.left + rect.width / 2 - tipLeft, tipW - 16));
-    tip.style.setProperty("--arrow-left", arrowLeft + "px");
 
     // Step indicator and buttons
     const dots = TOUR_STEPS.map((_, i) =>
