@@ -4,7 +4,7 @@ const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" 
 // Analytics — lightweight, privacy-first, fire-and-forget
 // Set to "" to disable. Deploy Worker from /analytics directory.
 // ---------------------------------------------------------------------------
-const ANALYTICS_URL = ""; // e.g., "https://phc-analytics.your-subdomain.workers.dev"
+const ANALYTICS_URL = "https://phc-analytics.noskoviak.workers.dev";
 
 function trackEvent(event, data) {
   if (!ANALYTICS_URL) return;

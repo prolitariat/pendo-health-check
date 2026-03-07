@@ -5,4 +5,4 @@ compatibility_date = "2024-01-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "phc-analytics"
-database_id = "" # Fill in after: wrangler d1 create phc-analytics
+database_id = "0acc9e1b-2b6f-4529-bbd4-f59b8372e9fd"
