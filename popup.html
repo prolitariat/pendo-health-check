@@ -8,7 +8,8 @@
     /* === Design tokens: shadcn/ui structure + Pendo brand === */
     :root {
       /* Pendo brand */
-      --pendo-pink: #FF4876;
+      --pendo-pink: #c8385d;
+      --pendo-pink-btn: #c8385d;
       --pendo-pink-light: #fff1f4;
       --pendo-pink-mid: #ffe0e8;
       --pendo-highlight: #FEF484;
@@ -20,7 +21,7 @@
       --card: #ffffff;
       --card-foreground: #09090b;
       --muted: #f4f4f5;
-      --muted-foreground: #71717a;
+      --muted-foreground: #6c6c75;
       --border: #e4e4e7;
       --input: #e4e4e7;
       --ring: var(--pendo-pink);
@@ -31,9 +32,9 @@
       --accent: var(--pendo-pink);
       --accent-foreground: #ffffff;
       --accent-subtle: var(--pendo-pink-light);
-      --destructive: #ef4444;
-      --success: #16a34a;
-      --warning: #d97706;
+      --destructive: #c93939;
+      --success: #117f39;
+      --warning: #a55a05;
       --radius: 8px;
       --radius-sm: 6px;
       --radius-lg: 12px;
@@ -41,6 +42,8 @@
 
     @media (prefers-color-scheme: dark) {
       :root {
+        --pendo-pink: #FF4876;
+        --pendo-pink-btn: #d13b61;
         --pendo-pink-light: #2a1019;
         --pendo-pink-mid: #3d1525;
         --pendo-highlight-light: #2a2810;
@@ -335,7 +338,7 @@
     }
 
     #feedback-submit {
-      background: var(--pendo-pink);
+      background: var(--pendo-pink-btn);
       color: #ffffff;
     }
 
@@ -608,6 +611,15 @@
     .badge-pink {
       background: var(--pendo-pink-light);
       color: #c0274e;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .badge-green { background: #052e16; color: #4ade80; }
+      .badge-yellow { color: #af8b4c; }
+      .badge-red { background: #450a0a; color: #fca5a5; }
+      .badge-blue { background: #172554; color: #93c5fd; }
+      .badge-pink { color: #d05d7a; }
+      .incident-banner { color: #ae8a60; }
     }
 
     /* === Metadata Table === */
