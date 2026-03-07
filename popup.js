@@ -330,30 +330,30 @@ function renderChecks(checks) {
 
 const REMEDIATION_MAP = {
   "Pendo Agent Loaded": {
-    fail: "FIX: Ensure the Pendo snippet is installed on this page. Add the Pendo install script to your <head> tag, or verify your npm package imports pendo-io correctly. See: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
+    fail: "FIX: The Pendo snippet is not installed on this page. Add the Pendo install script to your <head> tag, or verify your npm/yarn package imports pendo-io correctly.\n  Code: <script async src='https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js'></script>\n  → Find your API key: app.pendo.io → Settings → Subscription Settings → App Details\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
   "Pendo Ready": {
-    warn: "FIX: The agent loaded but isn't ready. This usually means pendo.initialize() hasn't been called yet, or it was called before the agent script finished loading. Ensure initialize() runs AFTER the Pendo script loads.",
-    fail: "FIX: pendo.isReady() threw an error. The Pendo agent may be corrupted or an incompatible version. Try clearing the cache and reloading."
+    warn: "FIX: The agent script loaded but pendo.isReady() returns false — pendo.initialize() hasn't been called yet, or it fired before the script finished loading. Ensure initialize() runs AFTER the Pendo script loads.\n  Code: pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } });\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference",
+    fail: "FIX: pendo.isReady() threw an error — the agent may be corrupted or an incompatible version. Clear browser cache, hard reload, and verify your CDN snippet URL matches your subscription.\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
   "Visitor ID": {
-    warn: "FIX: You're sending an anonymous/auto-generated visitor ID. Update your pendo.initialize() call to pass a stable, unique user identifier:\n  pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })",
-    fail: "FIX: No visitor ID found at all. Ensure pendo.initialize() is called with a visitor.id parameter after the user authenticates."
+    warn: "FIX: You're sending an anonymous or auto-generated visitor ID. Pendo can't track individual users without a stable, unique ID tied to your auth system.\n  Code: pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })\n  → Use whatever unique identifier your app assigns at login (e.g. user.id, email, UUID).\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference",
+    fail: "FIX: No visitor ID found. pendo.initialize() must be called with a visitor.id parameter after the user authenticates.\n  Code: pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })\n  → Call this AFTER your login/auth flow resolves — not on page load before the user is known.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
   },
   "Account ID": {
-    warn: "FIX: No account ID set. If your app is B2B, pass the account ID:\n  pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } })"
+    warn: "FIX: No account ID set. If your app is B2B (multi-tenant), Pendo needs the account ID for company-level analytics, NPS by account, and account-based guide targeting.\n  Code: pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } })\n  → Use your app's organization/tenant/company ID. Single-user apps can skip this.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
   },
   "Pendo Instances": {
-    warn: "FIX: Multiple Pendo instances or script tags detected. Remove duplicate <script> tags that load the Pendo agent. Check your build system for duplicate imports."
+    warn: "FIX: Multiple Pendo agent instances or duplicate <script> tags detected. This causes double-counted analytics, guide conflicts, and memory leaks.\n  → Check for duplicate <script> tags in your HTML (View Source → search 'pendo')\n  → Check your bundler config for duplicate pendo-io imports\n  → If using a tag manager (GTM), ensure the snippet isn't also hardcoded in your app\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
   "Network Requests": {
-    warn: "FIX: Pendo network requests are failing or absent. Check for:\n  1. Ad blockers or privacy extensions blocking *.pendo.io\n  2. Corporate proxy/firewall rules blocking pendo.io domains\n  3. CSP connect-src not allowing data.pendo.io\n  4. DNS issues resolving pendo.io domains"
+    warn: "FIX: Pendo network requests are failing or absent. Common causes:\n  1. Ad blocker or privacy extension blocking *.pendo.io → allowlist pendo.io domains\n  2. Corporate proxy/firewall blocking pendo.io → request IT to allowlist: data.pendo.io, cdn.pendo.io, app.pendo.io\n  3. CSP connect-src missing data.pendo.io → see CSP fixes below if present\n  4. VPN/DNS issue → try with VPN off, or verify pendo.io resolves\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
   },
   "Feature Flags": {
-    warn: "FIX: One or more Pendo features are disabled via configuration. If unintentional, check your pendo.initialize() options object and remove disableGuides, disableAnalytics, or other disable* flags."
+    warn: "FIX: One or more Pendo features are explicitly disabled in your configuration. Check your pendo.initialize() options for these flags and remove them if unintentional:\n  disableGuides: true      → blocks all in-app guides\n  disableAnalytics: true   → stops all event tracking\n  disableFeedback: true    → hides the Feedback module\n  disablePersistence: true → prevents visitor/account caching\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
   },
   "Ad Blocker": {
-    warn: "FIX: An ad blocker is interfering with Pendo. Disable your ad blocker for this domain or add *.pendo.io, *.pendo-static.storage.googleapis.com to your allowlist. Ad blockers commonly break Visual Design Studio, guide rendering, and analytics data collection."
+    warn: "FIX: An ad blocker or privacy extension is interfering with Pendo. This commonly breaks:\n  → Visual Design Studio (can't tag features)\n  → Guide rendering (guides won't appear)\n  → Analytics data collection (events silently dropped)\n  → Resource Center and NPS surveys\n  To fix: disable your ad blocker for this domain, or add these to your allowlist:\n  *.pendo.io, pendo-io-static.storage.googleapis.com, pendo-static-*.storage.googleapis.com\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
   }
 };
 
@@ -808,6 +808,7 @@ function buildIssuesReport() {
 
   let issueCount = 0;
   const reported = new Set(); // Track reported topics to avoid duplicates
+  const sources = new Set(); // Collect unique documentation URLs
 
   function addIssue(severity, title, problem, fix) {
     // Deduplicate by normalized title prefix — "Visitor ID" blocks "Visitor ID missing or anonymous"
@@ -819,7 +820,14 @@ function buildIssuesReport() {
     issueCount++;
     lines.push(`${issueCount}. [${severity}] ${title}`);
     lines.push(`   Problem: ${problem}`);
-    if (fix) lines.push(`   Fix: ${fix}`);
+    if (fix) {
+      // Extract Docs: URLs into Sources section, keep fix text clean
+      const cleanFix = fix.replace(/\n\s*Docs:\s*(https?:\/\/[^\s]+)/g, (_, url) => {
+        sources.add(url);
+        return "";
+      });
+      lines.push(`   Fix: ${cleanFix}`);
+    }
     lines.push("");
   }
 
@@ -877,9 +885,31 @@ function buildIssuesReport() {
   if (warnFields.length > 0) {
     if (!hasSetupIssues && issueCount > 0) { lines.push("── Setup ──"); lines.push(""); hasSetupIssues = true; }
     warnFields.forEach((f) => {
+      // Build specific fix text based on warning types
+      const fixes = [];
+      f.warnings.forEach(w => {
+        if (w.indexOf("sensitive") !== -1) {
+          fixes.push("Remove this field or replace with a non-PII equivalent (e.g. hashed email). Settings → Data Mappings to toggle off.");
+        } else if (w.indexOf("letters, numbers, underscores") !== -1) {
+          fixes.push("Rename to use only letters, numbers, and underscores (e.g. \"my_field_name\"). Special characters may cause data mapping issues.");
+        } else if (w.indexOf("exceeds 1024") !== -1) {
+          fixes.push("Truncate or summarize this value — Pendo drops strings longer than 1024 characters.");
+        } else if (w.indexOf("Null/undefined") !== -1) {
+          fixes.push("Either pass a real value or omit this field entirely. Null values create phantom metadata entries in Pendo.");
+        } else if (w.indexOf("Nested object") !== -1) {
+          fixes.push("Flatten this object: e.g. { plan: { name: 'Pro' } } → { plan_name: 'Pro' }. Pendo silently ignores nested objects.");
+        } else if (w.indexOf("Array value") !== -1) {
+          fixes.push("Convert to a comma-separated string: e.g. ['a','b'] → 'a,b'. Pendo silently ignores arrays.");
+        } else if (w.indexOf("Function value") !== -1) {
+          fixes.push("Replace with the function's return value. Functions are not serialized and will be silently dropped.");
+        }
+      });
+      const fixText = fixes.length > 0
+        ? fixes.join("\n  ") + "\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
+        : "Review this field in your pendo.initialize() call and correct the value format.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference";
       addIssue("WARNING", `Metadata: "${f.key}"`,
         f.warnings.join("; "),
-        "Review this field in your pendo.initialize() call and correct the value format.");
+        fixText);
     });
   }
 
@@ -888,7 +918,11 @@ function buildIssuesReport() {
     setup.recommendations.forEach((r) => {
       if (r.severity === "error" || r.severity === "warning") {
         if (!hasSetupIssues && issueCount > 0) { lines.push("── Setup ──"); lines.push(""); hasSetupIssues = true; }
-        addIssue(r.severity === "error" ? "PROBLEM" : "WARNING", r.title, r.detail, null);
+        // Split detail at FIX: marker so problem and fix render separately in clipboard
+        var fixIdx = r.detail.indexOf("\n  FIX:");
+        var prob = fixIdx !== -1 ? r.detail.substring(0, fixIdx) : r.detail;
+        var fix = fixIdx !== -1 ? r.detail.substring(fixIdx + 7) : null; // skip "\n  FIX: "
+        addIssue(r.severity === "error" ? "PROBLEM" : "WARNING", r.title, prob, fix);
       }
     });
   }
@@ -914,6 +948,24 @@ function buildIssuesReport() {
   } else {
     lines.push("──");
     lines.push(`Total: ${issueCount} issue${issueCount !== 1 ? "s" : ""}`);
+  }
+
+  // Append Sources section if any documentation URLs were collected
+  if (sources.size > 0) {
+    lines.push("");
+    lines.push("── Sources ──");
+    const sourceLabels = {
+      "360032209131": "Content Security Policy for Pendo",
+      "21374706009883": "Pendo Install API Reference",
+      "21397042498571": "Install Pendo on a Single Page Application",
+      "360032207332": "Manage Visitor and Account Metadata"
+    };
+    sources.forEach(url => {
+      // Extract article ID to generate a human-readable label
+      const match = url.match(/articles\/(\d+)/);
+      const label = match && sourceLabels[match[1]] ? sourceLabels[match[1]] : url;
+      lines.push(`• ${label}: ${url}`);
+    });
   }
 
   return lines.join("\n");
@@ -1460,11 +1512,17 @@ function runPendoSetupAssistant() {
       }
     } catch (perfErr) {}
 
-    // Helper: replace {{SUB_ID}} template with actual subscription ID if detected
+    // Helper: replace {{SUB_ID}} template with actual subscription ID if detected,
+    // or add clear instructions for finding it when not detected.
     function subIdFix(text) {
-      if (!detectedSubId || !text) return text;
-      return text.replace(/\{\{SUB_ID\}\}/g, detectedSubId)
-                 .replace(/\s*\(replace SUB_ID with your Pendo subscription ID from app\.pendo\.io\/s\/\[SUB_ID\]\/\)/gi, "");
+      if (!text) return text;
+      if (detectedSubId) {
+        return text.replace(/\{\{SUB_ID\}\}/g, detectedSubId)
+                   .replace(/\s*\(replace SUB_ID with your Pendo subscription ID from app\.pendo\.io\/s\/\[SUB_ID\]\/\)/gi, "");
+      }
+      // SUB_ID not detected — replace template with placeholder + clear instructions
+      return text.replace(/\{\{SUB_ID\}\}/g, "YOUR_SUB_ID") +
+        "\n  → To find your SUB_ID: log in to app.pendo.io → the number in the URL after /s/ is your subscription ID (e.g. app.pendo.io/s/12345678/ → SUB_ID is 12345678)";
     }
 
     // --- C. Proactive: check what Pendo needs vs what's actually working ---
@@ -1550,7 +1608,7 @@ function runPendoSetupAssistant() {
         if (!hostAllowed(scriptSrc)) {
           csp.issues.push({ directive: "script-src", severity: "error",
             detail: "Pendo domains not allowed in script-src — the Pendo agent and guide code can't load.",
-            fix: "Add to your CSP script-src directive:\n  cdn.pendo.io pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io\n  (Replace SUB_ID with your Pendo subscription ID from app.pendo.io/s/[SUB_ID]/)" });
+            fix: "Add to your CSP script-src directive:\n  cdn.pendo.io pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io\n  (Replace SUB_ID with your Pendo subscription ID from app.pendo.io/s/[SUB_ID]/)\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
         }
         if (!valueAllowed(scriptSrc, "'unsafe-inline'")) {
           var hasNonce = scriptSrc.some(function(v) { return v.indexOf("nonce-") !== -1; });
@@ -1558,13 +1616,13 @@ function runPendoSetupAssistant() {
           if (!hasNonce && !hasHash) {
             csp.issues.push({ directive: "script-src (inline)", severity: "warning",
               detail: "'unsafe-inline' not in script-src and no nonce/hash found — Pendo's inline snippet and guide code blocks won't run.",
-              fix: "Add 'unsafe-inline' to script-src (required for code blocks and classic guides).\n  Or use a nonce: script-src ... 'nonce-YOUR_NONCE'" });
+              fix: "Add 'unsafe-inline' to script-src (required for code blocks and classic guides).\n  Or use a nonce: script-src ... 'nonce-YOUR_NONCE'\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
           }
         }
         if (!valueAllowed(scriptSrc, "'unsafe-eval'") && !valueAllowed(scriptSrc, "*")) {
           csp.issues.push({ directive: "script-src (eval)", severity: "warning",
             detail: "'unsafe-eval' not in script-src — guide code blocks and Resource Center integrations may not execute.",
-            fix: "Add 'unsafe-eval' to script-src (required for code blocks and Resource Center):\n  script-src ... 'unsafe-eval'" });
+            fix: "Add 'unsafe-eval' to script-src (required for code blocks and Resource Center):\n  script-src ... 'unsafe-eval'\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
         }
       }
 
@@ -1575,7 +1633,7 @@ function runPendoSetupAssistant() {
       if (connectSrc.length > 0 && !hostAllowed(connectSrc)) {
         csp.issues.push({ directive: "connect-src", severity: "error",
           detail: "Pendo data endpoints not in connect-src — analytics events, guide data, and Session Replay won't transmit.",
-          fix: "Add to your CSP connect-src directive:\n  data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io" });
+          fix: "Add to your CSP connect-src directive:\n  data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
       }
 
       // style-src
@@ -1587,15 +1645,16 @@ function runPendoSetupAssistant() {
         if (!hostAllowed(styleSrc) && !valueAllowed(styleSrc, "*")) {
           csp.issues.push({ directive: "style-src (hosts)", severity: "warning",
             detail: "Pendo style hosts not in style-src — guide CSS and global styles won't load.",
-            fix: "Add to your CSP style-src directive:\n  pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io" });
+            fix: "Add to your CSP style-src directive:\n  pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
         }
         if (!valueAllowed(styleSrc, "'unsafe-inline'") && !valueAllowed(styleSrc, "*")) {
           var hasStyleNonce = styleSrc.some(function(v) { return v.indexOf("nonce-") !== -1; });
           csp.issues.push({ directive: "style-src (inline)", severity: "warning",
             detail: "'unsafe-inline' not in style-src — Pendo guide pseudo styles (hover, carets, number scale) won't render.",
-            fix: hasStyleNonce
+            fix: (hasStyleNonce
               ? "Pass your nonce to Pendo via the inlineStyleNonce option:\n  pendo.initialize({ inlineStyleNonce: 'YOUR_NONCE' })"
-              : "Add 'unsafe-inline' to your CSP style-src directive." });
+              : "Add 'unsafe-inline' to your CSP style-src directive.") +
+              "\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
         }
       }
 
@@ -1608,6 +1667,7 @@ function runPendoSetupAssistant() {
         var hasDataUri = valueAllowed(imgSrc, "data:");
         var imgFix = "Add to your CSP img-src directive:\n  cdn.pendo.io data.pendo.io pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io app.pendo.io";
         if (!hasDataUri) imgFix += " data:";
+        imgFix += "\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo";
         csp.issues.push({ directive: "img-src", severity: "warning",
           detail: "Pendo not in img-src — guide images won't load and analytics events won't send (Pendo uses img src for event transmission)." + (!hasDataUri ? " Also missing data: for default badge images." : ""),
           fix: imgFix });
@@ -1619,7 +1679,7 @@ function runPendoSetupAssistant() {
       if (fontSrc.length > 0 && !hostAllowed(fontSrc) && !valueAllowed(fontSrc, "*")) {
         csp.issues.push({ directive: "font-src", severity: "warning",
           detail: "Pendo not in font-src — Visual Design Studio fonts, debugger, and guide preview fonts won't load.",
-          fix: "Add to your CSP font-src directive:\n  cdn.pendo.io" });
+          fix: "Add to your CSP font-src directive:\n  cdn.pendo.io\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
       }
 
       // frame-src / child-src
@@ -1628,7 +1688,7 @@ function runPendoSetupAssistant() {
       if (frameSrc.length > 0 && !hostAllowed(frameSrc)) {
         csp.issues.push({ directive: "frame-src", severity: "warning",
           detail: "Pendo not in frame-src — the Visual Design Studio and Listen ideas portal use iframes and will be blocked.",
-          fix: "Add to your CSP frame-src directive:\n  app.pendo.io portal.pendo.io" });
+          fix: "Add to your CSP frame-src directive:\n  app.pendo.io portal.pendo.io\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
       }
 
       // worker-src
@@ -1637,7 +1697,7 @@ function runPendoSetupAssistant() {
       if (workerSrc.length > 0 && !valueAllowed(workerSrc, "*") && !valueAllowed(workerSrc, "blob:")) {
         csp.issues.push({ directive: "worker-src", severity: "warning",
           detail: "blob: not in worker-src — Session Replay's web worker for data compression can't start, impacting replay capture and page performance.",
-          fix: "Add to your CSP worker-src directive:\n  blob:" });
+          fix: "Add to your CSP worker-src directive:\n  blob:\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
       }
 
       // trusted-types (Chromium only, requires SDK ≥ 2.184.0)
@@ -1645,7 +1705,7 @@ function runPendoSetupAssistant() {
       if (trustedTypes.length > 0 && !valueAllowed(trustedTypes, "pendo")) {
         csp.issues.push({ directive: "trusted-types", severity: "warning",
           detail: "Trusted Types policy active but 'pendo' not listed — Pendo DOM operations will be blocked.",
-          fix: "Add to your CSP trusted-types directive:\n  trusted-types pendo" });
+          fix: "Add to your CSP trusted-types directive:\n  trusted-types pendo\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
       }
 
       // --- PROACTIVE: check for directives that SHOULD exist but DON'T ---
@@ -1697,7 +1757,7 @@ function runPendoSetupAssistant() {
           "'unsafe-inline'"];
         csp.issues.push({ directive: "script-src", severity: "error",
           detail: "Pendo scripts blocked" + (hasCdn ? " (cdn.pendo.io)" : "") + (hasStorage ? " (storage.googleapis.com)" : "") + ".",
-          fix: "Add to script-src:\n  " + scriptDomains.join(" ") });
+          fix: "Add to script-src:\n  " + scriptDomains.join(" ") + "\n  (Replace SUB_ID with your Pendo subscription ID from app.pendo.io/s/[SUB_ID]/)" });
       }
 
       // connect-src: data.pendo.io sends analytics, storage serves content
@@ -1848,7 +1908,7 @@ function runPendoSetupAssistant() {
   // Async loading
   if (result.snippet && !result.snippet.isAsync && result.snippet.loadMethod.indexOf("npm") === -1) {
     recommend("warning", "Script not loaded async",
-      "The Pendo snippet is loaded synchronously, which may impact page load performance. Add the async attribute to the script tag.");
+      "The Pendo snippet is loaded synchronously, which blocks page rendering until it finishes downloading.\n  FIX: Add the async attribute to your Pendo <script> tag:\n    <script async src=\"https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js\"></script>\n  If you're using the classic snippet with inline code, add async to the script block that creates the <script> element.\n  Docs: https://support.pendo.io/hc/en-us/articles/21397042498571-Install-Pendo-on-a-single-page-application");
   }
 
   // Duplicate scripts and dual initialization: owned by Health Check tab
@@ -1866,7 +1926,7 @@ function runPendoSetupAssistant() {
   }
   if (sensitiveFields.length > 0) {
     recommend("error", "Potentially sensitive metadata detected",
-      "Fields that may contain sensitive data: " + sensitiveFields.join(", ") + ". Review these fields and exclude any PII, passwords, or tokens.");
+      "Fields that may contain sensitive data: " + sensitiveFields.join(", ") + ".\n  FIX: Remove these fields from your pendo.initialize() call, or replace them with non-sensitive equivalents (e.g. use a hashed email instead of a raw email).\n  To exclude fields in Pendo: Settings → Subscription Settings → Data Mappings → find the field → toggle it off.\n  If these fields are intentional, ensure you have a Data Processing Agreement with Pendo covering PII.\n  Docs: https://support.pendo.io/hc/en-us/articles/360032207332-Manage-visitor-and-account-metadata");
   }
 
   // Nested or array fields
@@ -1880,24 +1940,24 @@ function runPendoSetupAssistant() {
   }
   if (complexFields.length > 0) {
     recommend("warning", "Complex metadata values",
-      "Fields with non-flat values: " + complexFields.join(", ") + ". Pendo works best with flat key-value pairs. Flatten nested objects or convert arrays to strings.");
+      "Fields with non-flat values: " + complexFields.join(", ") + ".\n  FIX: Pendo only processes flat key-value pairs — nested objects and arrays are silently ignored.\n  Instead of: { plan: { name: 'Pro', tier: 2 } }\n  Use:        { plan_name: 'Pro', plan_tier: 2 }\n  Instead of: { tags: ['admin', 'beta'] }\n  Use:        { tags: 'admin,beta' }\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
   }
 
   // Framework-specific timing tips
   if (fw.name.indexOf("React") !== -1 || fw.name.indexOf("Next") !== -1) {
     if (!init.hasVisitorId) {
       recommend("tip", "React initialization timing",
-        "In React, call pendo.initialize() inside a useEffect hook after authentication completes, so the visitor ID is available.");
+        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: Call pendo.initialize() inside a useEffect that depends on your auth state:\n    useEffect(() => {\n      if (user?.id) {\n        pendo.initialize({ visitor: { id: user.id }, account: { id: user.accountId } });\n      }\n    }, [user]);\n  Docs: https://support.pendo.io/hc/en-us/articles/21397042498571-Install-Pendo-on-a-single-page-application");
     }
   } else if (fw.name.indexOf("Vue") !== -1 || fw.name.indexOf("Nuxt") !== -1) {
     if (!init.hasVisitorId) {
       recommend("tip", "Vue initialization timing",
-        "In Vue, call pendo.initialize() in the mounted() lifecycle hook or in a route guard after the user is authenticated.");
+        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: In Vue, call pendo.initialize() in a route guard or in mounted() after the user is authenticated:\n    mounted() {\n      if (this.$auth.user) {\n        pendo.initialize({ visitor: { id: this.$auth.user.id } });\n      }\n    }\n  Docs: https://support.pendo.io/hc/en-us/articles/21397042498571-Install-Pendo-on-a-single-page-application");
     }
   } else if (fw.name.indexOf("Angular") !== -1) {
     if (!init.hasVisitorId) {
       recommend("tip", "Angular initialization timing",
-        "In Angular, call pendo.initialize() in an AfterViewInit lifecycle hook or in a route resolver after fetching user data.");
+        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: In Angular, call pendo.initialize() in an AfterViewInit lifecycle hook or route resolver after fetching user data:\n    ngAfterViewInit() {\n      this.authService.user$.subscribe(user => {\n        pendo.initialize({ visitor: { id: user.id } });\n      });\n    }\n  Docs: https://support.pendo.io/hc/en-us/articles/21397042498571-Install-Pendo-on-a-single-page-application");
     }
   }
 
@@ -1906,7 +1966,7 @@ function runPendoSetupAssistant() {
     var payloadEstimate = JSON.stringify(pendo.metadata || {}).length;
     if (payloadEstimate > 50000) {
       recommend("warning", "Large metadata payload",
-        "Estimated metadata size is " + Math.round(payloadEstimate / 1024) + "KB. Pendo has a 64KB limit. Consider reducing the number of metadata fields.");
+        "Estimated metadata size is " + Math.round(payloadEstimate / 1024) + "KB. Pendo has a 64KB limit per request — exceeding this will silently drop data.\n  FIX: Audit your pendo.initialize() call and remove fields that aren't used for segmentation or analytics.\n  Common culprits: serialized objects, long strings, redundant fields, debug data.\n  To see which fields are actually used: Pendo → Settings → Data Mappings → sort by 'Last Seen'.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
     }
   } catch (e) {}
 
@@ -1918,7 +1978,7 @@ function runPendoSetupAssistant() {
       var major = parseInt(parts[0], 10);
       if (major < 2) {
         recommend("tip", "Agent version may be outdated",
-          "Running Pendo agent v" + ver + ". Check if a newer version is available for improved features and bug fixes.");
+          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo-io/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
       }
     }
   } catch (e) {}
@@ -1929,7 +1989,7 @@ function runPendoSetupAssistant() {
   // No metadata at all
   if (result.visitorFields.length === 0 && result.accountFields.length === 0) {
     recommend("tip", "No metadata fields detected",
-      "Pendo is initialized without visitor or account metadata. Adding fields like email, role, plan_level, and created_at enables richer segmentation and analytics.");
+      "Pendo is initialized without visitor or account metadata. Without metadata, you can't segment users by role, plan, company, or other attributes.\n  FIX: Add metadata fields to your pendo.initialize() call:\n    pendo.initialize({\n      visitor: { id: 'USER_ID', email: 'user@example.com', role: 'admin', created_at: '2024-01-15' },\n      account: { id: 'ACCOUNT_ID', name: 'Acme Corp', plan_level: 'enterprise', is_paying: true }\n    });\n  Start with: email, role, plan_level, created_at, is_paying — these cover 80% of segmentation needs.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
   }
 
   return result;
