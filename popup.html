@@ -73,6 +73,14 @@
       box-sizing: border-box;
     }
 
+    /* === Focus-visible ring (shadcn pattern) === */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
+
     body {
       width: 380px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -156,6 +164,10 @@
       color: var(--foreground);
       border-bottom-color: var(--pendo-pink);
     }
+    .tab:focus-visible {
+      outline-offset: -2px;
+      border-radius: 4px 4px 0 0;
+    }
 
     /* === Tool Buttons (shadcn outline button style) === */
     .tools-grid {
@@ -179,6 +191,9 @@
       text-align: center;
       transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .tool-btn:focus-visible {
+      outline-offset: -1px;
     }
     .tool-btn:hover {
       background: var(--accent);
@@ -683,6 +698,9 @@
     .setup-section-header:hover {
       background: var(--muted);
     }
+    .setup-section-header:focus-visible {
+      outline-offset: -1px;
+    }
     .setup-chevron {
       font-size: 9px;
       color: var(--muted-foreground);
@@ -763,10 +781,10 @@
   <div id="pendo-status" style="display:none"></div>
 
   <!-- Tab Bar -->
-  <div id="tab-bar">
-    <div class="tab" data-tab="health">Health Check</div>
-    <div class="tab" data-tab="setup">Setup Assistant</div>
-    <div class="tab" data-tab="tools">Tools</div>
+  <div id="tab-bar" role="tablist">
+    <div class="tab" data-tab="health" role="tab" tabindex="0" aria-selected="true" aria-controls="panel-health">Health Check</div>
+    <div class="tab" data-tab="setup" role="tab" tabindex="-1" aria-selected="false" aria-controls="panel-setup">Setup Assistant</div>
+    <div class="tab" data-tab="tools" role="tab" tabindex="-1" aria-selected="false" aria-controls="panel-tools">Tools</div>
   </div>
 
   <!-- Loading View -->
@@ -795,7 +813,7 @@
   </div>
 
   <!-- Health Check Panel -->
-  <div id="panel-health" class="tab-panel active">
+  <div id="panel-health" class="tab-panel active" role="tabpanel" aria-labelledby="tab-health">
     <div id="checks-list"></div>
     <div id="health-summary">
       <div id="summary-counts"></div>
@@ -803,7 +821,7 @@
   </div>
 
   <!-- Setup Assistant Panel -->
-  <div id="panel-setup" class="tab-panel">
+  <div id="panel-setup" class="tab-panel" role="tabpanel" aria-labelledby="tab-setup">
     <div id="setup-loading">
       <div class="loading-spinner"></div>
       <p>Analyzing setup…</p>
@@ -815,7 +833,7 @@
   </div>
 
   <!-- Tools Panel -->
-  <div id="panel-tools" class="tab-panel">
+  <div id="panel-tools" class="tab-panel" role="tabpanel" aria-labelledby="tab-tools">
     <!-- Launch Debugger -->
     <div style="padding:12px 4px;border-bottom:1px solid var(--border)">
       <button class="tool-btn" id="tool-launch-debug" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">

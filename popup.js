@@ -152,15 +152,23 @@ function renderPendoStatus(data, detectedEnv) {
 // Click delegation and status setup
 document.addEventListener("DOMContentLoaded", () => {
 
-  // Event delegation for all .setup-section-header clicks (inline onclick is
-  // blocked by Manifest V3 CSP, so we delegate from the document instead)
+  // Event delegation for all .setup-section-header clicks & keyboard (inline
+  // onclick is blocked by Manifest V3 CSP, so we delegate from document)
+  function toggleSection(header) {
+    const section = header.parentElement;
+    if (section && section.classList.contains("setup-section")) {
+      const isOpen = section.classList.toggle("open");
+      header.setAttribute("aria-expanded", isOpen);
+    }
+  }
   document.addEventListener("click", (e) => {
     const header = e.target.closest(".setup-section-header");
-    if (header) {
-      const section = header.parentElement;
-      if (section && section.classList.contains("setup-section")) {
-        section.classList.toggle("open");
-      }
+    if (header) toggleSection(header);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      const header = e.target.closest(".setup-section-header");
+      if (header) { e.preventDefault(); toggleSection(header); }
     }
   });
 });
@@ -172,21 +180,45 @@ document.addEventListener("DOMContentLoaded", () => {
 let setupLoaded = false;
 let activeTabId = null;
 
+function activateTab(tab) {
+  const id = tab.dataset.tab;
+  if (id === activeTabId) return;
+  const tabs = document.querySelectorAll(".tab");
+  tabs.forEach((t) => {
+    t.classList.remove("active");
+    t.setAttribute("aria-selected", "false");
+    t.setAttribute("tabindex", "-1");
+  });
+  tab.classList.add("active");
+  tab.setAttribute("aria-selected", "true");
+  tab.setAttribute("tabindex", "0");
+  tab.focus();
+  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+  document.getElementById("panel-" + id).classList.add("active");
+  activeTabId = id;
+
+  trackEvent("tab_switch", { tab: id });
+
+  if (id === "setup" && !setupLoaded) {
+    setupLoaded = true;
+    runSetup();
+  }
+}
+
 document.querySelectorAll(".tab").forEach((tab) => {
-  tab.addEventListener("click", () => {
-    const id = tab.dataset.tab;
-    if (id === activeTabId) return;
-    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-    tab.classList.add("active");
-    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-    document.getElementById("panel-" + id).classList.add("active");
-    activeTabId = id;
-
-    trackEvent("tab_switch", { tab: id });
-
-    if (id === "setup" && !setupLoaded) {
-      setupLoaded = true;
-      runSetup();
+  tab.addEventListener("click", () => activateTab(tab));
+  tab.addEventListener("keydown", (e) => {
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const idx = tabs.indexOf(tab);
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      const next = e.key === "ArrowRight"
+        ? tabs[(idx + 1) % tabs.length]
+        : tabs[(idx - 1 + tabs.length) % tabs.length];
+      activateTab(next);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activateTab(tab);
     }
   });
 });
@@ -257,7 +289,7 @@ function renderChecks(checks) {
     });
 
     drawer.innerHTML = `
-      <div class="setup-section-header" style="color:var(--muted-foreground)">
+      <div class="setup-section-header" tabindex="0" role="button" aria-expanded="false" style="color:var(--muted-foreground)">
         <span class="setup-chevron">▶</span>
         <span class="setup-section-title">What's Good (${passingChecks.length})</span>
         <span class="setup-section-badge"><span class="badge badge-green">${passingChecks.length} passed</span></span>
@@ -344,7 +376,7 @@ function renderSetup(data) {
   function makeSection(title, badgeHtml, bodyHtml, hasIssue) {
     const html = `
       <div class="setup-section open">
-        <div class="setup-section-header">
+        <div class="setup-section-header" tabindex="0" role="button" aria-expanded="true">
           <span class="setup-chevron">▶</span>
           <span class="setup-section-title">${title}</span>
           <span class="setup-section-badge">${badgeHtml}</span>
@@ -512,7 +544,7 @@ function renderSetup(data) {
     healthySections.forEach((s) => {
       drawerBody += `
         <div class="setup-section">
-          <div class="setup-section-header">
+          <div class="setup-section-header" tabindex="0" role="button" aria-expanded="false">
             <span class="setup-chevron">▶</span>
             <span class="setup-section-title">${s.title}</span>
             <span class="setup-section-badge">${s.badge}</span>
@@ -522,7 +554,7 @@ function renderSetup(data) {
     });
     container.innerHTML += `
       <div class="setup-section" id="whats-good-drawer" style="border-top:1px solid var(--border);margin-top:4px">
-        <div class="setup-section-header" style="color:var(--muted-foreground)">
+        <div class="setup-section-header" tabindex="0" role="button" aria-expanded="false" style="color:var(--muted-foreground)">
           <span class="setup-chevron">▶</span>
           <span class="setup-section-title">What's Good (${healthySections.length})</span>
           <span class="setup-section-badge"><span class="badge badge-green">${healthySections.length} passed</span></span>
