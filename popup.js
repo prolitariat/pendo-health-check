@@ -1465,9 +1465,11 @@ function runPendoHealthCheck() {
       });
 
       if (corsLikely.length > 0 && corsLikely.length === failed.length) {
-        add("warn", "Network Requests", pendoRequests.length + " request(s) to Pendo — " + corsLikely.length + " returned 0 bytes (possible CORS block or ad blocker). Hosts: " + summary);
+        // All requests blocked — emphasize the diagnosis, not the count
+        add("warn", "Network Requests", "All " + pendoRequests.length + " Pendo requests returned 0 bytes — likely blocked by CORS policy, ad blocker, or firewall. Hosts: " + summary);
       } else if (failed.length > 0) {
-        add("warn", "Network Requests", pendoRequests.length + " request(s) to Pendo — " + failed.length + " may have failed (0 bytes). Hosts: " + summary);
+        var pct = Math.round((failed.length / pendoRequests.length) * 100);
+        add("warn", "Network Requests", failed.length + " of " + pendoRequests.length + " Pendo requests failed (" + pct + "% returned 0 bytes). Hosts: " + summary);
       } else {
         add("pass", "Network Requests", pendoRequests.length + " successful request(s). Hosts: " + summary);
       }
