@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pendo Health Check — QA Test Harness</title>
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --surface: #141416;
+      --surface-hover: #1c1c1f;
+      --border: #27272a;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --pink: #c8385d;
+      --pink-dim: #3d1525;
+      --green: #22c55e;
+      --green-dim: #052e16;
+      --yellow: #FEF484;
+      --yellow-dim: #2a2810;
+      --red: #f87171;
+      --red-dim: #450a0a;
+      --blue: #60a5fa;
+      --blue-dim: #172554;
+      --radius: 8px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 0;
+    }
+    .header {
+      background: #000;
+      border-bottom: 2px solid var(--pink);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .header h1 span { color: var(--pink); }
+    .header-actions { display: flex; gap: 8px; }
+    .header-actions button {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .header-actions button:hover { background: var(--surface-hover); border-color: var(--pink); }
+    .header-actions button.active { background: var(--pink); border-color: var(--pink); color: #fff; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: calc(100vh - 54px);
+    }
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      overflow-y: auto;
+      max-height: calc(100vh - 54px);
+      position: sticky;
+      top: 54px;
+    }
+    .main {
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    /* Sidebar sections */
+    .section {
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Toggle switch */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      gap: 8px;
+    }
+    .toggle-label {
+      font-size: 12px;
+      font-weight: 500;
+      flex: 1;
+    }
+    .toggle-label small {
+      display: block;
+      font-weight: 400;
+      color: var(--text-muted);
+      font-size: 10px;
+      line-height: 1.3;
+      margin-top: 1px;
+    }
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle .slider::before {
+      content: "";
+      position: absolute;
+      width: 16px; height: 16px;
+      left: 2px; top: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .slider { background: var(--pink); }
+    .toggle input:checked + .slider::before { transform: translateX(16px); }
+
+    /* Select */
+    .select-row {
+      padding: 6px 0;
+    }
+    .select-row label {
+      font-size: 12px;
+      font-weight: 500;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .select-row select {
+      width: 100%;
+      padding: 5px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    /* Presets */
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .preset-btn {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .preset-btn:hover { background: var(--surface-hover); border-color: var(--pink); }
+    .preset-btn small { display: block; color: var(--text-muted); font-weight: 400; font-size: 10px; }
+    .preset-btn.active { border-color: var(--pink); background: var(--pink-dim); }
+
+    /* Status log */
+    .log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .log .pass { color: var(--green); }
+    .log .warn { color: var(--yellow); }
+    .log .fail { color: var(--red); }
+    .log .info { color: var(--blue); }
+    .log .muted { color: var(--text-muted); }
+    .log .header-line { color: var(--pink); font-weight: 600; }
+
+    /* Active state indicator */
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+    .state-chip {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 500;
+      text-align: center;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .state-chip.on {
+      background: var(--green-dim);
+      border-color: var(--green);
+      color: var(--green);
+    }
+    .state-chip.broken {
+      background: var(--red-dim);
+      border-color: var(--red);
+      color: var(--red);
+    }
+    .state-chip.degraded {
+      background: var(--yellow-dim);
+      border-color: #a16207;
+      color: var(--yellow);
+    }
+
+    h2 { font-size: 14px; font-weight: 600; margin-bottom: 12px; letter-spacing: -0.01em; }
+    h3 { font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+    /* CSP meta tag display */
+    #csp-display {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: "SF Mono", monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 12px;
+      word-break: break-all;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🩺 Pendo Health Check — <span>QA Test Harness</span></h1>
+  <div class="header-actions">
+    <button id="btn-apply" class="active" onclick="applyState()">Apply State</button>
+    <button id="btn-reset" onclick="resetAll()">Reset All</button>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- ===== SIDEBAR: Controls ===== -->
+  <div class="sidebar">
+    <div class="section">
+      <div class="section-title">Quick Presets</div>
+      <div class="preset-grid">
+        <button class="preset-btn" onclick="loadPreset('healthy')">
+          ✅ Healthy
+          <small>All checks pass</small>
+        </button>
+        <button class="preset-btn" onclick="loadPreset('broken')">
+          ❌ Broken
+          <small>Agent fails to load</small>
+        </button>
+        <button class="preset-btn" onclick="loadPreset('csp-blocked')">
+          🔒 CSP Blocked
+          <small>Strict CSP, no Pendo</small>
+        </button>
+        <button class="preset-btn" onclick="loadPreset('gdpr-waiting')">
+          🇪🇺 GDPR Waiting
+          <small>CMP active, no consent</small>
+        </button>
+        <button class="preset-btn" onclick="loadPreset('cname')">
+          🏷️ CNAME Setup
+          <small>Custom domains active</small>
+        </button>
+        <button class="preset-btn" onclick="loadPreset('ad-blocked')">
+          🛡️ Ad Blocked
+          <small>Pendo blocked by adblocker</small>
+        </button>
+        <button class="preset-btn" onclick="loadPreset('partial')">
+          ⚠️ Partial Setup
+          <small>Loaded, bad metadata</small>
+        </button>
+        <button class="preset-btn" onclick="loadPreset('react-spa')">
+          ⚛️ React SPA
+          <small>React + timing issues</small>
+        </button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Pendo Agent</div>
+      <div class="toggle-row">
+        <span class="toggle-label">window.pendo exists<small>Core agent object</small></span>
+        <label class="toggle"><input type="checkbox" id="t-pendo" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">pendo.isReady() → true<small>Agent fully initialized</small></span>
+        <label class="toggle"><input type="checkbox" id="t-ready" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Pendo script tag present<small>Snippet in DOM</small></span>
+        <label class="toggle"><input type="checkbox" id="t-script" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Script has async attribute<small>Non-blocking load</small></span>
+        <label class="toggle"><input type="checkbox" id="t-async" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Dual pendo instance (pendo_)<small>Multiple agent copies</small></span>
+        <label class="toggle"><input type="checkbox" id="t-dual"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Identity & Metadata</div>
+      <div class="select-row">
+        <label>Visitor ID</label>
+        <select id="s-visitor">
+          <option value="user-12345">user-12345 (identified)</option>
+          <option value="_anon_abc">_anon_abc (anonymous)</option>
+          <option value="">Empty / missing</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label>Account ID</label>
+        <select id="s-account">
+          <option value="acme-corp">acme-corp</option>
+          <option value="">Missing</option>
+        </select>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Include visitor metadata<small>role, email, createdAt</small></span>
+        <label class="toggle"><input type="checkbox" id="t-visitor-meta" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Include sensitive fields<small>ssn, creditCard in metadata</small></span>
+        <label class="toggle"><input type="checkbox" id="t-sensitive"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Nested/complex metadata<small>Objects, arrays, functions</small></span>
+        <label class="toggle"><input type="checkbox" id="t-complex-meta"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Large metadata payload<small>>50 fields, >10KB</small></span>
+        <label class="toggle"><input type="checkbox" id="t-large-meta"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Guides & Features</div>
+      <div class="select-row">
+        <label>Active Guides</label>
+        <select id="s-guides">
+          <option value="3">3 guides loaded</option>
+          <option value="0">0 guides</option>
+          <option value="unavailable">pendo.guides unavailable</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label>Agent Version</label>
+        <select id="s-version">
+          <option value="2.225.2">2.225.2 (current)</option>
+          <option value="2.180.0">2.180.0 (outdated)</option>
+          <option value="">Unknown</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Network & Hosting</div>
+      <div class="select-row">
+        <label>Content Host</label>
+        <select id="s-content-host">
+          <option value="cdn.pendo.io">cdn.pendo.io (default)</option>
+          <option value="content.product.acme.com">content.product.acme.com (CNAME)</option>
+          <option value="cdn.eu.pendo.io">cdn.eu.pendo.io (EU)</option>
+        </select>
+      </div>
+      <div class="select-row">
+        <label>Data Host</label>
+        <select id="s-data-host">
+          <option value="data.pendo.io">data.pendo.io (default)</option>
+          <option value="data.product.acme.com">data.product.acme.com (CNAME)</option>
+          <option value="data.eu.pendo.io">data.eu.pendo.io (EU)</option>
+        </select>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Simulate ad blocker<small>Block Pendo resource fetch</small></span>
+        <label class="toggle"><input type="checkbox" id="t-adblock"><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Simulate CORS failure<small>0-byte cross-origin responses</small></span>
+        <label class="toggle"><input type="checkbox" id="t-cors"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">CSP (Content Security Policy)</div>
+      <div class="select-row">
+        <label>CSP Mode</label>
+        <select id="s-csp">
+          <option value="none">No CSP</option>
+          <option value="permissive">Permissive (Pendo allowed)</option>
+          <option value="strict-no-pendo">Strict (Pendo blocked)</option>
+          <option value="partial">Partial (some directives missing)</option>
+          <option value="nonce">Nonce-based (no unsafe-inline)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">CMP / GDPR</div>
+      <div class="select-row">
+        <label>Consent Platform</label>
+        <select id="s-cmp">
+          <option value="none">No CMP</option>
+          <option value="onetrust">OneTrust</option>
+          <option value="cookiebot">Cookiebot</option>
+          <option value="didomi">Didomi</option>
+          <option value="osano">Osano</option>
+          <option value="trustarc">TrustArc</option>
+          <option value="tcf">IAB TCF v2</option>
+          <option value="generic">Generic cookie banner</option>
+        </select>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">EU locale (navigator.language)<small>Simulates de/fr/es etc.</small></span>
+        <label class="toggle"><input type="checkbox" id="t-eu-locale"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Framework</div>
+      <div class="select-row">
+        <label>Detected Framework</label>
+        <select id="s-framework">
+          <option value="none">None (vanilla JS)</option>
+          <option value="react">React 18.2</option>
+          <option value="react-next">React + Next.js</option>
+          <option value="vue">Vue 3</option>
+          <option value="angular">Angular 16</option>
+          <option value="svelte">Svelte</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN: State display & log ===== -->
+  <div class="main">
+    <h2>Active State</h2>
+    <div class="state-grid" id="state-chips"></div>
+
+    <h2>Applied Configuration</h2>
+    <div class="log" id="state-log">Click "Apply State" to emulate the selected configuration.</div>
+
+    <div id="csp-display" style="display:none"></div>
+
+    <div style="margin-top: 24px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);">
+      <h3>How to Use</h3>
+      <ol style="padding-left: 20px; font-size: 12px; color: var(--text-muted); line-height: 1.8;">
+        <li>Select a <strong>preset</strong> or configure toggles manually</li>
+        <li>Click <strong>Apply State</strong> to inject the mock Pendo environment</li>
+        <li>Open the <strong>Pendo Health Check extension</strong> on this tab</li>
+        <li>Verify the extension detects the correct state and produces accurate remediation</li>
+        <li>Use <strong>Copy Issues</strong> in the extension to verify clipboard output</li>
+      </ol>
+      <p style="font-size: 11px; color: var(--text-muted); margin-top: 12px;">
+        <strong>Note:</strong> This page injects mock globals (window.pendo, window.OneTrust, etc.)
+        and DOM elements (script tags, CSP meta tags) to simulate real-world Pendo deployment states.
+        The extension runs its checks against these mocks just as it would on a production site.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// =========================================================================
+// QA Test Harness — Pendo Health Check Extension
+// Emulates all detectable Pendo states for regression testing
+// =========================================================================
+
+// --- State chips for visual feedback ---
+const CHIPS = [
+  { id: "pendo", label: "Pendo Agent" },
+  { id: "ready", label: "Initialized" },
+  { id: "visitor", label: "Visitor ID" },
+  { id: "account", label: "Account ID" },
+  { id: "metadata", label: "Metadata" },
+  { id: "guides", label: "Guides" },
+  { id: "cname", label: "CNAME" },
+  { id: "csp", label: "CSP" },
+  { id: "cmp", label: "CMP/GDPR" },
+  { id: "adblock", label: "Ad Blocker" },
+  { id: "cors", label: "CORS" },
+  { id: "framework", label: "Framework" },
+];
+
+function initChips() {
+  const grid = document.getElementById("state-chips");
+  grid.innerHTML = CHIPS.map(c =>
+    `<div class="state-chip" id="chip-${c.id}">${c.label}</div>`
+  ).join("");
+}
+initChips();
+
+function setChip(id, state) {
+  const el = document.getElementById("chip-" + id);
+  if (!el) return;
+  el.className = "state-chip" + (state ? " " + state : "");
+}
+
+// --- Cleanup previous state ---
+function cleanup() {
+  delete window.pendo;
+  delete window.pendo_;
+  delete window.React;
+  delete window.__REACT_DEVTOOLS_GLOBAL_HOOK__;
+  delete window.__NEXT_DATA__;
+  delete window.Vue;
+  delete window.__VUE__;
+  delete window.ng;
+  delete window.getAllAngularRootElements;
+  delete window.__svelte_devtools;
+  delete window.OneTrust;
+  delete window.OptanonWrapper;
+  delete window.OnetrustActiveGroups;
+  delete window.Cookiebot;
+  delete window.CookieConsent;
+  delete window.Didomi;
+  delete window.didomiOnReady;
+  delete window.Osano;
+  delete window.truste;
+  delete window.__cmp;
+  delete window.quantserve;
+  delete window.__tcfapi;
+
+  // Remove injected DOM elements
+  document.querySelectorAll("[data-qa-harness]").forEach(el => el.remove());
+
+  // Remove CSP meta
+  document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').forEach(el => el.remove());
+
+  // Reset chips
+  CHIPS.forEach(c => setChip(c.id, ""));
+
+  // Remove cookie consent banners
+  document.querySelectorAll(".cookie-consent, .cookie-banner, .gdpr-banner").forEach(el => el.remove());
+}
+
+// --- Apply current state ---
+function applyState() {
+  cleanup();
+  const log = [];
+
+  log.push("═══ Pendo QA State Applied ═══");
+  log.push("Time: " + new Date().toLocaleString());
+  log.push("");
+
+  const pendoEnabled = document.getElementById("t-pendo").checked;
+  const isReady = document.getElementById("t-ready").checked;
+  const hasScript = document.getElementById("t-script").checked;
+  const isAsync = document.getElementById("t-async").checked;
+  const isDual = document.getElementById("t-dual").checked;
+  const visitorId = document.getElementById("s-visitor").value;
+  const accountId = document.getElementById("s-account").value;
+  const hasVisitorMeta = document.getElementById("t-visitor-meta").checked;
+  const hasSensitive = document.getElementById("t-sensitive").checked;
+  const hasComplexMeta = document.getElementById("t-complex-meta").checked;
+  const hasLargeMeta = document.getElementById("t-large-meta").checked;
+  const guidesVal = document.getElementById("s-guides").value;
+  const version = document.getElementById("s-version").value;
+  const contentHost = document.getElementById("s-content-host").value;
+  const dataHost = document.getElementById("s-data-host").value;
+  const adblock = document.getElementById("t-adblock").checked;
+  const cors = document.getElementById("t-cors").checked;
+  const cspMode = document.getElementById("s-csp").value;
+  const cmpType = document.getElementById("s-cmp").value;
+  const euLocale = document.getElementById("t-eu-locale").checked;
+  const framework = document.getElementById("s-framework").value;
+
+  // ---- 1. Pendo Agent ----
+  if (pendoEnabled) {
+    const visitorMeta = {};
+    if (hasVisitorMeta) {
+      visitorMeta.role = "admin";
+      visitorMeta.email = "user@acme.com";
+      visitorMeta.createdAt = "2024-01-15T00:00:00Z";
+      visitorMeta.plan = "enterprise";
+    }
+    if (hasSensitive) {
+      visitorMeta.ssn = "123-45-6789";
+      visitorMeta.creditCard = "4111111111111111";
+      visitorMeta.password = "hunter2";
+    }
+    if (hasComplexMeta) {
+      visitorMeta.address = { street: "123 Main St", city: "Anytown", state: "CA" };
+      visitorMeta.tags = ["admin", "beta-tester", "enterprise"];
+      visitorMeta.getStatus = function() { return "active"; };
+    }
+    if (hasLargeMeta) {
+      for (let i = 0; i < 60; i++) {
+        visitorMeta["field_" + i] = "value_" + i + "_" + "x".repeat(100);
+      }
+    }
+
+    const guides = [];
+    if (guidesVal !== "unavailable") {
+      const count = parseInt(guidesVal) || 0;
+      for (let i = 0; i < count; i++) {
+        guides.push({ id: "guide_" + i, name: "Test Guide " + (i + 1), steps: [{}] });
+      }
+    }
+
+    window.pendo = {
+      visitorId: visitorId || undefined,
+      accountId: accountId || undefined,
+      VERSION: version || undefined,
+      apiKey: "test-api-key-12345678",
+      HOST: dataHost,
+      _config: {
+        dataHost: dataHost,
+        contentHost: contentHost,
+      },
+      isReady: function() { return isReady; },
+      get: function(key) {
+        if (key === "options") return { dataHost: dataHost, contentHost: contentHost };
+        return null;
+      },
+      getActiveGuides: guidesVal !== "unavailable" ? function() { return guides; } : undefined,
+      guides: guidesVal !== "unavailable" ? guides : undefined,
+      getVisitorId: function() { return visitorId; },
+      identity: { visitor: { id: visitorId, ...visitorMeta } },
+      metadata: { visitor: visitorMeta, account: accountId ? { id: accountId, name: "Acme Corp" } : {} },
+    };
+
+    if (isDual) {
+      window.pendo_ = { ...window.pendo };
+    }
+
+    setChip("pendo", "on");
+    setChip("ready", isReady ? "on" : "degraded");
+    log.push("[PASS] window.pendo created" + (isDual ? " + window.pendo_ (dual)" : ""));
+    log.push("  visitorId: " + (visitorId || "(empty)"));
+    log.push("  accountId: " + (accountId || "(empty)"));
+    log.push("  version: " + (version || "(unknown)"));
+    log.push("  isReady: " + isReady);
+  } else {
+    setChip("pendo", "broken");
+    log.push("[FAIL] window.pendo NOT created — agent missing");
+  }
+
+  // Visitor / Account chips
+  if (pendoEnabled) {
+    setChip("visitor", visitorId ? (visitorId.startsWith("_anon") ? "degraded" : "on") : "broken");
+    setChip("account", accountId ? "on" : "degraded");
+    setChip("metadata", hasVisitorMeta ? (hasSensitive || hasComplexMeta ? "degraded" : "on") : "broken");
+    setChip("guides", guidesVal === "unavailable" ? "broken" : (parseInt(guidesVal) > 0 ? "on" : "degraded"));
+  }
+
+  // ---- 2. Script Tag ----
+  if (hasScript) {
+    const script = document.createElement("script");
+    script.src = "https://" + contentHost + "/agent/static/test-api-key-12345678/pendo.js";
+    if (isAsync) script.async = true;
+    script.setAttribute("data-qa-harness", "true");
+    document.head.appendChild(script);
+    // Prevent actual load
+    script.onerror = () => {};
+    log.push("");
+    log.push("[INFO] Pendo script tag injected" + (isAsync ? " (async)" : " (sync — will trigger warning)"));
+  }
+
+  // ---- 3. CNAME ----
+  const isDefaultCdn = contentHost.includes("pendo.io") && dataHost.includes("pendo.io");
+  if (!isDefaultCdn) {
+    setChip("cname", "on");
+    log.push("");
+    log.push("[PASS] CNAME configured:");
+    log.push("  contentHost: " + contentHost);
+    log.push("  dataHost: " + dataHost);
+  } else {
+    setChip("cname", "degraded");
+    log.push("");
+    log.push("[WARN] Default Pendo CDN (no CNAME) — tip will recommend CNAME setup");
+  }
+
+  // ---- 4. Performance API mocks (network, ad blocker, CORS) ----
+  // We mock performance.getEntriesByType to return fake resource entries
+  const realGetEntries = performance.getEntriesByType.bind(performance);
+  const fakeResources = [];
+
+  if (pendoEnabled && !adblock) {
+    // Normal Pendo requests
+    fakeResources.push({
+      name: "https://" + contentHost + "/agent/static/test-api-key-12345678/pendo.js",
+      initiatorType: "script",
+      transferSize: cors ? 0 : 45000,
+      encodedBodySize: cors ? 0 : 45000,
+      decodedBodySize: cors ? 0 : 45000,
+      duration: 120,
+    });
+    fakeResources.push({
+      name: "https://" + dataHost + "/data/ptm/event",
+      initiatorType: "xmlhttprequest",
+      transferSize: cors ? 0 : 200,
+      encodedBodySize: cors ? 0 : 200,
+      decodedBodySize: cors ? 0 : 200,
+      duration: 80,
+    });
+    // Guide content
+    fakeResources.push({
+      name: "https://pendo-static-12345678.storage.googleapis.com/guide-content.js",
+      initiatorType: "script",
+      transferSize: cors ? 0 : 12000,
+      encodedBodySize: cors ? 0 : 12000,
+      decodedBodySize: cors ? 0 : 12000,
+      duration: 95,
+    });
+  }
+
+  if (adblock) {
+    // Ad blocker: Pendo resources loaded but got 0 bytes
+    fakeResources.push({
+      name: "https://cdn.pendo.io/agent/static/test-api-key/pendo.js",
+      initiatorType: "script",
+      transferSize: 0,
+      encodedBodySize: 0,
+      decodedBodySize: 0,
+      duration: 5,
+    });
+    setChip("adblock", "broken");
+    log.push("");
+    log.push("[FAIL] Ad blocker simulation active — Pendo resources will show as blocked");
+  } else {
+    setChip("adblock", "on");
+  }
+
+  if (cors) {
+    setChip("cors", "broken");
+    log.push("");
+    log.push("[FAIL] CORS simulation active — requests will show 0 bytes (non-cached)");
+  } else {
+    setChip("cors", pendoEnabled ? "on" : "");
+  }
+
+  performance.getEntriesByType = function(type) {
+    if (type === "resource") {
+      return [...realGetEntries("resource"), ...fakeResources];
+    }
+    return realGetEntries(type);
+  };
+  // Tag for cleanup
+  performance._qa_restore = realGetEntries;
+  log.push("");
+  log.push("[INFO] Performance API mocked with " + fakeResources.length + " fake resource entries");
+
+  // ---- 5. CSP ----
+  if (cspMode !== "none") {
+    let cspContent = "";
+    switch (cspMode) {
+      case "permissive":
+        cspContent = "default-src 'self' *.pendo.io *.storage.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.pendo.io *.pendo.io pendo-io-static.storage.googleapis.com *.storage.googleapis.com; connect-src 'self' data.pendo.io app.pendo.io *.pendo.io *.storage.googleapis.com; style-src 'self' 'unsafe-inline' *.pendo.io *.storage.googleapis.com; img-src 'self' data: *.pendo.io *.storage.googleapis.com; font-src 'self' *.pendo.io *.storage.googleapis.com; frame-src 'self' app.pendo.io";
+        break;
+      case "strict-no-pendo":
+        cspContent = "default-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; frame-src 'none'";
+        break;
+      case "partial":
+        cspContent = "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.pendo.io; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:";
+        break;
+      case "nonce":
+        cspContent = "default-src 'self'; script-src 'self' 'nonce-abc123' cdn.pendo.io *.pendo.io pendo-io-static.storage.googleapis.com; connect-src 'self' *.pendo.io; style-src 'self' 'unsafe-inline'";
+        break;
+    }
+    const meta = document.createElement("meta");
+    meta.setAttribute("http-equiv", "Content-Security-Policy");
+    meta.setAttribute("content", cspContent);
+    meta.setAttribute("data-qa-harness", "true");
+    document.head.appendChild(meta);
+
+    setChip("csp", cspMode === "permissive" ? "on" : (cspMode === "strict-no-pendo" ? "broken" : "degraded"));
+    log.push("");
+    log.push("[INFO] CSP meta tag injected: " + cspMode);
+
+    const cspDisplay = document.getElementById("csp-display");
+    cspDisplay.style.display = "block";
+    cspDisplay.textContent = "CSP: " + cspContent;
+  } else {
+    setChip("csp", "on");
+    document.getElementById("csp-display").style.display = "none";
+  }
+
+  // ---- 6. CMP / GDPR ----
+  if (cmpType !== "none") {
+    const pendoActive = pendoEnabled && isReady;
+    switch (cmpType) {
+      case "onetrust":
+        window.OneTrust = { GetDomainData: function() { return {}; } };
+        window.OptanonWrapper = function() {};
+        window.OnetrustActiveGroups = pendoActive ? ",C0001,C0002,C0003," : ",C0001,";
+        break;
+      case "cookiebot":
+        window.Cookiebot = {
+          consent: {
+            necessary: true,
+            statistics: pendoActive,
+            marketing: pendoActive,
+            preferences: pendoActive,
+          },
+          regulations: { gdprApplies: true },
+        };
+        window.CookieConsent = window.Cookiebot;
+        break;
+      case "didomi":
+        window.Didomi = { getUserConsentStatusForPurpose: function() { return pendoActive; } };
+        window.didomiOnReady = [];
+        break;
+      case "osano":
+        window.Osano = { cm: { mode: pendoActive ? "accept" : "deny" } };
+        break;
+      case "trustarc":
+        window.truste = { eu: { bindMap: {} } };
+        const trustDiv = document.createElement("div");
+        trustDiv.id = "truste-consent-track";
+        trustDiv.setAttribute("data-qa-harness", "true");
+        document.body.appendChild(trustDiv);
+        break;
+      case "tcf":
+        window.__tcfapi = function(cmd, version, callback) {
+          if (cmd === "getTCData") {
+            callback({ gdprApplies: true, tcString: "mock-tc-string", vendor: {} }, true);
+          }
+        };
+        break;
+      case "generic":
+        const banner = document.createElement("div");
+        banner.className = "cookie-consent";
+        banner.id = "cookie-consent-banner";
+        banner.setAttribute("data-qa-harness", "true");
+        banner.style.cssText = "position:fixed;bottom:0;left:0;right:0;background:#333;color:#fff;padding:12px 20px;font-size:13px;z-index:9999;display:flex;align-items:center;justify-content:space-between;";
+        banner.innerHTML = 'This site uses cookies for analytics. <button onclick="this.parentElement.remove()" style="padding:4px 12px;border:1px solid #fff;background:transparent;color:#fff;border-radius:4px;cursor:pointer;">Accept</button>';
+        document.body.appendChild(banner);
+        break;
+    }
+    setChip("cmp", pendoActive ? "on" : "degraded");
+    log.push("");
+    log.push("[INFO] CMP injected: " + cmpType + (pendoActive ? " (consent granted)" : " (consent pending)"));
+  } else {
+    setChip("cmp", euLocale ? "degraded" : "");
+    if (euLocale) {
+      log.push("");
+      log.push("[WARN] No CMP but EU locale active — GDPR warning expected");
+    }
+  }
+
+  // ---- 7. EU Locale override ----
+  if (euLocale) {
+    // We can't override navigator.language directly, but we can set html lang
+    document.documentElement.lang = "de-DE";
+    log.push("[INFO] HTML lang set to de-DE (EU locale simulation)");
+  } else {
+    document.documentElement.lang = "en";
+  }
+
+  // ---- 8. Framework ----
+  switch (framework) {
+    case "react":
+      window.React = { version: "18.2.0" };
+      window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {};
+      setChip("framework", "on");
+      log.push("");
+      log.push("[INFO] React 18.2.0 injected");
+      break;
+    case "react-next":
+      window.React = { version: "18.2.0" };
+      window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {};
+      window.__NEXT_DATA__ = { buildId: "test-build" };
+      const nextDiv = document.createElement("div");
+      nextDiv.id = "__next";
+      nextDiv.setAttribute("data-qa-harness", "true");
+      document.body.appendChild(nextDiv);
+      setChip("framework", "on");
+      log.push("");
+      log.push("[INFO] React 18.2.0 + Next.js injected");
+      break;
+    case "vue":
+      window.Vue = { version: "3.3.4" };
+      window.__VUE__ = {};
+      setChip("framework", "on");
+      log.push("");
+      log.push("[INFO] Vue 3.3.4 injected");
+      break;
+    case "angular":
+      window.ng = { getComponent: function() {} };
+      window.getAllAngularRootElements = function() { return [document.body]; };
+      setChip("framework", "on");
+      log.push("");
+      log.push("[INFO] Angular injected");
+      break;
+    case "svelte":
+      window.__svelte_devtools = {};
+      setChip("framework", "on");
+      log.push("");
+      log.push("[INFO] Svelte injected");
+      break;
+    default:
+      setChip("framework", "");
+      break;
+  }
+
+  // ---- Render log ----
+  log.push("");
+  log.push("═══ Ready for Extension Testing ═══");
+  log.push("Open the Pendo Health Check extension now.");
+
+  const logEl = document.getElementById("state-log");
+  logEl.innerHTML = log.map(line => {
+    if (line.startsWith("═══")) return `<span class="header-line">${line}</span>`;
+    if (line.startsWith("[PASS]")) return `<span class="pass">${line}</span>`;
+    if (line.startsWith("[FAIL]")) return `<span class="fail">${line}</span>`;
+    if (line.startsWith("[WARN]")) return `<span class="warn">${line}</span>`;
+    if (line.startsWith("[INFO]")) return `<span class="info">${line}</span>`;
+    if (line.startsWith("  ")) return `<span class="muted">${line}</span>`;
+    return line;
+  }).join("\n");
+}
+
+// --- Reset ---
+function resetAll() {
+  cleanup();
+  if (performance._qa_restore) {
+    performance.getEntriesByType = performance._qa_restore;
+    delete performance._qa_restore;
+  }
+
+  // Reset all toggles to defaults
+  document.getElementById("t-pendo").checked = true;
+  document.getElementById("t-ready").checked = true;
+  document.getElementById("t-script").checked = true;
+  document.getElementById("t-async").checked = true;
+  document.getElementById("t-dual").checked = false;
+  document.getElementById("s-visitor").value = "user-12345";
+  document.getElementById("s-account").value = "acme-corp";
+  document.getElementById("t-visitor-meta").checked = true;
+  document.getElementById("t-sensitive").checked = false;
+  document.getElementById("t-complex-meta").checked = false;
+  document.getElementById("t-large-meta").checked = false;
+  document.getElementById("s-guides").value = "3";
+  document.getElementById("s-version").value = "2.225.2";
+  document.getElementById("s-content-host").value = "cdn.pendo.io";
+  document.getElementById("s-data-host").value = "data.pendo.io";
+  document.getElementById("t-adblock").checked = false;
+  document.getElementById("t-cors").checked = false;
+  document.getElementById("s-csp").value = "none";
+  document.getElementById("s-cmp").value = "none";
+  document.getElementById("t-eu-locale").checked = false;
+  document.getElementById("s-framework").value = "none";
+
+  document.getElementById("state-log").innerHTML = '<span class="muted">State reset. Configure toggles and click Apply.</span>';
+  document.getElementById("csp-display").style.display = "none";
+  document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+}
+
+// --- Presets ---
+function loadPreset(name) {
+  resetAll();
+  document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+  event.target.closest(".preset-btn").classList.add("active");
+
+  switch (name) {
+    case "healthy":
+      // Defaults are already healthy
+      break;
+
+    case "broken":
+      document.getElementById("t-pendo").checked = false;
+      document.getElementById("t-ready").checked = false;
+      document.getElementById("t-script").checked = false;
+      document.getElementById("s-visitor").value = "";
+      document.getElementById("s-account").value = "";
+      document.getElementById("t-visitor-meta").checked = false;
+      document.getElementById("s-guides").value = "unavailable";
+      document.getElementById("s-version").value = "";
+      break;
+
+    case "csp-blocked":
+      document.getElementById("s-csp").value = "strict-no-pendo";
+      document.getElementById("t-ready").checked = false;
+      document.getElementById("s-guides").value = "0";
+      break;
+
+    case "gdpr-waiting":
+      document.getElementById("s-cmp").value = "onetrust";
+      document.getElementById("t-eu-locale").checked = true;
+      document.getElementById("t-ready").checked = false;
+      document.getElementById("s-visitor").value = "";
+      document.getElementById("s-account").value = "";
+      document.getElementById("t-visitor-meta").checked = false;
+      document.getElementById("s-guides").value = "0";
+      break;
+
+    case "cname":
+      document.getElementById("s-content-host").value = "content.product.acme.com";
+      document.getElementById("s-data-host").value = "data.product.acme.com";
+      break;
+
+    case "ad-blocked":
+      document.getElementById("t-adblock").checked = true;
+      document.getElementById("t-ready").checked = false;
+      document.getElementById("s-guides").value = "0";
+      break;
+
+    case "partial":
+      document.getElementById("t-visitor-meta").checked = true;
+      document.getElementById("t-sensitive").checked = true;
+      document.getElementById("t-complex-meta").checked = true;
+      document.getElementById("s-account").value = "";
+      document.getElementById("s-version").value = "2.180.0";
+      document.getElementById("t-async").checked = false;
+      break;
+
+    case "react-spa":
+      document.getElementById("s-framework").value = "react-next";
+      document.getElementById("t-ready").checked = false;
+      document.getElementById("s-visitor").value = "_anon_abc";
+      document.getElementById("s-account").value = "";
+      document.getElementById("t-visitor-meta").checked = false;
+      document.getElementById("s-guides").value = "0";
+      break;
+  }
+
+  applyState();
+}
+
+// Auto-apply healthy state on load
+window.addEventListener("DOMContentLoaded", () => applyState());
+</script>
+</body>
+</html>

@@ -770,6 +770,116 @@
       word-break: break-word;
       line-height: 1.5;
     }
+
+    /* === Onboarding Tour === */
+    .tour-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 2000;
+      transition: opacity 0.2s;
+    }
+    .tour-spotlight {
+      position: absolute;
+      border-radius: var(--radius);
+      box-shadow: 0 0 0 4000px rgba(0,0,0,0.55);
+      z-index: 2001;
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+    .tour-tooltip {
+      position: absolute;
+      z-index: 2002;
+      background: var(--card);
+      border: 1px solid var(--pendo-pink);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      width: 260px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(200,56,93,0.15);
+      animation: tour-fade-in 0.25s ease;
+    }
+    @keyframes tour-fade-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .tour-tooltip::before {
+      content: "";
+      position: absolute;
+      width: 10px; height: 10px;
+      background: var(--card);
+      border-left: 1px solid var(--pendo-pink);
+      border-top: 1px solid var(--pendo-pink);
+      transform: rotate(45deg);
+    }
+    .tour-tooltip.arrow-top::before { top: -6px; left: 24px; }
+    .tour-tooltip.arrow-bottom::before { bottom: -6px; left: 24px; transform: rotate(225deg); }
+    .tour-tooltip.arrow-left::before { left: -6px; top: 16px; transform: rotate(-45deg); }
+    .tour-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--foreground);
+    }
+    .tour-body {
+      font-size: 12px;
+      color: var(--muted-foreground);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .tour-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tour-dots {
+      display: flex;
+      gap: 5px;
+    }
+    .tour-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.2s;
+    }
+    .tour-dot.active { background: var(--pendo-pink); }
+    .tour-actions { display: flex; gap: 6px; }
+    .tour-btn {
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--background);
+      color: var(--foreground);
+      transition: all 0.15s;
+    }
+    .tour-btn:hover { background: var(--muted); }
+    .tour-btn-primary {
+      background: var(--pendo-pink-btn);
+      color: #fff;
+      border-color: transparent;
+    }
+    .tour-btn-primary:hover { opacity: 0.9; background: var(--pendo-pink-btn); }
+    .tour-skip {
+      font-size: 11px;
+      color: var(--muted-foreground);
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 4px;
+    }
+    .tour-skip:hover { color: var(--foreground); }
+
+    /* Copy button pulse */
+    @keyframes copy-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(200,56,93,0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(200,56,93,0); }
+    }
+    .copy-pulse {
+      animation: copy-pulse 1.5s ease-in-out 3;
+      border-color: var(--pendo-pink) !important;
+    }
   </style>
 </head>
 <body>

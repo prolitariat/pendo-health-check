@@ -174,6 +174,163 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ---------------------------------------------------------------------------
+// First-Run Onboarding Tour
+// ---------------------------------------------------------------------------
+
+const TOUR_STEPS = [
+  {
+    target: "#tab-bar",
+    title: "Welcome to Pendo Health Check",
+    body: "This extension runs diagnostics on any page with Pendo installed. Let's take a quick look at what's here.",
+    arrow: "top",
+  },
+  {
+    target: '[data-tab="health"]',
+    title: "Health Check",
+    body: "Instant pass/fail diagnostics — agent loaded, visitor ID, network requests, ad blockers, CMP/GDPR, and more.",
+    arrow: "top",
+  },
+  {
+    target: '[data-tab="setup"]',
+    title: "Setup Assistant",
+    body: "Deep-dive analysis of your Pendo snippet — framework detection, CSP policy, metadata validation, and actionable recommendations.",
+    arrow: "top",
+  },
+  {
+    target: '[data-tab="tools"]',
+    title: "Tools",
+    body: "Developer console, Pendo debugger launcher, and the Copy Issues button.",
+    arrow: "top",
+  },
+  {
+    target: "#tool-copy-issues",
+    title: "Copy Issues to Clipboard",
+    body: "One click copies every problem and fix as plain text — ready to paste into Slack, Jira, or a support ticket. No follow-up questions needed.",
+    arrow: "bottom",
+    preAction: () => {
+      // Switch to tools tab so the button is visible
+      const toolsTab = document.querySelector('[data-tab="tools"]');
+      if (toolsTab) activateTab(toolsTab);
+    },
+  },
+];
+
+let tourActive = false;
+let tourStep = 0;
+
+function startTour() {
+  tourActive = true;
+  tourStep = 0;
+  showTourStep(0);
+  trackEvent("tour_start");
+}
+
+function showTourStep(idx) {
+  // Clean up previous
+  document.querySelectorAll(".tour-overlay, .tour-spotlight, .tour-tooltip").forEach(el => el.remove());
+
+  if (idx >= TOUR_STEPS.length) {
+    endTour();
+    return;
+  }
+
+  const step = TOUR_STEPS[idx];
+  tourStep = idx;
+
+  // Pre-action (e.g. switch tabs)
+  if (step.preAction) step.preAction();
+
+  // Small delay to let DOM settle after tab switch
+  setTimeout(() => {
+    const targetEl = document.querySelector(step.target);
+    if (!targetEl) { showTourStep(idx + 1); return; }
+
+    const rect = targetEl.getBoundingClientRect();
+
+    // Overlay (clickable to dismiss)
+    const overlay = document.createElement("div");
+    overlay.className = "tour-overlay";
+    overlay.style.background = "transparent"; // spotlight handles the dimming
+    document.body.appendChild(overlay);
+
+    // Spotlight
+    const spot = document.createElement("div");
+    spot.className = "tour-spotlight";
+    spot.style.top = (rect.top - 4) + "px";
+    spot.style.left = (rect.left - 4) + "px";
+    spot.style.width = (rect.width + 8) + "px";
+    spot.style.height = (rect.height + 8) + "px";
+    document.body.appendChild(spot);
+
+    // Tooltip
+    const tip = document.createElement("div");
+    tip.className = "tour-tooltip arrow-" + (step.arrow || "top");
+
+    // Position tooltip
+    if (step.arrow === "top") {
+      tip.style.top = (rect.bottom + 12) + "px";
+      tip.style.left = Math.max(8, rect.left - 20) + "px";
+    } else if (step.arrow === "bottom") {
+      tip.style.bottom = (document.body.clientHeight - rect.top + 12) + "px";
+      tip.style.left = Math.max(8, rect.left - 20) + "px";
+    }
+
+    // Dots
+    const dots = TOUR_STEPS.map((_, i) =>
+      `<div class="tour-dot${i === idx ? " active" : ""}"></div>`
+    ).join("");
+
+    const isLast = idx === TOUR_STEPS.length - 1;
+    tip.innerHTML = `
+      <div class="tour-title">${step.title}</div>
+      <div class="tour-body">${step.body}</div>
+      <div class="tour-footer">
+        <div class="tour-dots">${dots}</div>
+        <div class="tour-actions">
+          <button class="tour-skip" id="tour-skip">Skip</button>
+          ${idx > 0 ? '<button class="tour-btn" id="tour-back">Back</button>' : ''}
+          <button class="tour-btn tour-btn-primary" id="tour-next">${isLast ? "Done" : "Next"}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(tip);
+
+    // Event handlers
+    document.getElementById("tour-next").addEventListener("click", () => showTourStep(idx + 1));
+    document.getElementById("tour-skip")?.addEventListener("click", () => endTour());
+    document.getElementById("tour-back")?.addEventListener("click", () => showTourStep(idx - 1));
+
+    // Keyboard: Escape to skip, arrow right/enter to advance
+    const keyHandler = (e) => {
+      if (e.key === "Escape") { document.removeEventListener("keydown", keyHandler); endTour(); }
+      else if (e.key === "ArrowRight" || e.key === "Enter") { document.removeEventListener("keydown", keyHandler); showTourStep(idx + 1); }
+      else if (e.key === "ArrowLeft" && idx > 0) { document.removeEventListener("keydown", keyHandler); showTourStep(idx - 1); }
+    };
+    document.addEventListener("keydown", keyHandler);
+  }, 80);
+}
+
+function endTour() {
+  tourActive = false;
+  document.querySelectorAll(".tour-overlay, .tour-spotlight, .tour-tooltip").forEach(el => el.remove());
+  chrome.storage?.local?.set({ tourComplete: true });
+  trackEvent("tour_complete", { step: tourStep, total: TOUR_STEPS.length });
+
+  // Return to health tab
+  const healthTab = document.querySelector('[data-tab="health"]');
+  if (healthTab) activateTab(healthTab);
+}
+
+function maybeStartTour() {
+  chrome.storage?.local?.get(["tourComplete"], (result) => {
+    if (!result.tourComplete) {
+      // Delay slightly so the UI has settled
+      setTimeout(() => startTour(), 600);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Tab switching
 // ---------------------------------------------------------------------------
 
@@ -322,6 +479,18 @@ function renderChecks(checks) {
     checks_warn: warn,
     checks_fail: fail,
   });
+
+  // Pulse the copy button if there are issues to copy
+  if (warn > 0 || fail > 0) {
+    const copyBtn = document.getElementById("tool-copy-issues");
+    if (copyBtn) {
+      setTimeout(() => copyBtn.classList.add("copy-pulse"), 800);
+      setTimeout(() => copyBtn.classList.remove("copy-pulse"), 5300);
+    }
+  }
+
+  // First-run tour
+  maybeStartTour();
 }
 
 // ---------------------------------------------------------------------------
