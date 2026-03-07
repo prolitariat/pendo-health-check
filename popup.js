@@ -554,6 +554,13 @@ const REMEDIATION_MAP = {
 // ---------------------------------------------------------------------------
 
 function renderSetup(data) {
+  if (!data || typeof data !== "object") {
+    document.getElementById("setup-loading").style.display = "none";
+    document.getElementById("setup-content").innerHTML =
+      '<div class="empty-state">No setup data returned — the page may not have loaded properly.</div>';
+    document.getElementById("setup-content").style.display = "block";
+    return;
+  }
   window.__lastSetup = data;
   const container = document.getElementById("setup-content");
   container.innerHTML = "";
@@ -643,34 +650,36 @@ function renderSetup(data) {
   }
 
   // 5. Visitor Metadata
-  if (data.visitorFields && data.visitorFields.length > 0) {
-    const vWarns = data.visitorFields.filter(f => f.warnings.length > 0).length;
+  if (Array.isArray(data.visitorFields) && data.visitorFields.length > 0) {
+    const vWarns = data.visitorFields.filter(f => (f.warnings || []).length > 0).length;
     const vBadge = vWarns > 0
       ? `<span class="badge badge-yellow">${data.visitorFields.length} fields · ${vWarns} warn</span>`
       : `<span class="badge badge-green">${data.visitorFields.length} fields</span>`;
     let vBody = `<table class="metadata-table"><tr><th>Field</th><th>Type</th><th>Status</th></tr>`;
     data.visitorFields.forEach((f) => {
-      const hasWarn = f.warnings.length > 0;
+      const w = f.warnings || [];
+      const hasWarn = w.length > 0;
       const cls = hasWarn ? "field-warn" : "field-ok";
-      const status = hasWarn ? f.warnings.map(escapeHtml).join(", ") : "OK";
-      vBody += `<tr><td>${escapeHtml(f.key)}</td><td>${escapeHtml(f.type)}</td><td class="${cls}">${status}</td></tr>`;
+      const status = hasWarn ? w.map(escapeHtml).join(", ") : "OK";
+      vBody += `<tr><td>${escapeHtml(f.key || "?")}</td><td>${escapeHtml(f.type || "?")}</td><td class="${cls}">${status}</td></tr>`;
     });
     vBody += `</table>`;
     makeSection(`Visitor Metadata`, vBadge, vBody, vWarns > 0);
   }
 
   // 6. Account Metadata
-  if (data.accountFields && data.accountFields.length > 0) {
-    const aWarns = data.accountFields.filter(f => f.warnings.length > 0).length;
+  if (Array.isArray(data.accountFields) && data.accountFields.length > 0) {
+    const aWarns = data.accountFields.filter(f => (f.warnings || []).length > 0).length;
     const aBadge = aWarns > 0
       ? `<span class="badge badge-yellow">${data.accountFields.length} fields · ${aWarns} warn</span>`
       : `<span class="badge badge-green">${data.accountFields.length} fields</span>`;
     let aBody = `<table class="metadata-table"><tr><th>Field</th><th>Type</th><th>Status</th></tr>`;
     data.accountFields.forEach((f) => {
-      const hasWarn = f.warnings.length > 0;
+      const w = f.warnings || [];
+      const hasWarn = w.length > 0;
       const cls = hasWarn ? "field-warn" : "field-ok";
-      const status = hasWarn ? f.warnings.map(escapeHtml).join(", ") : "OK";
-      aBody += `<tr><td>${escapeHtml(f.key)}</td><td>${escapeHtml(f.type)}</td><td class="${cls}">${status}</td></tr>`;
+      const status = hasWarn ? w.map(escapeHtml).join(", ") : "OK";
+      aBody += `<tr><td>${escapeHtml(f.key || "?")}</td><td>${escapeHtml(f.type || "?")}</td><td class="${cls}">${status}</td></tr>`;
     });
     aBody += `</table>`;
     makeSection(`Account Metadata`, aBadge, aBody, aWarns > 0);
@@ -688,8 +697,8 @@ function renderSetup(data) {
   }
 
   // Count metadata warnings
-  if (data.visitorFields) data.visitorFields.forEach(f => { if (f.warnings.length > 0) warnings++; });
-  if (data.accountFields) data.accountFields.forEach(f => { if (f.warnings.length > 0) warnings++; });
+  if (Array.isArray(data.visitorFields)) data.visitorFields.forEach(f => { if ((f.warnings || []).length > 0) warnings++; });
+  if (Array.isArray(data.accountFields)) data.accountFields.forEach(f => { if ((f.warnings || []).length > 0) warnings++; });
 
   // 7. Recommendations
   if (data.recommendations && data.recommendations.length > 0) {
