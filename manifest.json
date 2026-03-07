@@ -3,7 +3,7 @@
   "name": "Pendo Health Check",
   "version": "1.2.0",
   "description": "Run diagnostics against the Pendo agent — health checks, setup analysis, service status, network validation, and smart remediation.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

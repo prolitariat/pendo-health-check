@@ -291,11 +291,9 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
 
-    #feedback-submit {
+    #feedback-submit, #feedback-email {
       padding: 7px 14px;
       border: 1px solid transparent;
-      background: var(--pendo-pink);
-      color: #ffffff;
       border-radius: var(--radius-sm);
       cursor: pointer;
       font-size: 13px;
@@ -304,7 +302,17 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
 
-    #feedback-submit:hover {
+    #feedback-submit {
+      background: var(--pendo-pink);
+      color: #ffffff;
+    }
+
+    #feedback-email {
+      background: var(--foreground);
+      color: var(--background);
+    }
+
+    #feedback-submit:hover, #feedback-email:hover {
       opacity: 0.9;
     }
 
@@ -312,7 +320,7 @@
       background: var(--accent);
     }
 
-    #feedback-submit:disabled {
+    #feedback-submit:disabled, #feedback-email:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
@@ -818,11 +826,12 @@
   <div id="feedback-modal">
     <div class="feedback-modal-content">
       <h3>Send Feedback</h3>
-      <p>Opens a GitHub issue — your feedback is PII-scrubbed before it leaves the extension.</p>
+      <p>Feedback is PII-scrubbed before it leaves the extension.</p>
       <textarea id="feedback-text" placeholder="Describe the issue or suggestion..."></textarea>
       <div class="feedback-modal-buttons">
         <button id="feedback-cancel">Cancel</button>
-        <button id="feedback-submit">Open Issue</button>
+        <button id="feedback-email" title="Send via email (no account needed)">✉ Email</button>
+        <button id="feedback-submit" title="Open a GitHub issue (GitHub account required)">GitHub Issue</button>
       </div>
       <div id="feedback-status"></div>
     </div>

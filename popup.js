@@ -1851,6 +1851,30 @@ function runPendoSetupAssistant() {
     }
   });
 
+  // PII scrubbing before feedback leaves the extension
+  function scrubPII(str) {
+    if (!str) return str;
+    str = str.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, "[REDACTED_EMAIL]");
+    str = str.replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[REDACTED_SSN]");
+    str = str.replace(/\b(?:\d[ \-]?){13,19}\b/g, "[REDACTED_CC]");
+    str = str.replace(/(?:\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}\b/g, "[REDACTED_PHONE]");
+    str = str.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[REDACTED_IP]");
+    return str;
+  }
+
+  function buildFeedbackPayload() {
+    const text = feedbackTextarea.value.trim();
+    const pageUrl = document.getElementById("page-url").textContent || "(no URL)";
+    const version = chrome.runtime.getManifest().version;
+    return {
+      feedback: scrubPII(text),
+      url: scrubPII(pageUrl),
+      version: version,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // GitHub Issue button
   feedbackSubmit.addEventListener("click", () => {
     const text = feedbackTextarea.value.trim();
     if (!text) {
@@ -1859,42 +1883,50 @@ function runPendoSetupAssistant() {
       return;
     }
 
-    // PII scrubbing before it leaves the extension
-    function scrubPII(str) {
-      if (!str) return str;
-      str = str.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, "[REDACTED_EMAIL]");
-      str = str.replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[REDACTED_SSN]");
-      str = str.replace(/\b(?:\d[ \-]?){13,19}\b/g, "[REDACTED_CC]");
-      str = str.replace(/(?:\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}\b/g, "[REDACTED_PHONE]");
-      str = str.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[REDACTED_IP]");
-      return str;
-    }
-
-    const pageUrl = document.getElementById("page-url").textContent || "(no URL)";
-    const version = chrome.runtime.getManifest().version;
-    const scrubbedFeedback = scrubPII(text);
-    const scrubbedUrl = scrubPII(pageUrl);
-
-    const title = encodeURIComponent("Feedback: " + scrubbedFeedback.slice(0, 80) + (scrubbedFeedback.length > 80 ? "…" : ""));
+    const p = buildFeedbackPayload();
+    const title = encodeURIComponent("Feedback: " + p.feedback.slice(0, 80) + (p.feedback.length > 80 ? "…" : ""));
     const body = encodeURIComponent(
-      "## Feedback\n\n" + scrubbedFeedback +
+      "## Feedback\n\n" + p.feedback +
       "\n\n---\n" +
-      "**Page tested:** " + scrubbedUrl + "\n" +
-      "**Extension version:** v" + version + "\n" +
-      "**Submitted:** " + new Date().toISOString()
+      "**Page tested:** " + p.url + "\n" +
+      "**Extension version:** v" + p.version + "\n" +
+      "**Submitted:** " + p.timestamp
     );
-
     const issueUrl = "https://github.com/prolitariat/pendo-health-check/issues/new?labels=feedback&title=" + title + "&body=" + body;
-
     chrome.tabs.create({ url: issueUrl });
 
     feedbackStatus.textContent = "Opening GitHub — thanks!";
     feedbackStatus.className = "feedback-status feedback-success";
     feedbackTextarea.value = "";
-    setTimeout(() => {
-      feedbackModal.style.display = "none";
-    }, 1200);
+    setTimeout(() => { feedbackModal.style.display = "none"; }, 1200);
   });
+
+  // Email fallback button (no GitHub account needed)
+  const feedbackEmail = document.getElementById("feedback-email");
+  if (feedbackEmail) {
+    feedbackEmail.addEventListener("click", () => {
+      const text = feedbackTextarea.value.trim();
+      if (!text) {
+        feedbackStatus.textContent = "Please enter some feedback.";
+        feedbackStatus.className = "feedback-status feedback-error";
+        return;
+      }
+
+      const p = buildFeedbackPayload();
+      const subject = encodeURIComponent("Pendo Health Check Feedback (v" + p.version + ")");
+      const mailBody = encodeURIComponent(
+        p.feedback + "\n\n---\nPage tested: " + p.url +
+        "\nExtension version: v" + p.version +
+        "\nSubmitted: " + p.timestamp
+      );
+      chrome.tabs.create({ url: "mailto:pendohealthcheck@gmail.com?subject=" + subject + "&body=" + mailBody });
+
+      feedbackStatus.textContent = "Opening email — thanks!";
+      feedbackStatus.className = "feedback-status feedback-success";
+      feedbackTextarea.value = "";
+      setTimeout(() => { feedbackModal.style.display = "none"; }, 1200);
+    });
+  }
 
   // Allow Ctrl+Enter / Cmd+Enter to submit
   feedbackTextarea.addEventListener("keydown", (e) => {
