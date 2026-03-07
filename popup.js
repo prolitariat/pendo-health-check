@@ -1,16 +1,6 @@
 const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" };
 
 // ---------------------------------------------------------------------------
-// Mode system — Easy (glass) vs Full. Applied before first paint.
-// ---------------------------------------------------------------------------
-(function initMode() {
-  chrome.storage?.local?.get(["uiMode"], (result) => {
-    const mode = result?.uiMode || "";
-    if (mode) document.documentElement.setAttribute("data-mode", mode);
-  });
-})();
-
-// ---------------------------------------------------------------------------
 // Analytics — lightweight, privacy-first, fire-and-forget
 // Set to "" to disable. Deploy Worker from /analytics directory.
 // ---------------------------------------------------------------------------
@@ -845,7 +835,6 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       window.__lastChecks = data.checks;
       activeTabId = "health";
       renderChecks(data.checks);
-      populateEasyPanel(data.checks);
 
       // Re-render status filtered to detected environment
       const env = detectEnvFromChecks(data.checks);
@@ -2413,101 +2402,6 @@ function runPendoSetupAssistant() {
   return result;
 }
 
-
-// ---------------------------------------------------------------------------
-// Easy Mode — gear toggle, panel population, copy, drawer
-// ---------------------------------------------------------------------------
-
-(function initModeToggle() {
-  const btn = document.getElementById("mode-toggle-btn");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    const current = document.documentElement.getAttribute("data-mode");
-    const next = current === "easy" ? "" : "easy";
-    if (next) {
-      document.documentElement.setAttribute("data-mode", next);
-    } else {
-      document.documentElement.removeAttribute("data-mode");
-    }
-    chrome.storage?.local?.set({ uiMode: next });
-    trackEvent("mode_switch", { mode: next || "full" });
-    // Re-populate easy panel if switching into easy mode and we have data
-    if (next === "easy" && window.__lastChecks) {
-      populateEasyPanel(window.__lastChecks);
-    }
-  });
-})();
-
-function populateEasyPanel(checks) {
-  const icon = document.getElementById("easy-status-icon");
-  const label = document.getElementById("easy-status-label");
-  const detail = document.getElementById("easy-status-detail");
-  const copyBtn = document.getElementById("easy-copy-btn");
-  const drawer = document.getElementById("easy-details-drawer");
-  if (!icon || !label) return;
-
-  const fails = checks.filter(c => c.status === "fail");
-  const warns = checks.filter(c => c.status === "warn");
-  const passes = checks.filter(c => c.status === "pass");
-
-  if (fails.length > 0) {
-    icon.textContent = "❌";
-    label.textContent = fails.length + " Issue" + (fails.length > 1 ? "s" : "") + " Found";
-    detail.textContent = fails.length + " failing, " + warns.length + " warning" + (warns.length !== 1 ? "s" : "");
-  } else if (warns.length > 0) {
-    icon.textContent = "⚠️";
-    label.textContent = warns.length + " Warning" + (warns.length > 1 ? "s" : "");
-    detail.textContent = "No failures — " + warns.length + " item" + (warns.length !== 1 ? "s" : "") + " to review";
-  } else {
-    icon.textContent = "✅";
-    label.textContent = "All Clear";
-    detail.textContent = passes.length + " check" + (passes.length !== 1 ? "s" : "") + " passed";
-  }
-
-  // Enable copy button if there are issues
-  if (copyBtn) {
-    copyBtn.disabled = (fails.length === 0 && warns.length === 0);
-  }
-
-  // Populate details drawer
-  if (drawer) {
-    const issues = checks.filter(c => c.status === "fail" || c.status === "warn");
-    if (issues.length === 0) {
-      drawer.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--muted-foreground);text-align:center;">No issues to display.</div>';
-    } else {
-      drawer.innerHTML = issues.map(c => {
-        const ico = c.status === "fail" ? "❌" : "⚠️";
-        return '<div style="display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid var(--glass-border, var(--border));font-size:12px;">'
-          + '<span style="flex-shrink:0;">' + ico + '</span>'
-          + '<div><strong>' + escapeHtml(c.label) + '</strong><br><span style="color:var(--muted-foreground);">' + escapeHtml(c.detail) + '</span></div>'
-          + '</div>';
-      }).join("");
-    }
-  }
-}
-
-(function initEasyCopy() {
-  const btn = document.getElementById("easy-copy-btn");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    const text = buildIssuesReport();
-    navigator.clipboard.writeText(text).then(() => {
-      trackEvent("copy_report", { mode: "easy" });
-      btn.textContent = "Copied!";
-      setTimeout(() => { btn.textContent = "Copy Issues"; }, 1500);
-    });
-  });
-})();
-
-(function initEasyDrawer() {
-  const toggle = document.getElementById("easy-details-toggle");
-  const drawer = document.getElementById("easy-details-drawer");
-  if (!toggle || !drawer) return;
-  toggle.addEventListener("click", () => {
-    const open = drawer.classList.toggle("open");
-    toggle.textContent = open ? "Hide Details ▴" : "Show Details ▾";
-  });
-})();
 
 // ---------------------------------------------------------------------------
 // Feedback System
