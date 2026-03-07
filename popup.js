@@ -1115,14 +1115,33 @@ function buildIssuesReport() {
   if (collectedIssues.length === 0) {
     lines.push("No issues found. Everything looks healthy.");
   } else {
+    let hasSubIdPlaceholder = false;
     collectedIssues.forEach((issue, idx) => {
       lines.push(`${idx + 1}. [${issue.severity}] ${issue.title}`);
       lines.push(`   Problem: ${issue.problem}`);
-      if (issue.fix) lines.push(`   Fix: ${issue.fix}`);
-      lines.push("");
+      if (issue.fix) {
+        // Normalize internal line breaks: replace \n followed by any whitespace
+        // with \n + consistent 3-space indent so all fix lines align under "Fix:"
+        const normalizedFix = issue.fix
+          .replace(/\(Replace SUB_ID with your Pendo subscription ID from app\.pendo\.io\/s\/\[SUB_ID\]\/\)\s*/gi, "")
+          .replace(/\n\s*/g, "\n   ")
+          .trim();
+        lines.push(`   Fix: ${normalizedFix}`);
+        if (normalizedFix.indexOf("YOUR_SUB_ID") !== -1) hasSubIdPlaceholder = true;
+      }
     });
+    lines.push("");
     lines.push("──");
     lines.push(`Total: ${collectedIssues.length} issue${collectedIssues.length !== 1 ? "s" : ""}`);
+
+    // Add SUB_ID note once at the bottom if any fix references YOUR_SUB_ID
+    if (hasSubIdPlaceholder) {
+      lines.push("");
+      lines.push("── Note: YOUR_SUB_ID ──");
+      lines.push("Replace YOUR_SUB_ID with your Pendo subscription ID.");
+      lines.push("To find it: log in to app.pendo.io → the number in the URL after /s/ is your ID");
+      lines.push("(e.g. app.pendo.io/s/12345678/ → SUB_ID is 12345678)");
+    }
   }
 
   // Append Sources section if any documentation URLs were collected
@@ -1822,9 +1841,10 @@ function runPendoSetupAssistant() {
         return text.replace(/\{\{SUB_ID\}\}/g, detectedSubId)
                    .replace(/\s*\(replace SUB_ID with your Pendo subscription ID from app\.pendo\.io\/s\/\[SUB_ID\]\/\)/gi, "");
       }
-      // SUB_ID not detected — replace template with placeholder + clear instructions
-      return text.replace(/\{\{SUB_ID\}\}/g, "YOUR_SUB_ID") +
-        "\n  → To find your SUB_ID: log in to app.pendo.io → the number in the URL after /s/ is your subscription ID (e.g. app.pendo.io/s/12345678/ → SUB_ID is 12345678)";
+      // SUB_ID not detected — replace template with placeholder only.
+      // The SUB_ID lookup instructions are appended ONCE in the clipboard footer
+      // (see buildIssuesReport) to avoid repeating them on every CSP fix line.
+      return text.replace(/\{\{SUB_ID\}\}/g, "YOUR_SUB_ID");
     }
 
     // --- C. Proactive: check what Pendo needs vs what's actually working ---
@@ -1910,7 +1930,7 @@ function runPendoSetupAssistant() {
         if (!hostAllowed(scriptSrc)) {
           csp.issues.push({ directive: "script-src", severity: "error",
             detail: "Pendo domains not allowed in script-src — the Pendo agent and guide code can't load.",
-            fix: "Add to your CSP script-src directive:\n  cdn.pendo.io pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io\n  (Replace SUB_ID with your Pendo subscription ID from app.pendo.io/s/[SUB_ID]/)\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
+            fix: "Add to your CSP script-src directive:\n  cdn.pendo.io pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
         }
         if (!valueAllowed(scriptSrc, "'unsafe-inline'")) {
           var hasNonce = scriptSrc.some(function(v) { return v.indexOf("nonce-") !== -1; });
@@ -2059,7 +2079,7 @@ function runPendoSetupAssistant() {
           "'unsafe-inline'"];
         csp.issues.push({ directive: "script-src", severity: "error",
           detail: "Pendo scripts blocked" + (hasCdn ? " (cdn.pendo.io)" : "") + (hasStorage ? " (storage.googleapis.com)" : "") + ".",
-          fix: "Add to script-src:\n  " + scriptDomains.join(" ") + "\n  (Replace SUB_ID with your Pendo subscription ID from app.pendo.io/s/[SUB_ID]/)" });
+          fix: "Add to script-src:\n  " + scriptDomains.join(" ") });
       }
 
       // connect-src: data.pendo.io sends analytics, storage serves content
