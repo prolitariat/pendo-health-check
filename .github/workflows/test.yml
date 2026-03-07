@@ -1,10 +1,19 @@
 name: QA Tests
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+# DISABLED: Puppeteer tests require Chrome with the extension sideloaded
+# (--load-extension flag). Standard GitHub Actions runners don't support this
+# out of the box. To re-enable:
+#   1. Add puppeteer launch config with chrome-headless-shell or xvfb
+#   2. Use --disable-extensions-except and --load-extension flags
+#   3. Ensure tests handle headless extension popup limitations
+#
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+#     branches: [main]
+
+on: workflow_dispatch  # manual trigger only
 
 jobs:
   test:
