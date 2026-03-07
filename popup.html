@@ -840,16 +840,16 @@
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .tour-tooltip::before {
+    .tour-tooltip.arrow-top::before,
+    .tour-tooltip.arrow-bottom::before {
       content: "";
       position: absolute;
       width: 10px; height: 10px;
       background: var(--card);
       border-left: 1px solid var(--pendo-pink);
       border-top: 1px solid var(--pendo-pink);
-      transform: rotate(45deg);
     }
-    .tour-tooltip.arrow-top::before { top: -6px; left: var(--arrow-left, 24px); }
+    .tour-tooltip.arrow-top::before { top: -6px; left: var(--arrow-left, 24px); transform: rotate(45deg); }
     .tour-tooltip.arrow-bottom::before { bottom: -6px; left: var(--arrow-left, 24px); transform: rotate(225deg); }
     .tour-title {
       font-size: 13px;
@@ -916,6 +916,149 @@
     .copy-pulse {
       animation: copy-pulse 1.5s ease-in-out 3;
       border-color: var(--pendo-pink) !important;
+    }
+
+    /* =================================================================
+       EASY MODE — glassmorphism simplified view
+       ================================================================= */
+
+    /* Glass tokens (light) */
+    [data-mode="easy"] {
+      --glass-bg: rgba(255,255,255,0.55);
+      --glass-card: rgba(255,255,255,0.45);
+      --glass-border: rgba(228,228,231,0.6);
+      --glass-blur: 18px;
+      --glass-header: rgba(0,0,0,0.75);
+    }
+    @media (prefers-color-scheme: dark) {
+      [data-mode="easy"] {
+        --glass-bg: rgba(9,9,11,0.55);
+        --glass-card: rgba(17,17,19,0.5);
+        --glass-border: rgba(39,39,42,0.6);
+        --glass-header: rgba(24,24,27,0.75);
+      }
+    }
+
+    /* Hide full UI, show easy panel */
+    [data-mode="easy"] #tab-bar,
+    [data-mode="easy"] .tab-panel,
+    [data-mode="easy"] #pendo-status { display: none !important; }
+    [data-mode="easy"] #easy-panel { display: flex !important; }
+
+    /* Glass surfaces */
+    [data-mode="easy"] body {
+      background: var(--glass-bg);
+    }
+    [data-mode="easy"] .header {
+      background: var(--glass-header);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+    }
+    [data-mode="easy"] #feedback-bar {
+      background: var(--glass-card);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border-color: var(--glass-border);
+    }
+
+    /* Easy panel layout */
+    #easy-panel {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      padding: 24px 20px 16px;
+      gap: 16px;
+      text-align: center;
+      overflow-y: auto;
+    }
+    #easy-status-icon {
+      font-size: 48px;
+      line-height: 1;
+    }
+    #easy-status-label {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--foreground);
+    }
+    #easy-status-detail {
+      font-size: 12px;
+      color: var(--muted-foreground);
+      max-width: 280px;
+    }
+    #easy-copy-btn {
+      padding: 10px 28px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      background: var(--pendo-pink-btn);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #easy-copy-btn:hover { opacity: 0.9; }
+    #easy-copy-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    /* Details drawer inside easy mode */
+    #easy-details-toggle {
+      font-size: 11px;
+      color: var(--muted-foreground);
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 4px 8px;
+      transition: color 0.15s;
+    }
+    #easy-details-toggle:hover { color: var(--foreground); }
+    #easy-details-drawer {
+      display: none;
+      width: 100%;
+      max-height: 220px;
+      overflow-y: auto;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      text-align: left;
+    }
+    #easy-details-drawer.open { display: block; }
+    .easy-issue-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      padding: 4px 0;
+      font-size: 12px;
+      color: var(--foreground);
+    }
+    .easy-issue-icon { flex-shrink: 0; }
+
+    /* Gear / mode toggle button — matches ? button style */
+    #mode-toggle-btn {
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      font-size: 14px;
+      line-height: 24px;
+      text-align: center;
+      border: 1px solid var(--border);
+      background: var(--background);
+      color: var(--muted-foreground);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    #mode-toggle-btn:hover {
+      background: var(--pendo-pink-light);
+      border-color: var(--pendo-pink-mid);
+      color: var(--pendo-pink);
+    }
+    [data-mode="easy"] #mode-toggle-btn {
+      background: var(--glass-card);
+      border-color: var(--glass-border);
     }
   </style>
 </head>
@@ -1034,10 +1177,21 @@
     </div>
   </div>
 
+  <!-- Easy Mode Panel (hidden by default, shown when data-mode="easy") -->
+  <div id="easy-panel">
+    <div id="easy-status-icon">⏳</div>
+    <div id="easy-status-label">Checking…</div>
+    <div id="easy-status-detail">Running diagnostics</div>
+    <button id="easy-copy-btn" disabled>Copy Issues</button>
+    <button id="easy-details-toggle">Show Details ▾</button>
+    <div id="easy-details-drawer"></div>
+  </div>
+
   <!-- Feedback Bar -->
   <div id="feedback-bar">
     <span id="version-label"></span>
     <div id="feedback-bar-actions">
+      <button id="mode-toggle-btn" title="Switch mode" aria-label="Switch between Easy and Full mode">⚙</button>
       <button id="help-tour-btn" title="Show guided tour" aria-label="Show guided tour">?</button>
       <button id="feedback-btn">Feedback</button>
     </div>
