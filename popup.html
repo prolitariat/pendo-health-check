@@ -61,9 +61,10 @@
         --secondary: #1c1c1f;
         --secondary-foreground: #fafafa;
         --accent-subtle: #2a1019;
+        --pendo-highlight: #FEF484;
         --destructive: #f87171;
         --success: #22c55e;
-        --warning: #fbbf24;
+        --warning: var(--pendo-highlight);
       }
     }
 
@@ -638,11 +639,11 @@
 
     @media (prefers-color-scheme: dark) {
       .badge-green { background: #052e16; color: #4ade80; }
-      .badge-yellow { color: #af8b4c; }
+      .badge-yellow { color: var(--pendo-highlight); }
       .badge-red { background: #450a0a; color: #fca5a5; }
       .badge-blue { background: #172554; color: #93c5fd; }
       .badge-pink { color: #d05d7a; }
-      .incident-banner { color: #ae8a60; }
+      .incident-banner { color: var(--pendo-highlight); }
     }
 
     /* === Metadata Table === */
