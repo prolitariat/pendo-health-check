@@ -353,7 +353,13 @@ const REMEDIATION_MAP = {
     warn: "FIX: One or more Pendo features are explicitly disabled in your configuration. Check your pendo.initialize() options for these flags and remove them if unintentional:\n  disableGuides: true      → blocks all in-app guides\n  disableAnalytics: true   → stops all event tracking\n  disableFeedback: true    → hides the Feedback module\n  disablePersistence: true → prevents visitor/account caching\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
   },
   "Ad Blocker": {
-    warn: "FIX: An ad blocker or privacy extension is interfering with Pendo. This commonly breaks:\n  → Visual Design Studio (can't tag features)\n  → Guide rendering (guides won't appear)\n  → Analytics data collection (events silently dropped)\n  → Resource Center and NPS surveys\n  To fix: disable your ad blocker for this domain, or add these to your allowlist:\n  *.pendo.io, pendo-io-static.storage.googleapis.com, pendo-static-*.storage.googleapis.com\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
+    warn: "FIX: An ad blocker or privacy extension is interfering with Pendo. This commonly breaks:\n  → Visual Design Studio (can't tag features)\n  → Guide rendering (guides won't appear)\n  → Analytics data collection (events silently dropped)\n  → Resource Center and NPS surveys\n  To fix: disable your ad blocker for this domain, or add these to your allowlist:\n  *.pendo.io, pendo-io-static.storage.googleapis.com, pendo-static-*.storage.googleapis.com\n  Best long-term solution: configure a CNAME so Pendo traffic routes through your own domain.\n  Docs: https://support.pendo.io/hc/en-us/articles/360043539891-CNAME-for-Pendo"
+  },
+  "Data Host": {
+    warn: "FIX: Could not determine Pendo's content or data host. This may indicate the agent hasn't fully initialized, or the configuration is non-standard.\n  Check your pendo.initialize() call for contentHost and dataHost options, or verify the Pendo script src URL.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
+  },
+  "Consent (CMP)": {
+    warn: "FIX: No Consent Management Platform detected but EU locale suggests GDPR may apply. Pendo collects visitor and usage data — initializing without consent in the EU violates GDPR.\n  → Integrate with your CMP (OneTrust, Cookiebot, Didomi, etc.) and only call pendo.initialize() AFTER the user grants consent for analytics/functional cookies.\n  Code example with OneTrust:\n    OneTrust.OnConsentChanged(function() {\n      if (OnetrustActiveGroups.includes('C0002')) { // Performance cookies\n        pendo.initialize({ visitor: { id: user.id } });\n      }\n    });\n  Docs: https://support.pendo.io/hc/en-us/articles/360031867272-Configure-Pendo-with-a-cookie-consent-manager"
   }
 };
 
@@ -806,9 +812,12 @@ function buildIssuesReport() {
   lines.push(`Generated: ${new Date().toLocaleString()}`);
   lines.push("");
 
-  let issueCount = 0;
   const reported = new Set(); // Track reported topics to avoid duplicates
   const sources = new Set(); // Collect unique documentation URLs
+  const collectedIssues = []; // Collect all issues for priority sorting
+
+  // Severity priority: lower = more urgent
+  const SEVERITY_ORDER = { "PROBLEM": 0, "INCIDENT": 1, "WARNING": 2, "INFO": 3, "TIP": 4 };
 
   function addIssue(severity, title, problem, fix) {
     // Deduplicate by normalized title prefix — "Visitor ID" blocks "Visitor ID missing or anonymous"
@@ -817,18 +826,15 @@ function buildIssuesReport() {
       if (key.startsWith(existing) || existing.startsWith(key)) return;
     }
     reported.add(key);
-    issueCount++;
-    lines.push(`${issueCount}. [${severity}] ${title}`);
-    lines.push(`   Problem: ${problem}`);
+
+    let cleanFix = null;
     if (fix) {
-      // Extract Docs: URLs into Sources section, keep fix text clean
-      const cleanFix = fix.replace(/\n\s*Docs:\s*(https?:\/\/[^\s]+)/g, (_, url) => {
+      cleanFix = fix.replace(/\n\s*Docs:\s*(https?:\/\/[^\s]+)/g, (_, url) => {
         sources.add(url);
         return "";
       });
-      lines.push(`   Fix: ${cleanFix}`);
     }
-    lines.push("");
+    collectedIssues.push({ severity, title, problem, fix: cleanFix });
   }
 
   // --- Health Check issues ---
@@ -845,7 +851,6 @@ function buildIssuesReport() {
       let fix;
 
       if (c.label === "Network Requests" && hasCspIssues) {
-        // CSP is the diagnosed cause — don't list generic possibilities
         fix = "Your Content-Security-Policy is blocking Pendo requests. See the CSP directive fixes below.";
       } else {
         const remap = REMEDIATION_MAP[c.label];
@@ -856,14 +861,11 @@ function buildIssuesReport() {
   }
 
   // --- Setup Assistant issues ---
-  let hasSetupIssues = false;
 
   // CSP issues
   if (setup.csp && setup.csp.issues && setup.csp.issues.length > 0) {
     const cspProblems = setup.csp.issues.filter(i => i.severity === "error" || i.severity === "warning");
     if (cspProblems.length > 0) {
-      if (!hasSetupIssues && issueCount > 0) { lines.push("── Setup ──"); lines.push(""); }
-      hasSetupIssues = true;
       cspProblems.forEach((issue) => {
         const severity = issue.severity === "error" ? "PROBLEM" : "WARNING";
         addIssue(severity, `CSP: ${issue.directive}`, issue.detail, issue.fix || null);
@@ -873,7 +875,6 @@ function buildIssuesReport() {
 
   // Snippet issues
   if (setup.snippet && !setup.snippet.isAsync && setup.snippet.loadMethod.indexOf("npm") === -1) {
-    if (!hasSetupIssues && issueCount > 0) { lines.push("── Setup ──"); lines.push(""); hasSetupIssues = true; }
     addIssue("WARNING", "Synchronous script loading",
       "The Pendo snippet is blocking page load.",
       "Add the async attribute to the Pendo <script> tag.");
@@ -883,9 +884,7 @@ function buildIssuesReport() {
   const allFields = (setup.visitorFields || []).concat(setup.accountFields || []);
   const warnFields = allFields.filter(f => f.warnings.length > 0);
   if (warnFields.length > 0) {
-    if (!hasSetupIssues && issueCount > 0) { lines.push("── Setup ──"); lines.push(""); hasSetupIssues = true; }
     warnFields.forEach((f) => {
-      // Build specific fix text based on warning types
       const fixes = [];
       f.warnings.forEach(w => {
         if (w.indexOf("sensitive") !== -1) {
@@ -917,11 +916,9 @@ function buildIssuesReport() {
   if (setup.recommendations) {
     setup.recommendations.forEach((r) => {
       if (r.severity === "error" || r.severity === "warning") {
-        if (!hasSetupIssues && issueCount > 0) { lines.push("── Setup ──"); lines.push(""); hasSetupIssues = true; }
-        // Split detail at FIX: marker so problem and fix render separately in clipboard
         var fixIdx = r.detail.indexOf("\n  FIX:");
         var prob = fixIdx !== -1 ? r.detail.substring(0, fixIdx) : r.detail;
-        var fix = fixIdx !== -1 ? r.detail.substring(fixIdx + 7) : null; // skip "\n  FIX: "
+        var fix = fixIdx !== -1 ? r.detail.substring(fixIdx + 7) : null;
         addIssue(r.severity === "error" ? "PROBLEM" : "WARNING", r.title, prob, fix);
       }
     });
@@ -931,8 +928,6 @@ function buildIssuesReport() {
   if (window.__pendoServiceStatus) {
     const st = window.__pendoServiceStatus;
     if (st.incidents && st.incidents.length > 0) {
-      lines.push("── Pendo Service Status ──");
-      lines.push("");
       st.incidents.forEach((inc) => {
         const update = (inc.incident_updates && inc.incident_updates.length > 0)
           ? inc.incident_updates[0].body : null;
@@ -943,11 +938,22 @@ function buildIssuesReport() {
     }
   }
 
-  if (issueCount === 0) {
+  // --- Sort by severity and render ---
+  collectedIssues.sort((a, b) => {
+    return (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99);
+  });
+
+  if (collectedIssues.length === 0) {
     lines.push("No issues found. Everything looks healthy.");
   } else {
+    collectedIssues.forEach((issue, idx) => {
+      lines.push(`${idx + 1}. [${issue.severity}] ${issue.title}`);
+      lines.push(`   Problem: ${issue.problem}`);
+      if (issue.fix) lines.push(`   Fix: ${issue.fix}`);
+      lines.push("");
+    });
     lines.push("──");
-    lines.push(`Total: ${issueCount} issue${issueCount !== 1 ? "s" : ""}`);
+    lines.push(`Total: ${collectedIssues.length} issue${collectedIssues.length !== 1 ? "s" : ""}`);
   }
 
   // Append Sources section if any documentation URLs were collected
@@ -958,7 +964,10 @@ function buildIssuesReport() {
       "360032209131": "Content Security Policy for Pendo",
       "21374706009883": "Pendo Install API Reference",
       "21397042498571": "Install Pendo on a Single Page Application",
-      "360032207332": "Manage Visitor and Account Metadata"
+      "360032207332": "Manage Visitor and Account Metadata",
+      "360043539891": "CNAME for Pendo",
+      "360031867272": "Configure Pendo with a Cookie Consent Manager",
+      "21362607043355": "Install Pendo on Your Website or App"
     };
     sources.forEach(url => {
       // Extract article ID to generate a human-readable label
@@ -1109,45 +1118,83 @@ function runPendoHealthCheck() {
     add("warn", "API Key", "Error reading API key: " + e.message);
   }
 
-  // 10. Data host
+  // 10. Data host + content host (CNAME detection)
+  var detectedDataHost = null;
+  var detectedContentHost = null;
+  var isCname = false;
   try {
-    var dataHost = null;
+    // Read from pendo config — the authoritative source
     if (pendo.get && typeof pendo.get === "function") {
       try {
         var opts = pendo.get("options");
-        if (opts && opts.dataHost) dataHost = opts.dataHost;
+        if (opts && opts.dataHost) detectedDataHost = opts.dataHost;
+        if (opts && opts.contentHost) detectedContentHost = opts.contentHost;
       } catch (_) {}
     }
-    if (!dataHost) {
+    // Fallback: pendo._config (internal config object)
+    if (!detectedDataHost && pendo._config) {
+      if (pendo._config.dataHost) detectedDataHost = pendo._config.dataHost;
+      if (pendo._config.contentHost) detectedContentHost = pendo._config.contentHost;
+    }
+    // Fallback: pendo.HOST
+    if (!detectedDataHost && pendo.HOST) detectedDataHost = pendo.HOST;
+    // Fallback: Pendo script src URL — CNAME shows as content.product.company.com
+    if (!detectedContentHost) {
       var scripts = document.querySelectorAll('script[src*="pendo"]');
       for (var i = 0; i < scripts.length; i++) {
         try {
           var u = new URL(scripts[i].src);
-          if (!dataHost && u.hostname.includes("pendo")) dataHost = u.hostname;
+          if (u.hostname !== "cdn.pendo.io" && !u.hostname.includes("pendo.io") && !u.hostname.includes("pendo-")) {
+            detectedContentHost = u.hostname; // CNAME detected from script src
+          } else if (!detectedContentHost) {
+            detectedContentHost = u.hostname;
+          }
         } catch (_) {}
       }
     }
-    if (!dataHost && pendo.HOST) dataHost = pendo.HOST;
 
-    if (dataHost) {
-      var isDefault = dataHost.includes("cdn.pendo.io") || dataHost.includes("data.pendo.io");
-      add("pass", "Data Host", dataHost + (isDefault ? " (default Pendo CDN)" : " (CNAME / custom)"));
+    // Determine if CNAME is in use
+    var defaultDomains = ["cdn.pendo.io", "data.pendo.io", "app.pendo.io", "pendo-io-static.storage.googleapis.com"];
+    var isDataDefault = !detectedDataHost || defaultDomains.some(function(d) { return detectedDataHost.includes(d); }) || detectedDataHost.includes("pendo.io");
+    var isContentDefault = !detectedContentHost || defaultDomains.some(function(d) { return detectedContentHost.includes(d); }) || detectedContentHost.includes("pendo.io") || detectedContentHost.includes("pendo-");
+    isCname = !isDataDefault || !isContentDefault;
+
+    var hostParts = [];
+    if (detectedContentHost) hostParts.push("content: " + detectedContentHost);
+    if (detectedDataHost) hostParts.push("data: " + detectedDataHost);
+    var hostDisplay = hostParts.length > 0 ? hostParts.join(", ") : "unknown";
+
+    if (isCname) {
+      add("pass", "Data Host", hostDisplay + " (CNAME — ad-blocker resistant)");
+    } else if (detectedContentHost || detectedDataHost) {
+      add("pass", "Data Host", hostDisplay + " (default Pendo CDN)");
     } else {
-      add("warn", "Data Host", "Could not determine data host");
+      add("warn", "Data Host", "Could not determine data or content host");
     }
   } catch (e) {
     add("warn", "Data Host", "Error detecting data host: " + e.message);
   }
 
-  // 10. Network request validation
+  // 10b. Network request validation (CNAME-aware)
   try {
     var perfEntries = performance.getEntriesByType ? performance.getEntriesByType("resource") : [];
+    // Build match list: default Pendo domains + any detected CNAME domains
+    var matchDomains = ["pendo.io", "pendo-"];
+    if (isCname) {
+      if (detectedContentHost && matchDomains.indexOf(detectedContentHost) === -1) matchDomains.push(detectedContentHost);
+      if (detectedDataHost && matchDomains.indexOf(detectedDataHost) === -1) matchDomains.push(detectedDataHost);
+    }
+
     var pendoRequests = perfEntries.filter(function(e) {
-      return e.name && (e.name.indexOf("pendo.io") !== -1 || e.name.indexOf("pendo-") !== -1);
+      if (!e.name) return false;
+      for (var m = 0; m < matchDomains.length; m++) {
+        if (e.name.indexOf(matchDomains[m]) !== -1) return true;
+      }
+      return false;
     });
 
     if (pendoRequests.length === 0) {
-      add("warn", "Network Requests", "No Pendo network requests detected. Data may not be transmitting, or requests completed before page load.");
+      add("warn", "Network Requests", "No Pendo network requests detected" + (isCname ? " (checked CNAME domains too)" : "") + ". Data may not be transmitting, or requests completed before page load.");
     } else {
       var failed = pendoRequests.filter(function(e) { return e.transferSize === 0 && e.decodedBodySize === 0; });
       var categories = {};
@@ -1159,7 +1206,16 @@ function runPendoHealthCheck() {
       });
       var summary = Object.keys(categories).map(function(h) { return h + " (" + categories[h] + ")"; }).join(", ");
 
-      if (failed.length > 0) {
+      // CORS detection: check for requests that loaded but returned 0 bytes with no cache
+      var corsLikely = failed.filter(function(e) {
+        // transferSize 0 + decodedBodySize 0 + not from cache = likely CORS block
+        var isCached = e.encodedBodySize > 0 || (e.transferSize === 0 && e.decodedBodySize > 0);
+        return !isCached;
+      });
+
+      if (corsLikely.length > 0 && corsLikely.length === failed.length) {
+        add("warn", "Network Requests", pendoRequests.length + " request(s) to Pendo — " + corsLikely.length + " returned 0 bytes (possible CORS block or ad blocker). Hosts: " + summary);
+      } else if (failed.length > 0) {
         add("warn", "Network Requests", pendoRequests.length + " request(s) to Pendo — " + failed.length + " may have failed (0 bytes). Hosts: " + summary);
       } else {
         add("pass", "Network Requests", pendoRequests.length + " successful request(s). Hosts: " + summary);
@@ -1255,6 +1311,83 @@ function runPendoHealthCheck() {
     }
   } catch (e) {
     add("info", "Ad Blocker", "Could not check for ad blockers: " + e.message);
+  }
+
+  // 13. Consent Management Platform (CMP) / GDPR detection
+  try {
+    var cmpDetected = null;
+    var cmpSignals = [];
+
+    // OneTrust (most common enterprise CMP)
+    if (window.OneTrust || window.OptanonWrapper || window.OnetrustActiveGroups) {
+      cmpDetected = "OneTrust";
+      if (window.OnetrustActiveGroups) cmpSignals.push("Active groups: " + window.OnetrustActiveGroups);
+    }
+    // Cookiebot
+    else if (window.Cookiebot || window.CookieConsent) {
+      cmpDetected = "Cookiebot";
+      if (window.Cookiebot && window.Cookiebot.consent) {
+        var cb = window.Cookiebot.consent;
+        cmpSignals.push("Statistics: " + (cb.statistics ? "granted" : "denied") + ", Marketing: " + (cb.marketing ? "granted" : "denied"));
+      }
+    }
+    // Didomi
+    else if (window.Didomi || window.didomiOnReady) {
+      cmpDetected = "Didomi";
+    }
+    // Osano
+    else if (window.Osano) {
+      cmpDetected = "Osano";
+    }
+    // TrustArc / TRUSTe
+    else if (window.truste || document.querySelector('#truste-consent-track')) {
+      cmpDetected = "TrustArc";
+    }
+    // Quantcast Choice
+    else if (window.__cmp || window.quantserve) {
+      cmpDetected = "Quantcast Choice";
+    }
+    // IAB TCF v2 (standard consent API used by many CMPs)
+    else if (window.__tcfapi) {
+      cmpDetected = "IAB TCF v2 compatible CMP";
+      try {
+        window.__tcfapi("getTCData", 2, function(tcData, success) {
+          if (success && tcData) {
+            cmpSignals.push("GDPR applies: " + (tcData.gdprApplies ? "yes" : "no"));
+          }
+        });
+      } catch (_) {}
+    }
+    // Generic cookie consent banners (banner element detection)
+    else if (document.querySelector('[class*="cookie-consent"], [class*="cookie-banner"], [id*="cookie-consent"], [id*="cookie-banner"], [class*="gdpr"], [id*="gdpr"]')) {
+      cmpDetected = "Generic cookie consent banner";
+    }
+
+    var pendoInitialized = typeof pendo.isReady === "function" ? pendo.isReady() : !!pendo.visitorId;
+
+    if (cmpDetected) {
+      var cmpMsg = cmpDetected + " detected" + (cmpSignals.length > 0 ? " (" + cmpSignals.join("; ") + ")" : "");
+      if (pendoInitialized) {
+        add("pass", "Consent (CMP)", cmpMsg + ". Pendo is active — consent appears to have been granted.");
+      } else {
+        add("info", "Consent (CMP)", cmpMsg + ". Pendo is NOT active — likely waiting for user consent before initialization (this is correct GDPR behavior).");
+      }
+    } else {
+      // No CMP found — check if this matters
+      // Look for signals the app is EU/GDPR-relevant
+      var lang = (navigator.language || "").toLowerCase();
+      var isEuLocale = /^(de|fr|es|it|nl|pt|pl|sv|da|fi|el|cs|sk|hu|ro|bg|hr|sl|lt|lv|et|mt|ga|lb)/.test(lang);
+      var htmlLang = (document.documentElement.lang || "").toLowerCase();
+      var isEuHtml = /^(de|fr|es|it|nl|pt|pl|sv|da|fi|el|cs|sk|hu|ro|bg|hr|sl|lt|lv|et|mt|ga|lb)/.test(htmlLang);
+
+      if (isEuLocale || isEuHtml) {
+        add("warn", "Consent (CMP)", "No Consent Management Platform detected, but EU locale (" + (lang || htmlLang) + ") suggests GDPR may apply. Pendo should only initialize after user consent is obtained.");
+      } else {
+        add("info", "Consent (CMP)", "No CMP detected. If this app serves EU users, Pendo should be conditionally initialized based on consent.");
+      }
+    }
+  } catch (e) {
+    add("info", "Consent (CMP)", "Could not check for consent management: " + e.message);
   }
 
   return { pendoDetected: true, checks: checks };
@@ -1991,6 +2124,37 @@ function runPendoSetupAssistant() {
     recommend("tip", "No metadata fields detected",
       "Pendo is initialized without visitor or account metadata. Without metadata, you can't segment users by role, plan, company, or other attributes.\n  FIX: Add metadata fields to your pendo.initialize() call:\n    pendo.initialize({\n      visitor: { id: 'USER_ID', email: 'user@example.com', role: 'admin', created_at: '2024-01-15' },\n      account: { id: 'ACCOUNT_ID', name: 'Acme Corp', plan_level: 'enterprise', is_paying: true }\n    });\n  Start with: email, role, plan_level, created_at, is_paying — these cover 80% of segmentation needs.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
   }
+
+  // CNAME recommendation — check if using default Pendo domains
+  try {
+    var cnameContentHost = null;
+    var cnameDataHost = null;
+    if (pendo.get && typeof pendo.get === "function") {
+      try {
+        var pendoOpts = pendo.get("options");
+        if (pendoOpts && pendoOpts.contentHost) cnameContentHost = pendoOpts.contentHost;
+        if (pendoOpts && pendoOpts.dataHost) cnameDataHost = pendoOpts.dataHost;
+      } catch (_) {}
+    }
+    if (!cnameContentHost && pendo._config && pendo._config.contentHost) cnameContentHost = pendo._config.contentHost;
+    if (!cnameDataHost && pendo._config && pendo._config.dataHost) cnameDataHost = pendo._config.dataHost;
+    if (!cnameDataHost && pendo.HOST) cnameDataHost = pendo.HOST;
+    // Check script src for CNAME content host
+    if (!cnameContentHost) {
+      var pScripts = document.querySelectorAll('script[src*="pendo"]');
+      for (var ps = 0; ps < pScripts.length; ps++) {
+        try { cnameContentHost = new URL(pScripts[ps].src).hostname; } catch (_) {}
+      }
+    }
+
+    var usingDefaultCdn = (!cnameContentHost || cnameContentHost.indexOf("pendo.io") !== -1 || cnameContentHost.indexOf("pendo-") !== -1) &&
+                           (!cnameDataHost || cnameDataHost.indexOf("pendo.io") !== -1);
+
+    if (usingDefaultCdn) {
+      recommend("tip", "No CNAME configured",
+        "Pendo is loading from default CDN domains (cdn.pendo.io, data.pendo.io). Ad blockers and corporate firewalls commonly block *.pendo.io.\n  FIX: Configure a CNAME to route Pendo through your own domain (e.g. content.product.yourcompany.com and data.product.yourcompany.com). This makes Pendo traffic appear as first-party, bypassing most ad blockers and firewall restrictions.\n  Contact your Pendo CSM to enable CNAME for your subscription, then update your snippet and DNS.\n  Docs: https://support.pendo.io/hc/en-us/articles/360043539891-CNAME-for-Pendo");
+    }
+  } catch (_) {}
 
   return result;
 }
