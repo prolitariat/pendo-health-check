@@ -237,50 +237,64 @@ function showTourStep(idx) {
   const step = TOUR_STEPS[idx];
   tourStep = idx;
 
-  // Pre-action (e.g. switch tabs)
+  // Pre-action (e.g. switch tabs before measuring)
   if (step.preAction) step.preAction();
 
-  // Small delay to let DOM settle after tab switch
+  // Wait for DOM to settle after tab switch (needs more than 80ms for paint)
   setTimeout(() => {
     const targetEl = document.querySelector(step.target);
     if (!targetEl) { showTourStep(idx + 1); return; }
 
     const rect = targetEl.getBoundingClientRect();
+    const pad = 4; // padding around spotlight
 
-    // Overlay (clickable to dismiss)
+    // Overlay — transparent click-catcher (spotlight handles dimming via box-shadow)
     const overlay = document.createElement("div");
     overlay.className = "tour-overlay";
-    overlay.style.background = "transparent"; // spotlight handles the dimming
     document.body.appendChild(overlay);
 
-    // Spotlight
+    // Spotlight — fixed position, box-shadow creates the dim effect
     const spot = document.createElement("div");
     spot.className = "tour-spotlight";
-    spot.style.top = (rect.top - 4) + "px";
-    spot.style.left = (rect.left - 4) + "px";
-    spot.style.width = (rect.width + 8) + "px";
-    spot.style.height = (rect.height + 8) + "px";
+    spot.style.top = (rect.top - pad) + "px";
+    spot.style.left = (rect.left - pad) + "px";
+    spot.style.width = (rect.width + pad * 2) + "px";
+    spot.style.height = (rect.height + pad * 2) + "px";
     document.body.appendChild(spot);
 
-    // Tooltip
+    // Tooltip — fixed position, clamped to viewport
     const tip = document.createElement("div");
-    tip.className = "tour-tooltip arrow-" + (step.arrow || "top");
+    const arrowDir = step.arrow || "top";
+    tip.className = "tour-tooltip arrow-" + arrowDir;
 
-    // Position tooltip
-    if (step.arrow === "top") {
-      tip.style.top = (rect.bottom + 12) + "px";
-      tip.style.left = Math.max(8, rect.left - 20) + "px";
-    } else if (step.arrow === "bottom") {
-      tip.style.bottom = (document.body.clientHeight - rect.top + 12) + "px";
-      tip.style.left = Math.max(8, rect.left - 20) + "px";
+    // Horizontal: center under target, clamped to 8px from edges
+    const popupW = document.documentElement.clientWidth || 380;
+    const tipW = Math.min(280, popupW - 32);
+    let tipLeft = Math.round(rect.left + rect.width / 2 - tipW / 2);
+    tipLeft = Math.max(8, Math.min(tipLeft, popupW - tipW - 8));
+    tip.style.left = tipLeft + "px";
+    tip.style.width = tipW + "px";
+
+    // Vertical: below target (arrow-top) or above target (arrow-bottom)
+    const gap = 12;
+    if (arrowDir === "top") {
+      tip.style.top = (rect.bottom + gap) + "px";
+    } else if (arrowDir === "bottom") {
+      // Position above the target
+      tip.style.bottom = (document.documentElement.clientHeight - rect.top + gap) + "px";
     }
 
-    // Dots
+    // Arrow position: point toward center of target
+    const arrowLeft = Math.max(16, Math.min(rect.left + rect.width / 2 - tipLeft, tipW - 16));
+    tip.style.setProperty("--arrow-left", arrowLeft + "px");
+
+    // Step indicator and buttons
     const dots = TOUR_STEPS.map((_, i) =>
       `<div class="tour-dot${i === idx ? " active" : ""}"></div>`
     ).join("");
 
     const isLast = idx === TOUR_STEPS.length - 1;
+    const stepLabel = `${idx + 1} of ${TOUR_STEPS.length}`;
     tip.innerHTML = `
       <div class="tour-title">${step.title}</div>
       <div class="tour-body">${step.body}</div>
@@ -307,7 +321,7 @@ function showTourStep(idx) {
       else if (e.key === "ArrowLeft" && idx > 0) { document.removeEventListener("keydown", keyHandler); showTourStep(idx - 1); }
     };
     document.addEventListener("keydown", keyHandler);
-  }, 80);
+  }, 200);
 }
 
 function endTour() {

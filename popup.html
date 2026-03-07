@@ -775,34 +775,37 @@
     }
 
     /* === Onboarding Tour === */
+    /* Tour: single overlay with box-shadow cutout — no double-dim */
     .tour-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.55);
       z-index: 2000;
-      transition: opacity 0.2s;
+      /* transparent overlay just catches clicks outside spotlight */
+      background: transparent;
+      cursor: default;
     }
     .tour-spotlight {
-      position: absolute;
+      position: fixed;
       border-radius: var(--radius);
-      box-shadow: 0 0 0 4000px rgba(0,0,0,0.55);
+      box-shadow: 0 0 0 4000px rgba(0,0,0,0.5);
       z-index: 2001;
-      transition: all 0.3s ease;
+      transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
       pointer-events: none;
     }
     .tour-tooltip {
-      position: absolute;
+      position: fixed;
       z-index: 2002;
       background: var(--card);
       border: 1px solid var(--pendo-pink);
       border-radius: var(--radius-lg);
       padding: 14px 16px;
-      width: 260px;
+      max-width: 280px;
+      width: calc(100% - 32px);
       box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(200,56,93,0.15);
-      animation: tour-fade-in 0.25s ease;
+      animation: tour-fade-in 0.2s ease;
     }
     @keyframes tour-fade-in {
-      from { opacity: 0; transform: translateY(6px); }
+      from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
     }
     .tour-tooltip::before {
@@ -814,9 +817,8 @@
       border-top: 1px solid var(--pendo-pink);
       transform: rotate(45deg);
     }
-    .tour-tooltip.arrow-top::before { top: -6px; left: 24px; }
-    .tour-tooltip.arrow-bottom::before { bottom: -6px; left: 24px; transform: rotate(225deg); }
-    .tour-tooltip.arrow-left::before { left: -6px; top: 16px; transform: rotate(-45deg); }
+    .tour-tooltip.arrow-top::before { top: -6px; left: var(--arrow-left, 24px); }
+    .tour-tooltip.arrow-bottom::before { bottom: -6px; left: var(--arrow-left, 24px); transform: rotate(225deg); }
     .tour-title {
       font-size: 13px;
       font-weight: 600;
