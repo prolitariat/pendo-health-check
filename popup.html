@@ -152,17 +152,22 @@
       font-weight: 500;
       border-bottom: 2px solid transparent;
       color: var(--muted-foreground);
-      transition: color 0.15s, border-color 0.15s;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
       position: relative;
     }
 
     .tab:hover {
       color: var(--foreground);
+      border-bottom-color: var(--pendo-pink-mid);
+      background: var(--pendo-pink-light);
     }
 
     .tab.active {
       color: var(--foreground);
       border-bottom-color: var(--pendo-pink);
+    }
+    .tab.active:hover {
+      background: transparent;
     }
     .tab:focus-visible {
       outline-offset: -2px;
