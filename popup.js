@@ -549,9 +549,10 @@ function renderChecks(checks) {
     }
   }
 
-  // Render preliminary grade from HC data only (will be updated when setup completes)
+  // Compute preliminary grade from HC data only — don't render yet.
+  // Grade card stays hidden until setup analysis finishes (avoids flash).
   var prelimGrade = computeGrade(checks, []);
-  renderGradeCard(prelimGrade);
+  window.__prelimGrade = prelimGrade;
 
   // First-run tour
   maybeStartTour();
@@ -1039,7 +1040,15 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               applyBadge();
             }
           })
-          .catch(() => {}); // silently fail
+          .catch(() => {
+            // Setup failed — show grade from HC data only
+            if (!document.getElementById("grade-card").style.display ||
+                document.getElementById("grade-card").style.display === "none") {
+              renderGradeCard(window.__prelimGrade || computeGrade(data.checks, []));
+              window.__lastTotalIssues = (window.__prelimGrade || {}).criticals + (window.__prelimGrade || {}).warnings || 0;
+              applyBadge();
+            }
+          });
       }
     })
     .catch((err) => {
