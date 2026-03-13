@@ -1,15 +1,19 @@
-=== CHROME WEB STORE LISTING CONTENT (v1.6.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v2.0.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
 
 --- SHORT DESCRIPTION (132 chars max) ---
-Diagnose Pendo agent health with 11 runtime checks, setup audits, live service status, interactive tools, and smart remediation.
+Instant Pendo installation grade with prioritized diagnostics, one-click issue export, inline debugger, and live service status.
 
 --- DETAILED DESCRIPTION ---
-Pendo Health Check is a three-tab diagnostic suite for the Pendo agent. Each tab has a clear purpose: Health Check monitors runtime state and lets you copy issues, Setup Assistant audits implementation, and Tools provides interactive Pendo commands.
+Pendo Health Check gives you an instant letter grade for your Pendo installation. Open the popup on any page with Pendo installed and get a single, prioritized diagnostic report — no tab-switching, no guesswork.
 
-HEALTH CHECK TAB — "Is Pendo working right now?" (11 Checks + Copy Issues)
+REPORT TAB — Instant Installation Grade + Prioritized Diagnostics
+
+Your Pendo installation is scored from A to F based on 11 runtime health checks and a deep setup analysis. Every issue is ranked by severity so you know exactly where to start.
+
+Runtime Health Checks (11):
 • Agent Detection — confirms pendo.js is loaded
 • Initialization — verifies the agent initialized via pendo.isReady()
 • Visitor ID — checks that a non-anonymous visitor ID is set
@@ -21,22 +25,26 @@ HEALTH CHECK TAB — "Is Pendo working right now?" (11 Checks + Copy Issues)
 • Data Host — checks CNAME configuration vs default CDN
 • Network Requests — validates active network traffic to Pendo servers
 • Feature Flags — detects non-default agent configuration flags
-• Copy Issues to Clipboard — one-click priority-sorted diagnostic report with remediation. Paste into Slack, Jira, or a support ticket.
 
-SETUP ASSISTANT TAB — "Is Pendo installed correctly?"
+Setup Analysis (merged into the same view):
 • Framework detection (React, Angular, Vue, Ember, Svelte, Next.js, Nuxt, jQuery)
 • Snippet installation analysis (install method, placement, async loading)
-• Initialization method and timing analysis
 • CSP header and meta tag compatibility check (directive-by-directive)
 • CNAME-aware host detection for custom CDN and data endpoints
 • CMP/GDPR consent detection (OneTrust, Cookiebot, Didomi, Osano, TrustArc, TCF v2.0)
 • Visitor and account metadata validation (PII detection, data types, field naming)
-• Actionable recommendations prioritized by severity
 
-TOOLS TAB — "Run Pendo diagnostics directly"
-• Toggle Debugger — turns Pendo debugging on/off
-• Validate Install — runs pendo.validateInstall()
-• Validate Environment — runs pendo.validateEnvironment()
+Copy Issues to Clipboard — one-click priority-sorted diagnostic report with remediation. Paste into Slack, Jira, or a support ticket.
+
+TOOLS TAB — Debugger + Developer Console
+• Toggle Pendo Debugger — turns Pendo debugging on/off with one click
+• Validate Install — runs pendo.validateInstall() with inline results (no DevTools needed)
+• Validate Environment — runs pendo.validateEnvironment() with inline results
+
+ICON BADGE
+• Red badge shows count of critical issues at a glance
+• Orange badge for warnings only
+• No badge when everything passes
 
 PENDO SERVICE STATUS
 • Live status monitoring from status.pendo.io
@@ -45,8 +53,8 @@ PENDO SERVICE STATUS
 • Service status included in copied diagnostic reports
 
 FEATURES
-• Copy Issues pinned on the first tab — no hunting, one click to copy
-• Each warn/fail check includes an actionable fix recommendation
+• Installation grade (A–F) computed from all checks and setup analysis
+• Every warn/fail check includes an actionable fix recommendation
 • Smart network request messaging — diagnoses blocked requests without noise
 • First-run onboarding tour walks you through every feature
 • Feedback system with automatic PII scrubbing
@@ -63,4 +71,4 @@ Developer Tools
 English
 
 --- SINGLE PURPOSE DESCRIPTION ---
-Diagnose and report on the health, configuration, and service status of the Pendo analytics agent on any webpage, with interactive console tools.
+Diagnose and grade the health, configuration, and service status of the Pendo analytics agent on any webpage, with interactive console tools and one-click issue export.

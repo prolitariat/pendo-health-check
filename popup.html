@@ -926,6 +926,59 @@
       border-color: var(--pendo-pink) !important;
     }
 
+    /* === Grade Card === */
+    #grade-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      margin: 4px 0 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+    }
+    #grade-letter {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1;
+      min-width: 48px;
+      text-align: center;
+    }
+    #grade-details { flex: 1; }
+    #grade-score {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+    #grade-summary {
+      font-size: 11px;
+      color: var(--muted-foreground);
+      margin-top: 2px;
+    }
+    .grade-a { color: var(--success); }
+    .grade-b { color: #2563eb; }
+    .grade-c { color: var(--warning); }
+    .grade-d { color: #ea580c; }
+    .grade-f { color: var(--destructive); }
+
+    /* === Validate Results === */
+    #validate-results {
+      display: none;
+      margin: 8px 4px;
+      padding: 10px 12px;
+      background: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 11px;
+      color: var(--muted-foreground);
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.5;
+    }
+
   </style>
 </head>
 <body>
@@ -947,8 +1000,7 @@
 
   <!-- Tab Bar -->
   <div id="tab-bar" role="tablist">
-    <div class="tab" data-tab="health" role="tab" tabindex="0" aria-selected="true" aria-controls="panel-health">Health Check</div>
-    <div class="tab" data-tab="setup" role="tab" tabindex="-1" aria-selected="false" aria-controls="panel-setup">Setup Assistant</div>
+    <div class="tab" data-tab="report" role="tab" tabindex="0" aria-selected="true" aria-controls="panel-report">Report</div>
     <div class="tab" data-tab="tools" role="tab" tabindex="-1" aria-selected="false" aria-controls="panel-tools">Tools</div>
   </div>
 
@@ -977,9 +1029,17 @@
     </div>
   </div>
 
-  <!-- Health Check Panel -->
-  <div id="panel-health" class="tab-panel active" role="tabpanel" aria-labelledby="tab-health">
+  <!-- Report Panel (merged Health Check + Setup Assistant) -->
+  <div id="panel-report" class="tab-panel active" role="tabpanel" aria-labelledby="tab-report">
+    <div id="grade-card" style="display:none">
+      <div id="grade-letter">—</div>
+      <div id="grade-details">
+        <div id="grade-score"></div>
+        <div id="grade-summary"></div>
+      </div>
+    </div>
     <div id="checks-list"></div>
+    <div id="setup-issues-list"></div>
     <div id="health-summary">
       <div id="summary-counts"></div>
     </div>
@@ -992,18 +1052,6 @@
           <span class="tool-desc" style="display:block">Plain English problems &amp; fixes — paste into Slack, Jira, etc.</span>
         </div>
       </button>
-    </div>
-  </div>
-
-  <!-- Setup Assistant Panel -->
-  <div id="panel-setup" class="tab-panel" role="tabpanel" aria-labelledby="tab-setup">
-    <div id="setup-loading">
-      <div class="loading-spinner"></div>
-      <p>Analyzing setup…</p>
-    </div>
-    <div id="setup-content"></div>
-    <div id="setup-summary">
-      <div id="setup-summary-counts"></div>
     </div>
   </div>
 
@@ -1040,6 +1088,7 @@
       </div>
     </div>
     <div id="tool-status"></div>
+    <div id="validate-results"></div>
   </div>
 
   <!-- Feedback Bar -->

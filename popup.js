@@ -184,27 +184,21 @@ const TOUR_STEPS = [
     body: "This extension runs diagnostics on any page with Pendo installed. Let's take a quick look at what's here.",
   },
   {
-    target: '[data-tab="health"]',
-    title: "Health Check",
-    body: "Instant pass/fail diagnostics — agent loaded, visitor ID, network requests, ad blockers, CMP/GDPR, and more.",
-    arrow: "top",
-  },
-  {
-    target: '[data-tab="setup"]',
-    title: "Setup Assistant",
-    body: "Deep-dive analysis of your Pendo snippet — framework detection, CSP policy, metadata validation, and actionable recommendations.",
+    target: "#grade-card",
+    title: "Installation Grade",
+    body: "Your Pendo installation gets an instant letter grade. Issues from both runtime checks and setup analysis are merged into one prioritized list.",
     arrow: "top",
   },
   {
     target: "#tool-copy-issues",
     title: "Copy Issues to Clipboard",
-    body: "One click copies every problem and fix as plain text — ready to paste into Slack, Jira, or a support ticket. No follow-up questions needed.",
+    body: "One click copies every problem and fix as plain text — ready to paste into Slack, Jira, or a support ticket.",
     arrow: "bottom",
   },
   {
     target: '[data-tab="tools"]',
     title: "Tools",
-    body: "Developer console and Pendo debugger launcher for deeper troubleshooting.",
+    body: "Toggle the Pendo debugger and run validate commands with inline results — no DevTools needed.",
     arrow: "top",
   },
 ];
@@ -339,9 +333,9 @@ function endTour() {
   chrome.storage?.local?.set({ tourComplete: true });
   trackEvent("tour_complete", { step: tourStep, total: TOUR_STEPS.length });
 
-  // Return to health tab
-  const healthTab = document.querySelector('[data-tab="health"]');
-  if (healthTab) activateTab(healthTab);
+  // Return to report tab
+  const reportTab = document.querySelector('[data-tab="report"]');
+  if (reportTab) activateTab(reportTab);
 }
 
 function maybeStartTour() {
@@ -359,6 +353,8 @@ function maybeStartTour() {
 
 let setupLoaded = false;
 let activeTabId = null;
+let lastHealthData = null;
+let lastSetupData = null;
 
 function activateTab(tab) {
   const id = tab.dataset.tab;
@@ -378,11 +374,6 @@ function activateTab(tab) {
   activeTabId = id;
 
   trackEvent("tab_switch", { tab: id });
-
-  if (id === "setup" && !setupLoaded) {
-    setupLoaded = true;
-    runSetup();
-  }
 }
 
 document.querySelectorAll(".tab").forEach((tab) => {
@@ -408,6 +399,10 @@ document.querySelectorAll(".tab").forEach((tab) => {
 // ---------------------------------------------------------------------------
 
 function renderChecks(checks) {
+  // Store health data globally for grade computation
+  lastHealthData = { checks: checks };
+  window.__lastChecks = checks;
+
   const list = document.getElementById("checks-list");
   list.innerHTML = "";
 
@@ -512,6 +507,10 @@ function renderChecks(checks) {
     }
   }
 
+  // Render preliminary grade from HC data only (will be updated when setup completes)
+  var prelimGrade = computeGrade(checks, []);
+  renderGradeCard(prelimGrade);
+
   // First-run tour
   maybeStartTour();
 }
@@ -525,15 +524,15 @@ const REMEDIATION_MAP = {
     fail: "FIX: The Pendo snippet is not installed on this page. Add the Pendo install script to your <head> tag, or verify your npm/yarn package imports pendo-io correctly.\n  Code: <script async src='https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js'></script>\n  → Find your API key: app.pendo.io → Settings → Subscription Settings → App Details\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
   "Pendo Ready": {
-    warn: "FIX: The agent script loaded but pendo.isReady() returns false — pendo.initialize() hasn't been called yet, or it fired before the script finished loading. Ensure initialize() runs AFTER the Pendo script loads.\n  Code: pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } });\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference",
+    warn: "FIX: The agent script loaded but pendo.isReady() returns false — pendo.initialize() hasn't been called yet, or it fired before the script finished loading. Ensure initialize() runs AFTER the Pendo script loads.\n  Code: pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } });\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script",
     fail: "FIX: pendo.isReady() threw an error — the agent may be corrupted or an incompatible version. Clear browser cache, hard reload, and verify your CDN snippet URL matches your subscription.\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
   "Visitor ID": {
-    warn: "FIX: You're sending an anonymous or auto-generated visitor ID. Pendo can't track individual users without a stable, unique ID tied to your auth system.\n  Code: pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })\n  → Use whatever unique identifier your app assigns at login (e.g. user.id, email, UUID).\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference",
-    fail: "FIX: No visitor ID found. pendo.initialize() must be called with a visitor.id parameter after the user authenticates.\n  Code: pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })\n  → Call this AFTER your login/auth flow resolves — not on page load before the user is known.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
+    warn: "FIX: You're sending an anonymous or auto-generated visitor ID. Pendo can't track individual users without a stable, unique ID tied to your auth system.\n  Code: pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })\n  → Use whatever unique identifier your app assigns at login (e.g. user.id, email, UUID).\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script",
+    fail: "FIX: No visitor ID found. pendo.initialize() must be called with a visitor.id parameter after the user authenticates.\n  Code: pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })\n  → Call this AFTER your login/auth flow resolves — not on page load before the user is known.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Account ID": {
-    warn: "FIX: No account ID set. If your app is B2B (multi-tenant), Pendo needs the account ID for company-level analytics, NPS by account, and account-based guide targeting.\n  Code: pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } })\n  → Use your app's organization/tenant/company ID. Single-user apps can skip this.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
+    warn: "FIX: No account ID set. If your app is B2B (multi-tenant), Pendo needs the account ID for company-level analytics, NPS by account, and account-based guide targeting.\n  Code: pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } })\n  → Use your app's organization/tenant/company ID. Single-user apps can skip this.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Pendo Instances": {
     warn: "FIX: Multiple Pendo agent instances or duplicate <script> tags detected. This causes double-counted analytics, guide conflicts, and memory leaks.\n  → Check for duplicate <script> tags in your HTML (View Source → search 'pendo')\n  → Check your bundler config for duplicate pendo-io imports\n  → If using a tag manager (GTM), ensure the snippet isn't also hardcoded in your app\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
@@ -542,24 +541,178 @@ const REMEDIATION_MAP = {
     warn: "FIX: Pendo network requests are failing or absent. Common causes:\n  1. Ad blocker or privacy extension blocking *.pendo.io → allowlist pendo.io domains\n  2. Corporate proxy/firewall blocking pendo.io → request IT to allowlist: data.pendo.io, cdn.pendo.io, app.pendo.io\n  3. CSP connect-src missing data.pendo.io → see CSP fixes below if present\n  4. VPN/DNS issue → try with VPN off, or verify pendo.io resolves\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
   },
   "Feature Flags": {
-    warn: "FIX: One or more Pendo features are explicitly disabled in your configuration. Check your pendo.initialize() options for these flags and remove them if unintentional:\n  disableGuides: true      → blocks all in-app guides\n  disableAnalytics: true   → stops all event tracking\n  disableFeedback: true    → hides the Feedback module\n  disablePersistence: true → prevents visitor/account caching\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
+    warn: "FIX: One or more Pendo features are explicitly disabled in your configuration. Check your pendo.initialize() options for these flags and remove them if unintentional:\n  disableGuides: true      → blocks all in-app guides\n  disableAnalytics: true   → stops all event tracking\n  disableFeedback: true    → hides the Feedback module\n  disablePersistence: true → prevents visitor/account caching\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Ad Blocker": {
     warn: "FIX: An ad blocker or privacy extension is interfering with Pendo. This commonly breaks:\n  → Visual Design Studio (can't tag features)\n  → Guide rendering (guides won't appear)\n  → Analytics data collection (events silently dropped)\n  → Resource Center and NPS surveys\n  To fix: disable your ad blocker for this domain, or add these to your allowlist:\n  *.pendo.io, pendo-io-static.storage.googleapis.com, pendo-static-*.storage.googleapis.com\n  Best long-term solution: configure a CNAME so Pendo traffic routes through your own domain.\n  Docs: https://support.pendo.io/hc/en-us/articles/360043539891-CNAME-for-Pendo"
   },
   "Data Host": {
-    warn: "FIX: Could not determine Pendo's content or data host. This may indicate the agent hasn't fully initialized, or the configuration is non-standard.\n  Check your pendo.initialize() call for contentHost and dataHost options, or verify the Pendo script src URL.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
+    warn: "FIX: Could not determine Pendo's content or data host. This may indicate the agent hasn't fully initialized, or the configuration is non-standard.\n  Check your pendo.initialize() call for contentHost and dataHost options, or verify the Pendo script src URL.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Consent (CMP)": {
     warn: "FIX: No Consent Management Platform detected but EU locale suggests GDPR may apply. Pendo collects visitor and usage data — initializing without consent in the EU violates GDPR.\n  → Integrate with your CMP (OneTrust, Cookiebot, Didomi, etc.) and only call pendo.initialize() AFTER the user grants consent for analytics/functional cookies.\n  Code example with OneTrust:\n    OneTrust.OnConsentChanged(function() {\n      if (OnetrustActiveGroups.includes('C0002')) { // Performance cookies\n        pendo.initialize({ visitor: { id: user.id } });\n      }\n    });\n  Docs: https://support.pendo.io/hc/en-us/articles/360031867272-Configure-Pendo-with-a-cookie-consent-manager"
   }
 };
 
+// ---------------------------------------------------------------------------
+// Grade Calculation — unified score from HC + setup data
+// ---------------------------------------------------------------------------
+
+function computeGrade(hcChecks, setupIssues) {
+  var score = 100;
+  var criticals = 0, warnings = 0, passed = 0, infos = 0;
+
+  // Health Check items
+  (hcChecks || []).forEach(function(c) {
+    if (c.status === "fail") { score -= 15; criticals++; }
+    else if (c.status === "warn") { score -= 5; warnings++; }
+    else if (c.status === "info") { score -= 2; infos++; }
+    else { passed++; }
+  });
+
+  // Setup issues (CSP errors, recommendations)
+  (setupIssues || []).forEach(function(si) {
+    if (si.severity === "error" || si.severity === "fail") { score -= 15; criticals++; }
+    else if (si.severity === "warning" || si.severity === "warn") { score -= 5; warnings++; }
+    else if (si.severity === "tip" || si.severity === "info") { score -= 2; infos++; }
+  });
+
+  score = Math.max(0, Math.min(100, score));
+
+  var letter, cssClass;
+  if (score >= 90) { letter = "A"; cssClass = "grade-a"; }
+  else if (score >= 80) { letter = "B"; cssClass = "grade-b"; }
+  else if (score >= 70) { letter = "C"; cssClass = "grade-c"; }
+  else if (score >= 60) { letter = "D"; cssClass = "grade-d"; }
+  else { letter = "F"; cssClass = "grade-f"; }
+
+  var parts = [];
+  if (criticals > 0) parts.push(criticals + " critical");
+  if (warnings > 0) parts.push(warnings + " warning" + (warnings !== 1 ? "s" : ""));
+  if (infos > 0) parts.push(infos + " info");
+  parts.push(passed + " passed");
+
+  return { score: score, letter: letter, cssClass: cssClass, summary: parts.join(" · "), criticals: criticals, warnings: warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Grade Card Rendering
+// ---------------------------------------------------------------------------
+
+function renderGradeCard(grade) {
+  var card = document.getElementById("grade-card");
+  if (!card) return;
+  card.style.display = "flex";
+  var letterEl = document.getElementById("grade-letter");
+  letterEl.textContent = grade.letter;
+  letterEl.className = grade.cssClass;
+  document.getElementById("grade-score").textContent = grade.score + " / 100";
+  document.getElementById("grade-summary").textContent = grade.summary;
+}
+
+// ---------------------------------------------------------------------------
+// Extract Setup Issues into Unified Format
+// ---------------------------------------------------------------------------
+
+function extractSetupIssues(data) {
+  if (!data) return [];
+  var issues = [];
+
+  // CSP issues
+  if (data.csp && Array.isArray(data.csp.issues)) {
+    data.csp.issues.forEach(function(issue) {
+      issues.push({
+        severity: issue.severity, // "error" or "warning"
+        label: "CSP: " + issue.directive,
+        detail: issue.detail
+      });
+    });
+  }
+
+  // Recommendations (error, warning, tip)
+  if (Array.isArray(data.recommendations)) {
+    data.recommendations.forEach(function(rec) {
+      // Don't duplicate CSP issues that are already captured above
+      if (rec.title && rec.title.indexOf("CSP") === -1) {
+        issues.push({
+          severity: rec.severity, // "error", "warning", "tip"
+          label: rec.title,
+          detail: rec.detail
+        });
+      }
+    });
+  }
+
+  // Metadata warnings
+  if (Array.isArray(data.visitorFields)) {
+    data.visitorFields.forEach(function(f) {
+      if (f.warnings && f.warnings.length > 0) {
+        issues.push({
+          severity: "warning",
+          label: 'Metadata: "' + f.key + '"',
+          detail: f.warnings.join("; ")
+        });
+      }
+    });
+  }
+  if (Array.isArray(data.accountFields)) {
+    data.accountFields.forEach(function(f) {
+      if (f.warnings && f.warnings.length > 0) {
+        issues.push({
+          severity: "warning",
+          label: 'Metadata: "' + f.key + '"',
+          detail: f.warnings.join("; ")
+        });
+      }
+    });
+  }
+
+  return issues;
+}
+
+// ---------------------------------------------------------------------------
+// Render Setup Issues into Unified Report
+// ---------------------------------------------------------------------------
+
+function renderSetupIssues(setupIssues) {
+  var container = document.getElementById("setup-issues-list");
+  if (!container || setupIssues.length === 0) return;
+
+  // Add a section divider
+  container.innerHTML = "";
+  var divider = document.createElement("div");
+  divider.style.cssText = "font-size:10px;color:var(--muted-foreground);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:8px 8px 4px;border-top:1px solid var(--border);margin-top:4px";
+  divider.textContent = "Setup Analysis";
+  container.appendChild(divider);
+
+  setupIssues.forEach(function(issue) {
+    var row = document.createElement("div");
+    row.className = "check-row";
+
+    var statusIcon;
+    if (issue.severity === "error" || issue.severity === "fail") {
+      statusIcon = "❌";
+    } else if (issue.severity === "warning" || issue.severity === "warn") {
+      statusIcon = "⚠️";
+    } else {
+      statusIcon = "ℹ️";
+    }
+
+    row.innerHTML =
+      '<div class="check-status">' + statusIcon + '</div>' +
+      '<div class="check-info">' +
+        '<div class="check-label">' + escapeHtml(issue.label) + '</div>' +
+        '<div class="check-detail">' + escapeHtml(issue.detail) + '</div>' +
+      '</div>';
+    container.appendChild(row);
+  });
+}
+
 // (Old per-tab buildPlainTextReport / buildSetupPlainText removed —
 //  replaced by unified buildIssuesReport() in Tools section below)
 
 // ---------------------------------------------------------------------------
-// Setup Assistant — rendering
+// Setup Assistant — rendering (kept for data display in Setup tab if needed)
 // ---------------------------------------------------------------------------
 
 function renderSetup(data) {
@@ -828,7 +981,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         return;
       }
       window.__lastChecks = data.checks;
-      activeTabId = "health";
+      activeTabId = "report";
       renderChecks(data.checks);
 
       // Re-render status filtered to detected environment
@@ -838,6 +991,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       }
 
       // Pre-run Setup analysis in background so copy report always has CSP data
+      // and to extract issues for unified Report view
       if (!setupLoaded) {
         chrome.scripting
           .executeScript({
@@ -849,9 +1003,29 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
             const setupData = setupResults?.[0]?.result;
             if (setupData) {
               window.__lastSetup = setupData;
+              lastSetupData = setupData;
+
+              // Extract setup issues and add to unified report
+              const setupIssues = extractSetupIssues(setupData);
+              renderSetupIssues(setupIssues);
+
+              // Compute final grade from both HC and setup data
+              const finalGrade = computeGrade(data.checks, setupIssues);
+              renderGradeCard(finalGrade);
+
+              // Set badge on icon
+              if (finalGrade.criticals > 0) {
+                chrome.action.setBadgeText({ text: String(finalGrade.criticals) });
+                chrome.action.setBadgeBackgroundColor({ color: "#c93939" });
+              } else if (finalGrade.warnings > 0) {
+                chrome.action.setBadgeText({ text: String(finalGrade.warnings) });
+                chrome.action.setBadgeBackgroundColor({ color: "#a55a05" });
+              } else {
+                chrome.action.setBadgeText({ text: "" });
+              }
             }
           })
-          .catch(() => {}); // silently fail — Setup tab click will retry
+          .catch(() => {}); // silently fail
       }
     })
     .catch((err) => {
@@ -936,55 +1110,69 @@ function runPendoCommand(funcToInject, successMsg) {
 }
 
 document.getElementById("tool-validate-install")?.addEventListener("click", () => {
-  runPendoCommand(function () {
-    try {
-      if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-      if (typeof pendo.validateInstall === "function") {
+  if (!currentTabId) { setToolStatus("No active tab", "error"); return; }
+  setToolStatus("Running…", "");
+  chrome.scripting.executeScript({
+    target: { tabId: currentTabId },
+    func: function() {
+      try {
+        if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
+        if (typeof pendo.validateInstall !== "function") return { error: "pendo.validateInstall() not available" };
+        var captured = [];
+        var origLog = console.log;
+        var origWarn = console.warn;
+        console.log = function() { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
+        console.warn = function() { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
         pendo.validateInstall();
-        var isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-        var shortcut = isMac ? "Cmd+Option+J" : "F12";
-        return { message: "✅ validateInstall() executed — open DevTools (" + shortcut + ") → Console to see results" };
-      }
-      return { error: "pendo.validateInstall() not available on this agent version" };
-    } catch (e) {
-      return { error: e.message };
+        console.log = origLog;
+        console.warn = origWarn;
+        return { output: captured.length > 0 ? captured.join("\n") : "validateInstall() completed — no console output captured." };
+      } catch(e) { return { error: e.message }; }
+    },
+    world: "MAIN"
+  }).then(function(results) {
+    var r = results && results[0] && results[0].result;
+    if (r && r.error) {
+      setToolStatus(r.error, "error");
+    } else if (r && r.output) {
+      setToolStatus("✅ validateInstall() executed", "success");
+      var resultsDiv = document.getElementById("validate-results");
+      if (resultsDiv) { resultsDiv.style.display = "block"; resultsDiv.textContent = r.output; }
     }
-  }, "validateInstall() executed");
+  }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
 });
 
 document.getElementById("tool-validate-env")?.addEventListener("click", () => {
-  runPendoCommand(function () {
-    try {
-      if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-      if (typeof pendo.validateEnvironment === "function") {
-        var result = pendo.validateEnvironment();
-        // Try to capture and return meaningful output
-        if (result && typeof result === "object") {
-          var summary = [];
-          var keys = Object.keys(result);
-          for (var i = 0; i < keys.length; i++) {
-            var k = keys[i];
-            var v = result[k];
-            if (typeof v === "boolean") {
-              summary.push(k + ": " + (v ? "✅" : "❌"));
-            } else if (typeof v === "string" || typeof v === "number") {
-              summary.push(k + ": " + v);
-            }
-          }
-          if (summary.length > 0) {
-            return { message: "✅ " + summary.join(" · ") };
-          }
-        }
-        // Fallback — result wasn't a parseable object (output went to console)
-        var isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-        var shortcut = isMac ? "Cmd+Option+J" : "F12";
-        return { message: "✅ validateEnvironment() executed — open DevTools (" + shortcut + ") → Console to see results" };
-      }
-      return { error: "pendo.validateEnvironment() not available on this agent version" };
-    } catch (e) {
-      return { error: e.message };
+  if (!currentTabId) { setToolStatus("No active tab", "error"); return; }
+  setToolStatus("Running…", "");
+  chrome.scripting.executeScript({
+    target: { tabId: currentTabId },
+    func: function() {
+      try {
+        if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
+        if (typeof pendo.validateEnvironment !== "function") return { error: "pendo.validateEnvironment() not available" };
+        var captured = [];
+        var origLog = console.log;
+        var origWarn = console.warn;
+        console.log = function() { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
+        console.warn = function() { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
+        pendo.validateEnvironment();
+        console.log = origLog;
+        console.warn = origWarn;
+        return { output: captured.length > 0 ? captured.join("\n") : "validateEnvironment() completed — no console output captured." };
+      } catch(e) { return { error: e.message }; }
+    },
+    world: "MAIN"
+  }).then(function(results) {
+    var r = results && results[0] && results[0].result;
+    if (r && r.error) {
+      setToolStatus(r.error, "error");
+    } else if (r && r.output) {
+      setToolStatus("✅ validateEnvironment() executed", "success");
+      var resultsDiv = document.getElementById("validate-results");
+      if (resultsDiv) { resultsDiv.style.display = "block"; resultsDiv.textContent = r.output; }
     }
-  }, "validateEnvironment() executed");
+  }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
 });
 
 document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
@@ -1121,8 +1309,8 @@ function buildIssuesReport() {
         }
       });
       const fixText = fixes.length > 0
-        ? fixes.join("\n  ") + "\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference"
-        : "Review this field in your pendo.initialize() call and correct the value format.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference";
+        ? fixes.join("\n  ") + "\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+        : "Review this field in your pendo.initialize() call and correct the value format.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script";
       addIssue("WARNING", `Metadata: "${f.key}"`,
         f.warnings.join("; "),
         fixText);
@@ -1198,7 +1386,7 @@ function buildIssuesReport() {
     lines.push("── Sources ──");
     const sourceLabels = {
       "360032209131": "Content Security Policy for Pendo",
-      "21374706009883": "Pendo Install API Reference",
+      "360046272771": "Developer's Guide to Implementing Pendo",
       "21397042498571": "Install Pendo on a Single Page Application",
       "360032207332": "Manage Visitor and Account Metadata",
       "360043539891": "CNAME for Pendo",
@@ -2312,7 +2500,7 @@ function runPendoSetupAssistant() {
   }
   if (complexFields.length > 0) {
     recommend("warning", "Complex metadata values",
-      "Fields with non-flat values: " + complexFields.join(", ") + ".\n  FIX: Pendo only processes flat key-value pairs — nested objects and arrays are silently ignored.\n  Instead of: { plan: { name: 'Pro', tier: 2 } }\n  Use:        { plan_name: 'Pro', plan_tier: 2 }\n  Instead of: { tags: ['admin', 'beta'] }\n  Use:        { tags: 'admin,beta' }\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
+      "Fields with non-flat values: " + complexFields.join(", ") + ".\n  FIX: Pendo only processes flat key-value pairs — nested objects and arrays are silently ignored.\n  Instead of: { plan: { name: 'Pro', tier: 2 } }\n  Use:        { plan_name: 'Pro', plan_tier: 2 }\n  Instead of: { tags: ['admin', 'beta'] }\n  Use:        { tags: 'admin,beta' }\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
   }
 
   // Framework-specific timing tips
@@ -2338,7 +2526,7 @@ function runPendoSetupAssistant() {
     var payloadEstimate = JSON.stringify(pendo.metadata || {}).length;
     if (payloadEstimate > 50000) {
       recommend("warning", "Large metadata payload",
-        "Estimated metadata size is " + Math.round(payloadEstimate / 1024) + "KB. Pendo has a 64KB limit per request — exceeding this will silently drop data.\n  FIX: Audit your pendo.initialize() call and remove fields that aren't used for segmentation or analytics.\n  Common culprits: serialized objects, long strings, redundant fields, debug data.\n  To see which fields are actually used: Pendo → Settings → Data Mappings → sort by 'Last Seen'.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
+        "Estimated metadata size is " + Math.round(payloadEstimate / 1024) + "KB. Pendo has a 64KB limit per request — exceeding this will silently drop data.\n  FIX: Audit your pendo.initialize() call and remove fields that aren't used for segmentation or analytics.\n  Common culprits: serialized objects, long strings, redundant fields, debug data.\n  To see which fields are actually used: Pendo → Settings → Data Mappings → sort by 'Last Seen'.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
     }
   } catch (e) {}
 
@@ -2350,7 +2538,7 @@ function runPendoSetupAssistant() {
       var major = parseInt(parts[0], 10);
       if (major < 2) {
         recommend("tip", "Agent version may be outdated",
-          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo-io/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
+          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo-io/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
       }
     }
   } catch (e) {}
@@ -2361,7 +2549,7 @@ function runPendoSetupAssistant() {
   // No metadata at all
   if (result.visitorFields.length === 0 && result.accountFields.length === 0) {
     recommend("tip", "No metadata fields detected",
-      "Pendo is initialized without visitor or account metadata. Without metadata, you can't segment users by role, plan, company, or other attributes.\n  FIX: Add metadata fields to your pendo.initialize() call:\n    pendo.initialize({\n      visitor: { id: 'USER_ID', email: 'user@example.com', role: 'admin', created_at: '2024-01-15' },\n      account: { id: 'ACCOUNT_ID', name: 'Acme Corp', plan_level: 'enterprise', is_paying: true }\n    });\n  Start with: email, role, plan_level, created_at, is_paying — these cover 80% of segmentation needs.\n  Docs: https://support.pendo.io/hc/en-us/articles/21374706009883-Pendo-install-API-reference");
+      "Pendo is initialized without visitor or account metadata. Without metadata, you can't segment users by role, plan, company, or other attributes.\n  FIX: Add metadata fields to your pendo.initialize() call:\n    pendo.initialize({\n      visitor: { id: 'USER_ID', email: 'user@example.com', role: 'admin', created_at: '2024-01-15' },\n      account: { id: 'ACCOUNT_ID', name: 'Acme Corp', plan_level: 'enterprise', is_paying: true }\n    });\n  Start with: email, role, plan_level, created_at, is_paying — these cover 80% of segmentation needs.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
   }
 
   // CNAME recommendation — check if using default Pendo domains

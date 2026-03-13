@@ -2,6 +2,20 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [2.0.0] — 2026-03-12
+
+### Changed
+- **Unified Report view** — Health Check and Setup Assistant merged into a single "Report" tab. All runtime checks and setup analysis findings appear in one prioritized list. No more switching between tabs to understand your Pendo installation.
+- **Installation Grade** — every popup open now shows an instant letter grade (A–F) computed from runtime health checks and setup analysis. Score starts at 100; fail/error = −15, warn = −5, info/tip = −2.
+- **Two-tab layout** — simplified from three tabs (Health Check, Setup Assistant, Tools) to two (Report, Tools). The Report tab is the default landing view.
+- **Icon badge** — the extension icon now shows a red badge with the count of critical issues, or an orange badge for warnings. Clears automatically when no issues are detected.
+- **Inline Validate results** — Validate Install and Validate Environment output now renders inline in the Tools tab instead of requiring DevTools (Cmd+Option+J).
+- **Onboarding tour updated** — reduced from 5 steps to 4 steps to match the new two-tab layout.
+- **Updated Pendo doc link** — replaced dead `support.pendo.io/hc/en-us/articles/21374706009883` link with working Developer's Guide URL.
+
+### Fixed
+- **Debugger toggle only works once** — replaced unreliable DOM element detection with `data-pendo-debug-active` attribute on `document.body` that persists between `executeScript` injections.
+
 ## [1.6.0] — 2026-03-12
 
 ### Changed

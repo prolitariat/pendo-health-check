@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Pendo Health Check",
-  "version": "1.6.0",
-  "description": "Run diagnostics against the Pendo agent — health checks, setup analysis, service status, network validation, and smart remediation.",
+  "version": "2.0.0",
+  "description": "Instant Pendo installation grade with prioritized diagnostics, one-click issue export, inline debugger, and live service status.",
   "permissions": ["activeTab", "scripting", "storage"],
   "action": {
     "default_popup": "popup.html",

@@ -1,6 +1,6 @@
 # Pendo Health Check — Chrome Extension
 
-A Manifest V3 Chrome extension that runs real-time diagnostics against the [Pendo](https://www.pendo.io/) analytics agent on any web page. Click the toolbar icon to get instant pass/warn/fail results across 11 health checks, a deep-dive Setup Assistant with framework detection, metadata validation, and actionable recommendations, plus interactive Pendo console tools.
+A Manifest V3 Chrome extension that gives you an instant letter grade (A–F) for any [Pendo](https://www.pendo.io/) installation. Click the toolbar icon to get a single prioritized diagnostic report merging 11 runtime health checks with deep setup analysis, one-click issue export, an inline debugger, and live service status — no tab-switching, no guesswork.
 
 Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-setup-assistant) — the ai-setup-assistant helps developers **install** Pendo into a codebase, while this extension **validates** the running installation from the browser.
 
@@ -10,13 +10,12 @@ Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-s
 
 - [Installation](#installation)
 - [Usage](#usage)
-- [What's New in v1.6](#whats-new-in-v16)
+- [What's New in v2.0](#whats-new-in-v20)
 - [Extension Architecture](#extension-architecture)
 - [File Reference](#file-reference)
 - [Tab Purposes](#tab-purposes)
-- [Tab 1: Health Check](#tab-1-health-check)
-- [Tab 2: Setup Assistant](#tab-2-setup-assistant)
-- [Tab 3: Tools](#tab-3-tools)
+- [Tab 1: Report](#tab-1-report)
+- [Tab 2: Tools](#tab-2-tools)
 - [Pendo Service Status](#pendo-service-status)
 - [QA Test Harness](#qa-test-harness)
 - [First-Run Onboarding Tour](#first-run-onboarding-tour)
@@ -54,33 +53,41 @@ To update later, just `git pull` and click the ↻ reload button on the extensio
 
 ## Usage
 
-**Pendo Detected** — Navigate to any page with Pendo installed and click the icon. The Health Check tab runs automatically. Switch to Setup Assistant for implementation audit or Tools for interactive Pendo commands.
+**Pendo Detected** — Navigate to any page with Pendo installed and click the icon. The Report tab runs automatically, showing your installation grade and all diagnostics. Switch to Tools for the debugger and validate commands.
 
 **Pendo Not Detected** — On pages without Pendo (e.g., `https://example.com`), the extension shows a "Pendo Not Detected" message with guidance.
 
 **Restricted Pages** — On `chrome://` pages, `chrome-extension://` pages, and the Chrome Web Store, the extension shows an error state explaining the restriction.
 
-**Copy Issues** — The Health Check tab includes a "Copy Issues to Clipboard" button pinned at the bottom. It generates a priority-sorted diagnostic report (critical issues first, then warnings, then passes). Issues include smart remediation suggestions and CSP fix instructions, making copied reports self-contained troubleshooting guides. When issues are detected, the copy button pulses to draw attention.
+**Copy Issues** — The Report tab includes a "Copy Issues to Clipboard" button pinned at the bottom. It generates a priority-sorted diagnostic report (critical issues first, then warnings, then passes). Issues include smart remediation suggestions and CSP fix instructions, making copied reports self-contained troubleshooting guides. When issues are detected, the copy button pulses to draw attention.
 
-**First-Run Tour** — On first install, the extension walks you through each tab and the copy button with a guided spotlight tour.
+**Icon Badge** — The extension icon shows a red badge with the count of critical issues, or an orange badge for warnings. Clears automatically when everything passes.
+
+**First-Run Tour** — On first install, the extension walks you through the grade card, copy button, and tools tab with a guided spotlight tour.
 
 **Send Feedback** — A feedback button at the bottom of the popup lets you report issues or suggest features. You can open a GitHub Issue (requires GitHub account) or send an email (no account needed). All feedback is PII-scrubbed before it leaves the extension.
 
 ---
 
-## What's New in v1.6
+## What's New in v2.0
 
-### Copy Issues Promoted to Health Check Tab (v1.6.0)
-The "Copy Issues to Clipboard" button is now pinned at the bottom of the Health Check tab — the first thing you see. No more hunting in the Tools tab. One click copies every problem and fix as plain text, ready to paste into Slack, Jira, or a support ticket.
+### Unified Report with Installation Grade (v2.0.0)
+Health Check and Setup Assistant are merged into a single **Report** tab. Your Pendo installation gets an instant letter grade (A–F) computed from 11 runtime health checks and deep setup analysis. All issues appear in one prioritized list — no more switching between tabs to understand your installation. Score starts at 100; fail/error = −15, warn = −5, info/tip = −2.
 
-### Smarter Network Request Messaging (v1.6.0)
-When all Pendo requests are blocked (CORS, ad blocker, firewall), the extension now shows a single diagnosis — "All N Pendo requests returned 0 bytes — likely blocked by…" — instead of repeating every individual failure.
+### Two-Tab Layout (v2.0.0)
+Simplified from three tabs to two: **Report** (diagnostics + grade) and **Tools** (debugger + validate). The Report tab is the default landing view.
 
-### Tab Layout Redesigned (v1.6.0)
-Tabs reordered: Health Check → Setup Assistant → Tools. The Tools tab is now focused solely on interactive Pendo commands (debugger toggle, validate install, validate environment).
+### Icon Badge (v2.0.0)
+The extension icon now shows a **red badge** with the count of critical issues, or an **orange badge** for warnings. Clears automatically when no issues are detected.
 
-### CI Workflow Stabilized (v1.6.0)
-GitHub Actions QA workflow switched to manual-only (`workflow_dispatch`). Puppeteer tests require Chrome with extension sideloading, which standard GH Actions runners don't support. No more spurious failure notifications.
+### Inline Validate Results (v2.0.0)
+Validate Install and Validate Environment output now renders inline in the Tools tab instead of requiring DevTools (Cmd+Option+J). Results appear in a monospace panel directly below the buttons.
+
+### Debugger Toggle Fix (v2.0.0)
+The Toggle Pendo Debugger button now works reliably on repeated clicks, using a data attribute instead of DOM element detection.
+
+### Updated Pendo Doc Link (v2.0.0)
+Replaced the dead `support.pendo.io` article link with the current Developer's Guide URL.
 
 ### QA Test Harness (v1.5.0)
 A self-hosted HTML page (`test-harness.html`) for regression testing every extension check. Includes 8 preset scenarios (Healthy, Broken, CSP Blocked, GDPR Waiting, CNAME, Ad Blocked, Partial Setup, React SPA) and granular toggle controls for Pendo agent state, identity/metadata, network/hosting, CSP modes, CMP/GDPR platforms, and frameworks. See [QA Test Harness](#qa-test-harness) for details.
@@ -126,7 +133,7 @@ Live Pendo service status monitoring with auto-detected realm, network request v
 │                   popup.html                      │
 │  ┌─────────────┐  ┌───────────┐  ┌────────────┐  │
 │  │   Header    │  │  Tab Bar  │  │  Feedback   │  │
-│  │  (icon+URL) │  │HC|Setup|T │  │   Button    │  │
+│  │  (icon+URL) │  │Report|Tool│  │   Button    │  │
 │  └─────────────┘  └─────┬─────┘  └─────┬──────┘  │
 │  ┌──────────────┐       │               │         │
 │  │Pendo Status  │       │               │         │
@@ -167,7 +174,7 @@ Live Pendo service status monitoring with auto-detected realm, network request v
 **Key design decisions:**
 
 - **No content script relay.** Both diagnostic functions are injected directly via `chrome.scripting.executeScript` with `world: "MAIN"`, giving them access to the page's `window.pendo` object without message-passing overhead.
-- **Background pre-loading.** The Setup Assistant analysis runs in the background immediately after Health Check completes, so the copy report always includes CSP data regardless of which tab the user is viewing.
+- **Background setup analysis.** The Setup Assistant analysis runs in the background after Health Check completes. Results merge into the Report tab and the final installation grade.
 - **Live service status.** Fetches from Pendo's public Atlassian Statuspage API (`status.pendo.io/api/v2/summary.json`) on popup open. Auto-detects realm. No authentication required.
 - **Flex column layout.** The popup uses `display: flex; flex-direction: column` with a fixed 600px height. Header, tab bar, and feedback bar are pinned (`flex-shrink: 0`); only the active tab panel scrolls. This prevents the tab bar from scrolling off-screen.
 - **Zero external dependencies.** Pure vanilla JS with inline CSS. No build step, no npm, no bundler.
@@ -185,8 +192,8 @@ Chrome Extension Manifest V3 configuration.
 |-------|-------|---------|
 | `manifest_version` | `3` | Required for Chrome Manifest V3 extensions |
 | `name` | `"Pendo Health Check"` | Display name in Chrome toolbar and extensions page |
-| `version` | `"1.6.0"` | Extension version (semver) |
-| `description` | `"Run diagnostics against the Pendo agent — health checks, setup analysis, service status, network validation, and smart remediation."` | Shown on `chrome://extensions` |
+| `version` | `"2.0.0"` | Extension version (semver) |
+| `description` | `"Instant Pendo installation grade with prioritized diagnostics, one-click issue export, inline debugger, and live service status."` | Shown on `chrome://extensions` |
 | `permissions` | `["activeTab", "scripting", "storage"]` | Grants access to the current tab, script injection, and local storage |
 | `action.default_popup` | `"popup.html"` | The HTML file rendered when the icon is clicked |
 | `action.default_icon` | `16/48/128px PNGs` | Toolbar icon at various resolutions |
@@ -199,7 +206,7 @@ The popup UI rendered when the user clicks the extension icon. Contains all CSS 
 
 ### `popup.js`
 
-All UI logic, event handling, the two injected diagnostic functions (`runPendoHealthCheck`, `runPendoSetupAssistant`), Tools tab handlers, first-run onboarding tour, and copy button pulse animation.
+All UI logic, event handling, the two injected diagnostic functions (`runPendoHealthCheck`, `runPendoSetupAssistant`), grade computation, badge management, inline validate output, Tools tab handlers, first-run onboarding tour, and copy button pulse animation.
 
 ### `background.js`
 
@@ -221,21 +228,20 @@ Self-hosted QA regression test page. Not included in the Chrome Web Store submis
 
 ## Tab Purposes
 
-Each tab has a clearly defined purpose with no overlapping responsibilities:
-
 | Tab | Purpose | Question It Answers |
 |-----|---------|---------------------|
-| **Health Check** | Runtime state monitoring | *"Is Pendo working right now?"* |
-| **Setup Assistant** | Implementation audit | *"Is Pendo installed correctly?"* |
-| **Tools** | Interactive commands | *"Run Pendo debugger and console commands"* |
+| **Report** | Installation grade + all diagnostics | *"What's wrong with my Pendo installation and where do I start?"* |
+| **Tools** | Debugger + developer console commands | *"Run Pendo debugger and validate commands"* |
 
 ---
 
-## Tab 1: Health Check
+## Tab 1: Report
 
-Runs automatically when the popup opens. Injects `runPendoHealthCheck()` into the page's MAIN world and renders results as a single-column list of pass/warn/fail rows with a summary bar.
+Opens automatically when the popup loads. Shows an instant installation grade (A–F) followed by a prioritized list of all diagnostics.
 
-11 checks are run in sequence:
+**Installation Grade** — Score starts at 100. Each fail/error deducts 15 points, each warning deducts 5, each info/tip deducts 2. Grade thresholds: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, F < 60.
+
+**Runtime Health Checks (11)** — Injected via `runPendoHealthCheck()` into the page's MAIN world:
 
 | # | Name | What It Inspects |
 |---|------|-----------------|
@@ -251,19 +257,17 @@ Runs automatically when the popup opens. Injects `runPendoHealthCheck()` into th
 | 10 | **Network Requests** | `performance.getEntriesByType('resource')` for Pendo traffic + CORS detection |
 | 11 | **Feature Flags** | `pendo.getOptions()` for non-default config |
 
----
+**Setup Analysis** — Runs in the background after health checks complete. Findings merge into the same Report view:
 
-## Tab 2: Setup Assistant
-
-Runs on first click of the "Setup Assistant" tab and pre-runs in the background after Health Check completes.
-
-Seven analysis sections: Framework Detection, Snippet Analysis, Initialization, Content Security Policy (per-directive with auto-detected SUB_ID), CNAME Host Detection, CMP/GDPR Consent Detection, Metadata Fields, and Recommendations.
+Framework detection, snippet installation analysis, CSP compatibility (per-directive with auto-detected SUB_ID), CNAME host detection, CMP/GDPR consent detection, and metadata field validation.
 
 ---
 
-## Tab 3: Tools
+## Tab 2: Tools
 
-One-click access to Pendo console commands: Toggle Pendo Debugger, Validate Install, and Validate Environment. Each injected via MAIN world.
+**Toggle Pendo Debugger** — One-click enable/disable using `pendo.enableDebugging()` / `pendo.disableDebugging()`. State tracked via `data-pendo-debug-active` attribute.
+
+**Developer Console** — Validate Install and Validate Environment buttons run the corresponding Pendo commands and display results inline in a monospace panel — no DevTools required.
 
 ---
 
@@ -299,13 +303,12 @@ Auto-detects realm (US/EU/US1/JP), shows status badge linking to `status.pendo.i
 
 ## First-Run Onboarding Tour
 
-On first install, the extension runs a 5-step guided tour:
+On first install, the extension runs a 4-step guided tour:
 
 1. **Welcome** — Introduction and what the extension does
-2. **Health Check tab** — Runtime diagnostics
-3. **Setup Assistant tab** — Implementation audit
-4. **Copy Issues button** — Priority-sorted clipboard report (on Health Check tab)
-5. **Tools tab** — Interactive commands
+2. **Installation Grade** — Letter grade and merged diagnostics
+3. **Copy Issues** — One-click priority-sorted clipboard report
+4. **Tools tab** — Debugger and inline validate commands
 
 The tour uses a spotlight overlay (box-shadow cutout) with positioned tooltips. Supports keyboard navigation: arrow keys to advance/retreat, Escape to skip, Enter to advance. Tour completion is persisted via `chrome.storage.local` so it only runs once.
 
