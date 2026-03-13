@@ -966,16 +966,43 @@
     .grade-f { color: var(--destructive); }
 
     /* === Validate Results === */
+    #validate-results-wrap {
+      position: relative;
+      margin: 8px 4px;
+    }
+    #validate-results-wrap .copy-result-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--background);
+      color: var(--muted-foreground);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s, background 0.15s;
+      z-index: 2;
+    }
+    #validate-results-wrap:hover .copy-result-btn {
+      opacity: 1;
+    }
+    #validate-results-wrap .copy-result-btn:hover {
+      background: var(--pendo-pink-light);
+      border-color: var(--pendo-pink-mid);
+      color: var(--foreground);
+    }
     #validate-results {
       display: none;
-      margin: 8px 4px;
       padding: 10px 12px;
       background: var(--muted);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 11px;
-      color: var(--muted-foreground);
+      color: var(--foreground);
       max-height: 200px;
       overflow-y: auto;
       white-space: pre-wrap;
@@ -1094,7 +1121,10 @@
       </div>
     </div>
     <div id="tool-status"></div>
-    <div id="validate-results"></div>
+    <div id="validate-results-wrap">
+      <button class="copy-result-btn" id="copy-validate-result" title="Copy output">Copy</button>
+      <div id="validate-results"></div>
+    </div>
     <!-- Settings -->
     <div style="margin-top:auto;padding:10px 4px 4px;border-top:1px solid var(--border)">
       <div style="font-size:10px;color:var(--muted-foreground);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Settings</div>

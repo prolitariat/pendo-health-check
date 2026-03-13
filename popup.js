@@ -1189,6 +1189,17 @@ document.getElementById("tool-validate-env")?.addEventListener("click", () => {
   }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
 });
 
+// Copy validate output to clipboard
+document.getElementById("copy-validate-result")?.addEventListener("click", function() {
+  var resultsDiv = document.getElementById("validate-results");
+  if (!resultsDiv || !resultsDiv.textContent) return;
+  navigator.clipboard.writeText(resultsDiv.textContent).then(function() {
+    var btn = document.getElementById("copy-validate-result");
+    btn.textContent = "Copied!";
+    setTimeout(function() { btn.textContent = "Copy"; }, 1500);
+  });
+});
+
 document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
   runPendoCommand(function () {
     try {
