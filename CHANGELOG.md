@@ -2,6 +2,22 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [1.6.0] — 2026-03-12
+
+### Changed
+- **Copy Issues promoted to Health Check tab** — the "Copy Issues to Clipboard" button is now pinned at the bottom of the Health Check tab (the first tab you see), rather than buried in the Tools tab. One click copies every problem and fix as plain text.
+- **Smarter network request messaging** — when all Pendo requests are blocked (CORS, ad blocker, firewall), the extension shows a single diagnosis instead of repeating every individual failure count.
+- **Tab layout redesigned** — tabs reordered: Health Check → Setup Assistant → Tools. The Tools tab is now focused solely on interactive Pendo commands (debugger toggle, validate install, validate environment).
+- **Onboarding tour updated** — tour steps reordered to match the new tab layout; Copy Issues step now highlights the Health Check tab button.
+
+### Fixed
+- **CI workflow stabilized** — GitHub Actions QA workflow switched to manual-only (`workflow_dispatch`). Puppeteer tests require Chrome with extension sideloading, which standard GH Actions runners don't support.
+- **Defensive `renderSetup` guards** — Setup Assistant renderer handles partial or malformed data objects without crashing.
+- **Tour arrow positioning** — fixed CSS for tour tooltip arrows.
+
+### Removed
+- **Easy Mode / Glassmorphism UI** — experimental feature removed before release. Chrome extension popups are opaque OS-level windows, making `backdrop-filter: blur()` ineffective.
+
 ## [1.5.0] — 2026-03-07
 
 ### Added

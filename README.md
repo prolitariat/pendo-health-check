@@ -10,7 +10,7 @@ Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-s
 
 - [Installation](#installation)
 - [Usage](#usage)
-- [What's New in v1.5](#whats-new-in-v15)
+- [What's New in v1.6](#whats-new-in-v16)
 - [Extension Architecture](#extension-architecture)
 - [File Reference](#file-reference)
 - [Tab Purposes](#tab-purposes)
@@ -60,7 +60,7 @@ To update later, just `git pull` and click the ↻ reload button on the extensio
 
 **Restricted Pages** — On `chrome://` pages, `chrome-extension://` pages, and the Chrome Web Store, the extension shows an error state explaining the restriction.
 
-**Copy Issues** — The Tools tab includes a "Copy Issues to Clipboard" button that generates a priority-sorted diagnostic report (critical issues first, then warnings, then passes). Issues include smart remediation suggestions and CSP fix instructions, making copied reports self-contained troubleshooting guides. When issues are detected, the copy button pulses to draw attention.
+**Copy Issues** — The Health Check tab includes a "Copy Issues to Clipboard" button pinned at the bottom. It generates a priority-sorted diagnostic report (critical issues first, then warnings, then passes). Issues include smart remediation suggestions and CSP fix instructions, making copied reports self-contained troubleshooting guides. When issues are detected, the copy button pulses to draw attention.
 
 **First-Run Tour** — On first install, the extension walks you through each tab and the copy button with a guided spotlight tour.
 
@@ -68,7 +68,19 @@ To update later, just `git pull` and click the ↻ reload button on the extensio
 
 ---
 
-## What's New in v1.5
+## What's New in v1.6
+
+### Copy Issues Promoted to Health Check Tab (v1.6.0)
+The "Copy Issues to Clipboard" button is now pinned at the bottom of the Health Check tab — the first thing you see. No more hunting in the Tools tab. One click copies every problem and fix as plain text, ready to paste into Slack, Jira, or a support ticket.
+
+### Smarter Network Request Messaging (v1.6.0)
+When all Pendo requests are blocked (CORS, ad blocker, firewall), the extension now shows a single diagnosis — "All N Pendo requests returned 0 bytes — likely blocked by…" — instead of repeating every individual failure.
+
+### Tab Layout Redesigned (v1.6.0)
+Tabs reordered: Health Check → Setup Assistant → Tools. The Tools tab is now focused solely on interactive Pendo commands (debugger toggle, validate install, validate environment).
+
+### CI Workflow Stabilized (v1.6.0)
+GitHub Actions QA workflow switched to manual-only (`workflow_dispatch`). Puppeteer tests require Chrome with extension sideloading, which standard GH Actions runners don't support. No more spurious failure notifications.
 
 ### QA Test Harness (v1.5.0)
 A self-hosted HTML page (`test-harness.html`) for regression testing every extension check. Includes 8 preset scenarios (Healthy, Broken, CSP Blocked, GDPR Waiting, CNAME, Ad Blocked, Partial Setup, React SPA) and granular toggle controls for Pendo agent state, identity/metadata, network/hosting, CSP modes, CMP/GDPR platforms, and frameworks. See [QA Test Harness](#qa-test-harness) for details.
@@ -77,7 +89,7 @@ A self-hosted HTML page (`test-harness.html`) for regression testing every exten
 On first install, a 5-step guided tour spotlights each tab and the copy issues button. Uses `chrome.storage.local` to track completion. Supports keyboard navigation (arrow keys, Escape, Enter). See [First-Run Onboarding Tour](#first-run-onboarding-tour).
 
 ### Copy Button Pulse (v1.5.0)
-When the health check detects warnings or failures, the "Copy Issues" button in the Tools tab pulses pink for 3 cycles to draw attention without overwriting the clipboard.
+When the health check detects warnings or failures, the "Copy Issues" button pulses pink for 3 cycles to draw attention without overwriting the clipboard.
 
 ### CNAME-Aware Host Detection (v1.4.0)
 The Setup Assistant now recognizes custom CNAME domains for Pendo CDN and data endpoints. Detects both standard Pendo hosts and custom CNAMEs by inspecting network entries and `pendo._config`.
@@ -173,7 +185,7 @@ Chrome Extension Manifest V3 configuration.
 |-------|-------|---------|
 | `manifest_version` | `3` | Required for Chrome Manifest V3 extensions |
 | `name` | `"Pendo Health Check"` | Display name in Chrome toolbar and extensions page |
-| `version` | `"1.5.0"` | Extension version (semver) |
+| `version` | `"1.6.0"` | Extension version (semver) |
 | `description` | `"Run diagnostics against the Pendo agent — health checks, setup analysis, service status, network validation, and smart remediation."` | Shown on `chrome://extensions` |
 | `permissions` | `["activeTab", "scripting", "storage"]` | Grants access to the current tab, script injection, and local storage |
 | `action.default_popup` | `"popup.html"` | The HTML file rendered when the icon is clicked |
@@ -215,7 +227,7 @@ Each tab has a clearly defined purpose with no overlapping responsibilities:
 |-----|---------|---------------------|
 | **Health Check** | Runtime state monitoring | *"Is Pendo working right now?"* |
 | **Setup Assistant** | Implementation audit | *"Is Pendo installed correctly?"* |
-| **Tools** | Interactive commands & clipboard | *"Run diagnostics and copy issues"* |
+| **Tools** | Interactive commands | *"Run Pendo debugger and console commands"* |
 
 ---
 
@@ -251,9 +263,7 @@ Seven analysis sections: Framework Detection, Snippet Analysis, Initialization, 
 
 ## Tab 3: Tools
 
-One-click access to Pendo console commands: Validate Install, Validate Environment, Enable Debugger, Disable Debugger. Each injected via MAIN world.
-
-Also includes the **Copy Issues to Clipboard** button, which generates a priority-sorted report with remediation for every warn/fail check.
+One-click access to Pendo console commands: Toggle Pendo Debugger, Validate Install, and Validate Environment. Each injected via MAIN world.
 
 ---
 
@@ -294,8 +304,8 @@ On first install, the extension runs a 5-step guided tour:
 1. **Welcome** — Introduction and what the extension does
 2. **Health Check tab** — Runtime diagnostics
 3. **Setup Assistant tab** — Implementation audit
-4. **Tools tab** — Interactive commands
-5. **Copy Issues button** — Priority-sorted clipboard report
+4. **Copy Issues button** — Priority-sorted clipboard report (on Health Check tab)
+5. **Tools tab** — Interactive commands
 
 The tour uses a spotlight overlay (box-shadow cutout) with positioned tooltips. Supports keyboard navigation: arrow keys to advance/retreat, Escape to skip, Enter to advance. Tour completion is persisted via `chrome.storage.local` so it only runs once.
 

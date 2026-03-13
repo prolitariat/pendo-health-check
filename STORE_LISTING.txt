@@ -1,4 +1,4 @@
-=== CHROME WEB STORE LISTING CONTENT (v1.2.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v1.6.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
@@ -7,9 +7,9 @@ Pendo Health Check
 Diagnose Pendo agent health with 11 runtime checks, setup audits, live service status, interactive tools, and smart remediation.
 
 --- DETAILED DESCRIPTION ---
-Pendo Health Check is a three-tab diagnostic suite for the Pendo agent. Each tab has a clear purpose: Health Check monitors runtime state, Setup Assistant audits implementation, and Tools provides interactive Pendo commands.
+Pendo Health Check is a three-tab diagnostic suite for the Pendo agent. Each tab has a clear purpose: Health Check monitors runtime state and lets you copy issues, Setup Assistant audits implementation, and Tools provides interactive Pendo commands.
 
-HEALTH CHECK TAB — "Is Pendo working right now?" (11 Checks)
+HEALTH CHECK TAB — "Is Pendo working right now?" (11 Checks + Copy Issues)
 • Agent Detection — confirms pendo.js is loaded
 • Initialization — verifies the agent initialized via pendo.isReady()
 • Visitor ID — checks that a non-anonymous visitor ID is set
@@ -21,20 +21,22 @@ HEALTH CHECK TAB — "Is Pendo working right now?" (11 Checks)
 • Data Host — checks CNAME configuration vs default CDN
 • Network Requests — validates active network traffic to Pendo servers
 • Feature Flags — detects non-default agent configuration flags
+• Copy Issues to Clipboard — one-click priority-sorted diagnostic report with remediation. Paste into Slack, Jira, or a support ticket.
 
 SETUP ASSISTANT TAB — "Is Pendo installed correctly?"
 • Framework detection (React, Angular, Vue, Ember, Svelte, Next.js, Nuxt, jQuery)
 • Snippet installation analysis (install method, placement, async loading)
 • Initialization method and timing analysis
 • CSP header and meta tag compatibility check (directive-by-directive)
+• CNAME-aware host detection for custom CDN and data endpoints
+• CMP/GDPR consent detection (OneTrust, Cookiebot, Didomi, Osano, TrustArc, TCF v2.0)
 • Visitor and account metadata validation (PII detection, data types, field naming)
 • Actionable recommendations prioritized by severity
 
 TOOLS TAB — "Run Pendo diagnostics directly"
+• Toggle Debugger — turns Pendo debugging on/off
 • Validate Install — runs pendo.validateInstall()
 • Validate Environment — runs pendo.validateEnvironment()
-• Enable Debugger — turns on pendo.enableDebugging()
-• Disable Debugger — turns off pendo.disableDebugging()
 
 PENDO SERVICE STATUS
 • Live status monitoring from status.pendo.io
@@ -43,8 +45,10 @@ PENDO SERVICE STATUS
 • Service status included in copied diagnostic reports
 
 FEATURES
-• One-click copy of diagnostic reports with smart remediation suggestions
+• Copy Issues pinned on the first tab — no hunting, one click to copy
 • Each warn/fail check includes an actionable fix recommendation
+• Smart network request messaging — diagnoses blocked requests without noise
+• First-run onboarding tour walks you through every feature
 • Feedback system with automatic PII scrubbing
 • Version displayed in-app (syncs from manifest)
 • Works on any page with Pendo installed

@@ -39,7 +39,14 @@ const EXCLUDE = [
   ".git/",
 ];
 
-const excludeArgs = EXCLUDE.map((p) => `-x '${p}'`).join(" ");
+// Expand directory patterns to match zip's path format (./ prefix)
+const excludeFlags = EXCLUDE.flatMap((p) => {
+  if (p.endsWith("/")) {
+    // Directory: exclude the dir itself and everything inside
+    return ["-x", `./${p}*`];
+  }
+  return ["-x", `./${p}`];
+});
 
 console.log(`Packaging Pendo Health Check v${version}...`);
 console.log(`Excluding: ${EXCLUDE.join(", ")}\n`);
@@ -49,8 +56,9 @@ try {
   const zipPath = path.join(ROOT, outFile);
   if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
 
-  // Create zip from project root
-  execSync(`cd "${ROOT}" && zip -r "${outFile}" . ${excludeArgs}`, { stdio: "inherit" });
+  // Create zip from project root using spawn for proper argument handling
+  const { execFileSync } = require("child_process");
+  execFileSync("zip", ["-r", outFile, ".", ...excludeFlags], { cwd: ROOT, stdio: "inherit" });
 
   // Report
   const stats = fs.statSync(zipPath);
