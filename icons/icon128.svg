@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Flat Pendo pink background — no gradients, no shading -->
+  <rect width="128" height="128" rx="28" ry="28" fill="#c8385d"/>
+
+  <!-- Bold medical cross — square ends, heavy weight -->
+  <!-- Horizontal bar -->
+  <rect x="30" y="49" width="68" height="30" fill="white"/>
+  <!-- Vertical bar -->
+  <rect x="49" y="30" width="30" height="68" fill="white"/>
+</svg>
