@@ -43,6 +43,11 @@ function showView(id) {
 
 function showTabs() {
   document.getElementById("tab-bar").style.display = "flex";
+  // Show pinned copy bar when Report tab is active
+  if (activeTabId === "report") {
+    const copyBar = document.getElementById("health-copy-bar");
+    if (copyBar) copyBar.style.display = "block";
+  }
 }
 
 function escapeHtml(str) {
@@ -373,6 +378,10 @@ function activateTab(tab) {
   document.getElementById("panel-" + id).classList.add("active");
   activeTabId = id;
 
+  // Show/hide pinned copy bar based on active tab
+  const copyBar = document.getElementById("health-copy-bar");
+  if (copyBar) copyBar.style.display = (id === "report") ? "block" : "none";
+
   trackEvent("tab_switch", { tab: id });
 }
 
@@ -444,35 +453,8 @@ function renderChecks(checks) {
     list.appendChild(allGood);
   }
 
-  // "What's Good" drawer for passing checks — collapsed by default
-  if (passingChecks.length > 0) {
-    const drawer = document.createElement("div");
-    drawer.className = "setup-section";
-    drawer.id = "health-whats-good";
-    drawer.style.cssText = "border-top:1px solid var(--border);margin-top:4px";
-
-    let drawerRows = "";
-    passingChecks.forEach((c) => {
-      drawerRows += `
-        <div class="check-row" style="opacity:0.7">
-          <span class="check-status">${STATUS_ICONS[c.status]}</span>
-          <div class="check-info">
-            <div class="check-label">${escapeHtml(c.label)}</div>
-            <div class="check-detail">${escapeHtml(c.detail)}</div>
-          </div>
-        </div>`;
-    });
-
-    drawer.innerHTML = `
-      <div class="setup-section-header" tabindex="0" role="button" aria-expanded="false" style="color:var(--muted-foreground)">
-        <span class="setup-chevron">▶</span>
-        <span class="setup-section-title">What's Good (${passingChecks.length})</span>
-        <span class="setup-section-badge"><span class="badge badge-green">${passingChecks.length} passed</span></span>
-      </div>
-      <div class="setup-section-body" style="padding-left:0">${drawerRows}</div>
-    `;
-    list.appendChild(drawer);
-  }
+  // Passed checks omitted — grade card summary already shows the count.
+  // Keeping the view focused on actionable issues only.
 
   // Summary: lead with problems if any exist
   const issues = fail + warn;
@@ -898,30 +880,8 @@ function renderSetup(data) {
     container.innerHTML += `<div style="text-align:center;padding:16px 8px;color:var(--success);font-weight:600;font-size:13px">✅ No issues detected</div>`;
   }
 
-  // "What's Good" drawer — collapsed by default
-  if (healthySections.length > 0) {
-    let drawerBody = "";
-    healthySections.forEach((s) => {
-      drawerBody += `
-        <div class="setup-section">
-          <div class="setup-section-header" tabindex="0" role="button" aria-expanded="false">
-            <span class="setup-chevron">▶</span>
-            <span class="setup-section-title">${s.title}</span>
-            <span class="setup-section-badge">${s.badge}</span>
-          </div>
-          <div class="setup-section-body">${s.body}</div>
-        </div>`;
-    });
-    container.innerHTML += `
-      <div class="setup-section" id="whats-good-drawer" style="border-top:1px solid var(--border);margin-top:4px">
-        <div class="setup-section-header" tabindex="0" role="button" aria-expanded="false" style="color:var(--muted-foreground)">
-          <span class="setup-chevron">▶</span>
-          <span class="setup-section-title">What's Good (${healthySections.length})</span>
-          <span class="setup-section-badge"><span class="badge badge-green">${healthySections.length} passed</span></span>
-        </div>
-        <div class="setup-section-body" style="padding-left:4px">${drawerBody}</div>
-      </div>`;
-  }
+  // "What's Good" drawer removed — grade card summary already shows passed count.
+  // Keeps the view focused on actionable issues only.
 
   // Summary
   if (errors + warnings > 0) {
