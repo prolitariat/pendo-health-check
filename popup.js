@@ -1004,13 +1004,12 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               renderGradeCard(finalGrade);
               setTimeout(updateScrollFade, 50);
 
-              // Set badge on icon
-              if (finalGrade.criticals > 0) {
-                chrome.action.setBadgeText({ text: String(finalGrade.criticals) });
-                chrome.action.setBadgeBackgroundColor({ color: "#c93939" });
-              } else if (finalGrade.warnings > 0) {
-                chrome.action.setBadgeText({ text: String(finalGrade.warnings) });
-                chrome.action.setBadgeBackgroundColor({ color: "#a55a05" });
+              // Set badge on icon — Pendo brand yellow with black text
+              var totalIssues = finalGrade.criticals + finalGrade.warnings;
+              if (totalIssues > 0) {
+                chrome.action.setBadgeText({ text: String(totalIssues) });
+                chrome.action.setBadgeBackgroundColor({ color: "#FEF484" });
+                chrome.action.setBadgeTextColor({ color: "#000000" });
               } else {
                 chrome.action.setBadgeText({ text: "" });
               }
