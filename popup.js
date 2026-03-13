@@ -1,6 +1,36 @@
 const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" };
 
 // ---------------------------------------------------------------------------
+// Badge preference — stored in chrome.storage.local
+// ---------------------------------------------------------------------------
+var badgeEnabled = true; // default on
+
+function applyBadge() {
+  var count = window.__lastTotalIssues || 0;
+  if (badgeEnabled && count > 0) {
+    chrome.action.setBadgeText({ text: String(count) });
+    chrome.action.setBadgeBackgroundColor({ color: "#FEF484" });
+    chrome.action.setBadgeTextColor({ color: "#000000" });
+  } else {
+    chrome.action.setBadgeText({ text: "" });
+  }
+}
+
+// Load preference and wire toggle
+chrome.storage.local.get("badgeEnabled", function(result) {
+  if (result.badgeEnabled === false) badgeEnabled = false;
+  var checkbox = document.getElementById("badge-enabled");
+  if (checkbox) {
+    checkbox.checked = badgeEnabled;
+    checkbox.addEventListener("change", function() {
+      badgeEnabled = checkbox.checked;
+      chrome.storage.local.set({ badgeEnabled: badgeEnabled });
+      applyBadge();
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Analytics — lightweight, privacy-first, fire-and-forget
 // Set to "" to disable. Deploy Worker from /analytics directory.
 // ---------------------------------------------------------------------------
@@ -1004,15 +1034,9 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               renderGradeCard(finalGrade);
               setTimeout(updateScrollFade, 50);
 
-              // Set badge on icon — Pendo brand yellow with black text
-              var totalIssues = finalGrade.criticals + finalGrade.warnings;
-              if (totalIssues > 0) {
-                chrome.action.setBadgeText({ text: String(totalIssues) });
-                chrome.action.setBadgeBackgroundColor({ color: "#FEF484" });
-                chrome.action.setBadgeTextColor({ color: "#000000" });
-              } else {
-                chrome.action.setBadgeText({ text: "" });
-              }
+              // Set badge on icon — respects user preference
+              window.__lastTotalIssues = finalGrade.criticals + finalGrade.warnings;
+              applyBadge();
             }
           })
           .catch(() => {}); // silently fail
