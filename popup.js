@@ -992,22 +992,23 @@ document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
     try {
       if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
 
-      // Toggle: check if debugger overlay is already open
-      var overlay = document.getElementById("pendo-debug-bar") ||
-                    document.querySelector("[id*='pendo-debug']") ||
-                    document.querySelector("[class*='pendo-debug']");
-      if (overlay) {
+      // Track debug state via a data attribute on <body>. DOM element detection
+      // is unreliable because Pendo's debugger overlay may use shadow DOM, iframes,
+      // or element names that don't match querySelector patterns.
+      var isActive = document.body.getAttribute("data-pendo-debug-active") === "true";
+
+      if (isActive) {
         if (typeof pendo.disableDebugging === "function") {
           pendo.disableDebugging();
+          document.body.removeAttribute("data-pendo-debug-active");
           return { message: "🔒 Debugger closed" };
         }
-        // Fallback: try removing the overlay directly
-        overlay.remove();
-        return { message: "🔒 Debugger overlay removed" };
+        return { error: "pendo.disableDebugging() not available on this agent version" };
       }
 
       if (typeof pendo.enableDebugging === "function") {
         pendo.enableDebugging();
+        document.body.setAttribute("data-pendo-debug-active", "true");
         return { message: "✅ Debugger launched — click again to close" };
       }
       return { error: "pendo.enableDebugging() not available on this agent version" };
