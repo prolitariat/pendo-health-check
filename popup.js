@@ -562,28 +562,28 @@ function computeGrade(hcChecks, setupIssues) {
   var score = 100;
   var criticals = 0, warnings = 0, passed = 0, infos = 0;
 
-  // Health Check items
+  // Health Check items — graded on a curve so F = badly broken, not "some warnings"
   (hcChecks || []).forEach(function(c) {
-    if (c.status === "fail") { score -= 15; criticals++; }
-    else if (c.status === "warn") { score -= 5; warnings++; }
-    else if (c.status === "info") { score -= 2; infos++; }
+    if (c.status === "fail") { score -= 10; criticals++; }
+    else if (c.status === "warn") { score -= 3; warnings++; }
+    else if (c.status === "info") { score -= 1; infos++; }
     else { passed++; }
   });
 
   // Setup issues (CSP errors, recommendations)
   (setupIssues || []).forEach(function(si) {
-    if (si.severity === "error" || si.severity === "fail") { score -= 15; criticals++; }
-    else if (si.severity === "warning" || si.severity === "warn") { score -= 5; warnings++; }
-    else if (si.severity === "tip" || si.severity === "info") { score -= 2; infos++; }
+    if (si.severity === "error" || si.severity === "fail") { score -= 10; criticals++; }
+    else if (si.severity === "warning" || si.severity === "warn") { score -= 3; warnings++; }
+    else if (si.severity === "tip" || si.severity === "info") { score -= 1; infos++; }
   });
 
   score = Math.max(0, Math.min(100, score));
 
   var letter, cssClass;
   if (score >= 90) { letter = "A"; cssClass = "grade-a"; }
-  else if (score >= 80) { letter = "B"; cssClass = "grade-b"; }
-  else if (score >= 70) { letter = "C"; cssClass = "grade-c"; }
-  else if (score >= 60) { letter = "D"; cssClass = "grade-d"; }
+  else if (score >= 75) { letter = "B"; cssClass = "grade-b"; }
+  else if (score >= 60) { letter = "C"; cssClass = "grade-c"; }
+  else if (score >= 40) { letter = "D"; cssClass = "grade-d"; }
   else { letter = "F"; cssClass = "grade-f"; }
 
   var parts = [];

@@ -72,7 +72,7 @@ To update later, just `git pull` and click the ↻ reload button on the extensio
 ## What's New in v2.0
 
 ### Unified Report with Installation Grade (v2.0.0)
-Health Check and Setup Assistant are merged into a single **Report** tab. Your Pendo installation gets an instant letter grade (A–F) computed from 11 runtime health checks and deep setup analysis. All issues appear in one prioritized list — no more switching between tabs to understand your installation. Score starts at 100; fail/error = −15, warn = −5, info/tip = −2.
+Health Check and Setup Assistant are merged into a single **Report** tab. Your Pendo installation gets an instant letter grade (A–F) computed from 11 runtime health checks and deep setup analysis. All issues appear in one prioritized list — no more switching between tabs to understand your installation. Graded on a curve: fail/error = −10, warn = −3, info/tip = −1. F means badly broken, not "some warnings."
 
 ### Two-Tab Layout (v2.0.0)
 Simplified from three tabs to two: **Report** (diagnostics + grade) and **Tools** (debugger + validate). The Report tab is the default landing view.
@@ -239,7 +239,7 @@ Self-hosted QA regression test page. Not included in the Chrome Web Store submis
 
 Opens automatically when the popup loads. Shows an instant installation grade (A–F) followed by a prioritized list of all diagnostics.
 
-**Installation Grade** — Score starts at 100. Each fail/error deducts 15 points, each warning deducts 5, each info/tip deducts 2. Grade thresholds: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, F < 60.
+**Installation Grade** — Score starts at 100. Each fail/error deducts 10 points, each warning deducts 3, each info/tip deducts 1. Graded on a curve so F means "badly broken," not "some warnings." Thresholds: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F < 40.
 
 **Runtime Health Checks (11)** — Injected via `runPendoHealthCheck()` into the page's MAIN world:
 
