@@ -132,14 +132,6 @@
       letter-spacing: -0.01em;
     }
 
-    #page-url {
-      font-size: 11px;
-      max-width: 250px;
-      opacity: 0.85;
-      word-break: break-all;
-      white-space: normal;
-    }
-
     /* === Tab Bar (shadcn line variant) === */
     #tab-bar {
       display: none;
@@ -1002,10 +994,8 @@
     </div>
   </div>
 
-  <!-- Page URL -->
-  <div style="padding: 6px 16px; background: var(--muted); border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted-foreground); word-break: break-all; white-space: normal; flex-shrink: 0;">
-    <div id="page-url"></div>
-  </div>
+  <!-- Page URL — hidden; value used by clipboard report and feedback -->
+  <div id="page-url" style="display:none"></div>
 
   <!-- Pendo Status Section -->
   <div id="pendo-status" style="display:none; flex-shrink: 0;"></div>
