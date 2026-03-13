@@ -42,12 +42,12 @@ TOOLS TAB — Debugger + Developer Console
 • Validate Environment — runs pendo.validateEnvironment() with inline results
 
 ICON BADGE
-• Red badge shows count of critical issues at a glance
-• Orange badge for warnings only
+• Pendo-yellow badge shows total issue count at a glance
+• Disable the badge entirely from Settings in the Tools tab
 • No badge when everything passes
 
 PENDO SERVICE STATUS
-• Live status monitoring from status.pendo.io
+• Live status monitoring from status.pendo.io — only shown during outages or recent incidents
 • Per-component health indicators (App, Data Pipeline, Guides, Integrations)
 • Active incident banners with latest updates
 • Service status included in copied diagnostic reports
