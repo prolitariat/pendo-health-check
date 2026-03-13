@@ -486,6 +486,18 @@
       flex-direction: column;
     }
 
+    /* === Scroll fade — bottom gradient hinting at more content === */
+    #scroll-fade {
+      display: none;
+      height: 28px;
+      margin-top: -28px;
+      background: linear-gradient(to bottom, transparent, var(--background));
+      pointer-events: none;
+      position: relative;
+      z-index: 1;
+      flex-shrink: 0;
+    }
+
     /* === Health Check copy bar — pinned below scroll area === */
     #health-copy-bar {
       display: none;
@@ -1044,6 +1056,9 @@
       <div id="summary-counts"></div>
     </div>
   </div>
+
+  <!-- Scroll fade — visual cue that more content is below -->
+  <div id="scroll-fade"></div>
 
   <!-- Copy Issues — pinned outside scroll area so it's always visible -->
   <div id="health-copy-bar">

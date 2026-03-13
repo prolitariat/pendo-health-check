@@ -50,6 +50,23 @@ function showTabs() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Scroll fade indicator — shows/hides bottom gradient on Report panel
+// ---------------------------------------------------------------------------
+function updateScrollFade() {
+  const panel = document.getElementById("panel-report");
+  const fade = document.getElementById("scroll-fade");
+  if (!panel || !fade) return;
+  if (activeTabId !== "report") { fade.style.display = "none"; return; }
+  const hasOverflow = panel.scrollHeight > panel.clientHeight + 2;
+  const nearBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 8;
+  fade.style.display = (hasOverflow && !nearBottom) ? "block" : "none";
+}
+(function() {
+  const panel = document.getElementById("panel-report");
+  if (panel) panel.addEventListener("scroll", updateScrollFade);
+})();
+
 function escapeHtml(str) {
   const el = document.createElement("span");
   el.textContent = str;
@@ -389,9 +406,10 @@ function activateTab(tab) {
   document.getElementById("panel-" + id).classList.add("active");
   activeTabId = id;
 
-  // Show/hide pinned copy bar based on active tab
+  // Show/hide pinned copy bar and scroll fade based on active tab
   const copyBar = document.getElementById("health-copy-bar");
   if (copyBar) copyBar.style.display = (id === "report") ? "block" : "none";
+  setTimeout(updateScrollFade, 50);
 
   trackEvent("tab_switch", { tab: id });
 }
@@ -482,6 +500,7 @@ function renderChecks(checks) {
   document.getElementById("health-summary").style.display = "flex";
   showView("__none__");
   showTabs();
+  setTimeout(updateScrollFade, 50); // after DOM settles
 
   // Track popup open with check results
   trackEvent("popup_open", {
@@ -983,6 +1002,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               // Compute final grade from both HC and setup data
               const finalGrade = computeGrade(data.checks, setupIssues);
               renderGradeCard(finalGrade);
+              setTimeout(updateScrollFade, 50);
 
               // Set badge on icon
               if (finalGrade.criticals > 0) {
