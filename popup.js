@@ -5,76 +5,54 @@ const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" 
 // Canvas-rendered icon overlay for pixel-perfect badge positioning
 // ---------------------------------------------------------------------------
 var badgeEnabled = true; // default on
-var baseIconCache = {}; // { size: ImageBitmap }
-
-function loadBaseIcon(size) {
-  return new Promise(function(resolve) {
-    if (baseIconCache[size]) { resolve(baseIconCache[size]); return; }
-    var img = new Image();
-    img.onload = function() {
-      var canvas = new OffscreenCanvas(size, size);
-      var ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, size, size);
-      createImageBitmap(canvas).then(function(bmp) {
-        baseIconCache[size] = bmp;
-        resolve(bmp);
-      });
-    };
-    img.onerror = function() { resolve(null); };
-    // Use the largest icon for quality, scale down
-    img.src = chrome.runtime.getURL("icons/icon128.png");
-  });
-}
-
-function renderBadgeIcon(count) {
+// Canvas-rendered badge: yellow number + black stroke, bottom-right of icon
+function renderBadgeIcon(count, callback) {
   var sizes = [16, 32, 48];
   var imageDataMap = {};
-  return Promise.all(sizes.map(function(size) {
-    return loadBaseIcon(size).then(function(baseBmp) {
-      var canvas = new OffscreenCanvas(size, size);
+  var img = new Image();
+  img.onload = function() {
+    sizes.forEach(function(size) {
+      var canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
       var ctx = canvas.getContext("2d");
-      // Draw base icon
-      if (baseBmp) ctx.drawImage(baseBmp, 0, 0, size, size);
-      // Draw badge circle + text
+      ctx.drawImage(img, 0, 0, size, size);
       if (count > 0) {
         var text = count > 99 ? "99+" : String(count);
-        var r = size * 0.28; // badge radius
-        var cx = size - r - (size * 0.04); // center x — nudged left from edge
-        var cy = r + (size * 0.04); // center y — nudged down from edge
-        // Badge background — Pendo yellow
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fillStyle = "#FEF484";
-        ctx.fill();
-        // Thin dark border for contrast
-        ctx.lineWidth = Math.max(1, size * 0.04);
-        ctx.strokeStyle = "rgba(0,0,0,0.25)";
-        ctx.stroke();
-        // Badge text — black, bold, centered
-        var fontSize = Math.round(size * 0.32);
-        if (text.length >= 3) fontSize = Math.round(size * 0.22);
-        else if (text.length === 2) fontSize = Math.round(size * 0.26);
+        // Font sizing based on icon size and digit count
+        var fontSize = Math.round(size * 0.5);
+        if (text.length >= 3) fontSize = Math.round(size * 0.36);
+        else if (text.length === 2) fontSize = Math.round(size * 0.44);
         ctx.font = "bold " + fontSize + "px -apple-system, Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = "#000000";
-        ctx.fillText(text, cx, cy + (size * 0.02)); // slight downward nudge for optical center
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        var x = size - Math.round(size * 0.04);
+        var y = size - Math.round(size * 0.02);
+        // Black stroke outline for legibility
+        ctx.lineWidth = Math.max(2, Math.round(size * 0.12));
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = "#000000";
+        ctx.strokeText(text, x, y);
+        // Pendo yellow fill
+        ctx.fillStyle = "#FEF484";
+        ctx.fillText(text, x, y);
       }
       imageDataMap[size] = ctx.getImageData(0, 0, size, size);
     });
-  })).then(function() { return imageDataMap; });
+    callback(imageDataMap);
+  };
+  img.onerror = function() { callback(null); };
+  img.src = chrome.runtime.getURL("icons/icon128.png");
 }
 
 function applyBadge() {
   var count = window.__lastTotalIssues || 0;
-  // Always clear the native badge text (we draw our own)
   chrome.action.setBadgeText({ text: "" });
   if (badgeEnabled && count > 0) {
-    renderBadgeIcon(count).then(function(imageDataMap) {
-      chrome.action.setIcon({ imageData: imageDataMap });
+    renderBadgeIcon(count, function(imageDataMap) {
+      if (imageDataMap) chrome.action.setIcon({ imageData: imageDataMap });
     });
   } else {
-    // Reset to default icons
     chrome.action.setIcon({
       path: { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
     });
