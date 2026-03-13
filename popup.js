@@ -5,57 +5,14 @@ const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" 
 // Canvas-rendered icon overlay for pixel-perfect badge positioning
 // ---------------------------------------------------------------------------
 var badgeEnabled = true; // default on
-// Canvas-rendered badge: yellow number + black stroke, bottom-right of icon
-function renderBadgeIcon(count, callback) {
-  var sizes = [16, 32, 48];
-  var imageDataMap = {};
-  var img = new Image();
-  img.onload = function() {
-    sizes.forEach(function(size) {
-      var canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      var ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, size, size);
-      if (count > 0) {
-        var text = count > 99 ? "99+" : String(count);
-        // Font sizing based on icon size and digit count
-        var fontSize = Math.round(size * 0.5);
-        if (text.length >= 3) fontSize = Math.round(size * 0.36);
-        else if (text.length === 2) fontSize = Math.round(size * 0.44);
-        ctx.font = "bold " + fontSize + "px -apple-system, Arial, sans-serif";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "bottom";
-        var x = size - Math.round(size * 0.04);
-        var y = size - Math.round(size * 0.02);
-        // Black stroke outline for legibility
-        ctx.lineWidth = Math.max(2, Math.round(size * 0.12));
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = "#000000";
-        ctx.strokeText(text, x, y);
-        // Pendo yellow fill
-        ctx.fillStyle = "#FEF484";
-        ctx.fillText(text, x, y);
-      }
-      imageDataMap[size] = ctx.getImageData(0, 0, size, size);
-    });
-    callback(imageDataMap);
-  };
-  img.onerror = function() { callback(null); };
-  img.src = chrome.runtime.getURL("icons/icon128.png");
-}
-
 function applyBadge() {
   var count = window.__lastTotalIssues || 0;
-  chrome.action.setBadgeText({ text: "" });
   if (badgeEnabled && count > 0) {
-    renderBadgeIcon(count, function(imageDataMap) {
-      if (imageDataMap) chrome.action.setIcon({ imageData: imageDataMap });
-    });
+    chrome.action.setBadgeText({ text: String(count) });
+    chrome.action.setBadgeBackgroundColor({ color: "#FEF484" });
+    chrome.action.setBadgeTextColor({ color: "#000000" });
   } else {
-    chrome.action.setIcon({
-      path: { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
-    });
+    chrome.action.setBadgeText({ text: "" });
   }
 }
 
