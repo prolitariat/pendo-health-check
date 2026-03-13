@@ -117,10 +117,12 @@ function renderPendoStatus(data, detectedEnv) {
 
   let badgeText = "Unknown";
   let badgeClass = "";
+  let isHealthy = false;
 
   if (statusValue === "none" || statusValue === "operational") {
     badgeText = "All Operational";
     badgeClass = "badge-green";
+    isHealthy = true;
   } else if (statusValue === "minor" || statusValue === "degraded_performance" || statusValue === "partial_outage") {
     badgeText = "Degraded";
     badgeClass = "badge-yellow";
@@ -132,20 +134,29 @@ function renderPendoStatus(data, detectedEnv) {
     badgeClass = "badge-blue";
   }
 
+  // Check for incidents in the last 24 hours
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const recentIncidents = (data.incidents || []).filter(function(inc) {
+    const ts = inc.created_at || inc.updated_at || "";
+    return ts ? new Date(ts).getTime() > oneDayAgo : true; // keep if no timestamp
+  });
+  const hasRecentIncident = recentIncidents.length > 0;
+
+  // Only show status bar when something is wrong or there was a recent incident.
+  // "All Operational" with no incidents = nothing to show.
+  if (isHealthy && !hasRecentIncident) return;
+
   // Build realm label if detected
   const realmLabel = detectedEnv ? detectedEnv.replace(" environment", "") : null;
 
-  // Check for active incidents
-  const hasIncident = data.incidents && Array.isArray(data.incidents) && data.incidents.length > 0;
   let incidentHtml = "";
-  if (hasIncident) {
-    const inc = data.incidents[0];
+  if (hasRecentIncident) {
+    const inc = recentIncidents[0];
     const updates = inc.updates && inc.updates.length > 0 ? inc.updates[0] : null;
     const updateText = updates ? updates.body : "";
     incidentHtml = `<div class="incident-banner" style="margin:4px 16px 0;padding:6px 8px;border-radius:4px;background:var(--destructive-bg, #fef2f2);color:var(--destructive, #dc2626);font-size:11px"><strong>⚠️ ${escapeHtml(inc.name)}</strong>${updateText ? " — " + escapeHtml(updateText.substring(0, 80)) : ""}</div>`;
   }
 
-  // Simple: badge + link to status page — no dropdown needed
   statusDiv.innerHTML = `
     <a href="https://status.pendo.io" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px;text-decoration:none;color:inherit;cursor:pointer" title="View Pendo Status Page">
       <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-foreground)">Pendo Service Status${realmLabel ? ` <span class="badge badge-blue" style="font-size:9px;padding:1px 5px">${escapeHtml(realmLabel)}</span>` : ""}</span>
