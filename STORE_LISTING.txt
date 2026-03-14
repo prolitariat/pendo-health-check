@@ -1,4 +1,4 @@
-=== CHROME WEB STORE LISTING CONTENT (v2.0.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v2.2.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
@@ -7,62 +7,65 @@ Pendo Health Check
 Instant Pendo installation grade with prioritized diagnostics, one-click issue export, inline debugger, and live service status.
 
 --- DETAILED DESCRIPTION ---
-Pendo Health Check gives you an instant letter grade for your Pendo installation. Open the popup on any page with Pendo installed and get a single, prioritized diagnostic report — no tab-switching, no guesswork.
+Pendo Health Check gives your Pendo installation a letter grade from A to F. Open it on any page and get a single, prioritized diagnostic report — no guesswork, no DevTools.
 
-REPORT TAB — Instant Installation Grade + Prioritized Diagnostics
+Built for Pendo admins who need to prove what's wrong and hand it to engineering.
 
-Your Pendo installation is scored from A to F based on 11 runtime health checks and a deep setup analysis. Every issue is ranked by severity so you know exactly where to start.
+INSTALLATION GRADE (A–F)
 
-Runtime Health Checks (11):
-• Agent Detection — confirms pendo.js is loaded
-• Initialization — verifies the agent initialized via pendo.isReady()
+Your Pendo installation is scored from A to F across runtime health checks and a deep setup analysis. Issues are sorted by severity so you know exactly where to start.
+
+Health Checks:
+• Agent loaded — confirms pendo.js is on the page
+• Initialization — verifies the agent started via pendo.isReady()
 • Visitor ID — checks that a non-anonymous visitor ID is set
 • Account ID — validates account-level identity
-• Active Guides — reports loaded guides count and state
-• Pendo Instances — detects dual installations and multiple script tags
-• Agent Version — reports the running Pendo agent version
-• API Key — validates the Pendo API key is present
-• Data Host — checks CNAME configuration vs default CDN
-• Network Requests — validates active network traffic to Pendo servers
-• Feature Flags — detects non-default agent configuration flags
+• Active Guides — reports loaded guide count and state
+• Duplicate detection — flags multiple Pendo instances or agent scripts
+• Agent Version — reports the running version
+• Data Transmission — validates that analytics data is reaching Pendo servers
+• Feature Flags — surfaces disabled features (guides off, analytics off, etc.)
 
 Setup Analysis (merged into the same view):
 • Framework detection (React, Angular, Vue, Ember, Svelte, Next.js, Nuxt, jQuery)
-• Snippet installation analysis (install method, placement, async loading)
-• CSP header and meta tag compatibility check (directive-by-directive)
+• Snippet analysis — install method, placement, async loading
+• CSP compatibility — directive-by-directive check with strict-dynamic and nonce awareness
+• Report-Only CSP detection — won't flag non-enforcing policies as blocking errors
 • CNAME-aware host detection for custom CDN and data endpoints
 • CMP/GDPR consent detection (OneTrust, Cookiebot, Didomi, Osano, TrustArc, TCF v2.0)
-• Visitor and account metadata validation (PII detection, data types, field naming)
+• Visitor and account metadata validation — PII detection, data types, field naming
+• Actionable recommendations with links to Pendo documentation
 
-Copy Issues to Clipboard — one-click priority-sorted diagnostic report with remediation. Paste into Slack, Jira, or a support ticket.
+COPY TO CLIPBOARD
 
-TOOLS TAB — Debugger + Developer Console
-• Toggle Pendo Debugger — turns Pendo debugging on/off with one click
-• Validate Install — runs pendo.validateInstall() with inline results (no DevTools needed)
+One click exports a priority-sorted diagnostic report with remediation steps. Paste into Slack, Jira, or a support ticket. Includes grade, all issues, and Pendo service status.
+
+DEVELOPER TOOLS (collapsible)
+
+• Toggle Pendo Debugger — one click, no DevTools needed
+• Validate Install — runs pendo.validateInstall() with inline results
 • Validate Environment — runs pendo.validateEnvironment() with inline results
 
 ICON BADGE
-• Pendo-yellow badge shows total issue count at a glance
-• Disable the badge entirely from Settings in the Tools tab
-• No badge when everything passes
+
+• Yellow badge shows issue count after analysis
+• Red badge when critical problems are found
+• Clears automatically when you navigate to a new page — never shows stale data
+• Toggle the badge on or off from the feedback bar
 
 PENDO SERVICE STATUS
-• Live status monitoring from status.pendo.io — only shown during outages or recent incidents
-• Per-component health indicators (App, Data Pipeline, Guides, Integrations)
-• Active incident banners with latest updates
-• Service status included in copied diagnostic reports
 
-FEATURES
-• Installation grade (A–F) computed from all checks and setup analysis
-• Every warn/fail check includes an actionable fix recommendation
-• Smart network request messaging — diagnoses blocked requests without noise
-• First-run onboarding tour walks you through every feature
-• Feedback system with automatic PII scrubbing
-• Version displayed in-app (syncs from manifest)
-• Works on any page with Pendo installed
-• No data leaves your browser — all checks run locally
+• Live monitoring from status.pendo.io — only shown during outages or incidents
+• Per-component health (App, Data Pipeline, Guides, Integrations)
+• Included in copied diagnostic reports
 
-Built for Pendo admins, implementation engineers, and customer success teams who need fast answers about agent health.
+PRIVACY
+
+• All checks run locally in your browser
+• No data is collected or sent to third parties
+• No account or login required
+
+Built for Pendo admins, implementation engineers, and customer success teams who need fast, accurate answers about agent health.
 
 --- CATEGORY ---
 Developer Tools
@@ -71,4 +74,4 @@ Developer Tools
 English
 
 --- SINGLE PURPOSE DESCRIPTION ---
-Diagnose and grade the health, configuration, and service status of the Pendo analytics agent on any webpage, with interactive console tools and one-click issue export.
+Diagnose and grade the health, configuration, and service status of the Pendo analytics agent on any webpage, with inline developer tools and one-click issue export.
