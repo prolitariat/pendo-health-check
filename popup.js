@@ -10,13 +10,14 @@ function applyBadge() {
   var crits = window.__lastCriticals || 0;
   var warns = window.__lastWarnings || 0;
   // Let background handle badge rendering — send full analysis results
+  // Catch silently: service worker may not be awake yet (MV3 lazy lifecycle)
   chrome.runtime.sendMessage({
     type: "pendo-badge-update",
     tabId: currentTabId,
     issues: count,
     criticals: crits,
     warnings: warns,
-  });
+  }).catch(function() {});
 }
 
 // Load preference and wire toggle
@@ -28,7 +29,7 @@ chrome.storage.local.get("badgeEnabled", function(result) {
     checkbox.addEventListener("change", function() {
       badgeEnabled = checkbox.checked;
       chrome.storage.local.set({ badgeEnabled: badgeEnabled });
-      chrome.runtime.sendMessage({ type: "badge-pref-changed" });
+      chrome.runtime.sendMessage({ type: "badge-pref-changed" }).catch(function() {});
       applyBadge();
     });
   }
