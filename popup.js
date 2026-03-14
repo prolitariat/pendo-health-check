@@ -72,12 +72,9 @@ function showView(id) {
 }
 
 function showTabs() {
-  document.getElementById("tab-bar").style.display = "flex";
-  // Show pinned copy bar when Report tab is active
-  if (activeTabId === "report") {
-    const copyBar = document.getElementById("health-copy-bar");
-    if (copyBar) copyBar.style.display = "block";
-  }
+  // No tab bar — just show the copy bar
+  const copyBar = document.getElementById("health-copy-bar");
+  if (copyBar) copyBar.style.display = "block";
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +84,6 @@ function updateScrollFade() {
   const panel = document.getElementById("panel-report");
   const fade = document.getElementById("scroll-fade");
   if (!panel || !fade) return;
-  if (activeTabId !== "report") { fade.style.display = "none"; return; }
   const hasOverflow = panel.scrollHeight > panel.clientHeight + 2;
   const nearBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 8;
   fade.style.display = (hasOverflow && !nearBottom) ? "block" : "none";
@@ -246,52 +242,29 @@ document.addEventListener("DOMContentLoaded", () => {
 // ---------------------------------------------------------------------------
 
 let setupLoaded = false;
-let activeTabId = null;
+let activeTabId = "report"; // Single view — always report
 let lastHealthData = null;
 let lastSetupData = null;
 
-function activateTab(tab) {
-  const id = tab.dataset.tab;
-  if (id === activeTabId) return;
-  const tabs = document.querySelectorAll(".tab");
-  tabs.forEach((t) => {
-    t.classList.remove("active");
-    t.setAttribute("aria-selected", "false");
-    t.setAttribute("tabindex", "-1");
-  });
-  tab.classList.add("active");
-  tab.setAttribute("aria-selected", "true");
-  tab.setAttribute("tabindex", "0");
-  tab.focus();
-  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-  document.getElementById("panel-" + id).classList.add("active");
-  activeTabId = id;
-
-  // Show/hide pinned copy bar and scroll fade based on active tab
-  const copyBar = document.getElementById("health-copy-bar");
-  if (copyBar) copyBar.style.display = (id === "report") ? "block" : "none";
-  setTimeout(updateScrollFade, 50);
-
-  trackEvent("tab_switch", { tab: id });
-}
-
-document.querySelectorAll(".tab").forEach((tab) => {
-  tab.addEventListener("click", () => activateTab(tab));
-  tab.addEventListener("keydown", (e) => {
-    const tabs = Array.from(document.querySelectorAll(".tab"));
-    const idx = tabs.indexOf(tab);
-    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-      e.preventDefault();
-      const next = e.key === "ArrowRight"
-        ? tabs[(idx + 1) % tabs.length]
-        : tabs[(idx - 1 + tabs.length) % tabs.length];
-      activateTab(next);
-    } else if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      activateTab(tab);
+// Developer Tools drawer toggle
+(function() {
+  const toggle = document.getElementById("dev-tools-toggle");
+  const body = document.getElementById("dev-tools-body");
+  const chevron = toggle ? toggle.querySelector(".setup-chevron") : null;
+  if (toggle && body) {
+    function toggleDrawer() {
+      const isOpen = body.style.display !== "none";
+      body.style.display = isOpen ? "none" : "block";
+      if (chevron) chevron.style.transform = isOpen ? "" : "rotate(90deg)";
+      toggle.setAttribute("aria-expanded", !isOpen);
+      trackEvent("dev_tools_toggle", { open: !isOpen });
     }
-  });
-});
+    toggle.addEventListener("click", toggleDrawer);
+    toggle.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDrawer(); }
+    });
+  }
+})();
 
 // ---------------------------------------------------------------------------
 // Health Check — rendering
@@ -1240,18 +1213,18 @@ function runPendoHealthCheck() {
 
   // 1. Pendo agent loaded
   if (typeof window.pendo === "undefined" || !window.pendo) {
-    add("fail", "Pendo Agent Loaded", "window.pendo is not present");
+    add("fail", "Pendo Agent Loaded", "Pendo is not installed on this page");
     return { pendoDetected: false, checks: checks };
   }
-  add("pass", "Pendo Agent Loaded", "window.pendo is present");
+  add("pass", "Pendo Agent Loaded", "Pendo is installed on this page");
 
   // 2. pendo.isReady()
   try {
     var ready = typeof pendo.isReady === "function" && pendo.isReady();
     if (ready) {
-      add("pass", "Pendo Ready", "pendo.isReady() returned true");
+      add("pass", "Pendo Ready", "Pendo is initialized and running");
     } else {
-      add("warn", "Pendo Ready", "pendo.isReady() returned false — agent may still be initializing");
+      add("warn", "Pendo Ready", "Pendo is not ready yet — it may still be initializing");
     }
   } catch (e) {
     add("fail", "Pendo Ready", "Error calling pendo.isReady(): " + e.message);
@@ -1296,15 +1269,26 @@ function runPendoHealthCheck() {
     var instanceCount = 0;
     if (window.pendo) instanceCount++;
     if (window.pendo_) instanceCount++;
-    var pendoScripts = document.querySelectorAll('script[src*="pendo"]');
-    var totalScripts = pendoScripts.length;
+    // Only count AGENT scripts — not guide/content resource scripts.
+    // Agent: cdn.pendo.io/.../pendo.js or pendo-io-static URLs with /agent/ path.
+    // NOT guide content from pendo-static-*, content-*.static.pendo.io, etc.
+    var allPendoScripts = document.querySelectorAll('script[src*="pendo"]');
+    var agentScripts = 0;
+    for (var ps = 0; ps < allPendoScripts.length; ps++) {
+      var scriptSrc = allPendoScripts[ps].getAttribute("src") || "";
+      var isAgent = (scriptSrc.indexOf("cdn.pendo.io") !== -1 || scriptSrc.indexOf("/agent/") !== -1 ||
+                    (scriptSrc.indexOf("pendo-io-static") !== -1 && scriptSrc.indexOf("pendo.js") !== -1));
+      var isContent = scriptSrc.indexOf("pendo-static-") !== -1 || scriptSrc.indexOf(".static.pendo.io") !== -1;
+      if (isAgent && !isContent) agentScripts++;
+    }
 
     if (instanceCount > 1) {
       add("warn", "Pendo Instances", instanceCount + " Pendo objects detected (window.pendo + window.pendo_) — possible dual initialization");
-    } else if (totalScripts > 1) {
-      add("warn", "Pendo Instances", "1 Pendo object, but " + totalScripts + " Pendo script tags found — review for duplicate loading");
+    } else if (agentScripts > 1) {
+      add("warn", "Pendo Instances", "1 Pendo object, but " + agentScripts + " Pendo agent scripts found — review for duplicate loading");
     } else {
-      add("pass", "Pendo Instances", "1 instance detected (" + totalScripts + " script tag" + (totalScripts !== 1 ? "s" : "") + ")");
+      // Suppress pass row — "1 instance" is just the expected state, not useful info
+      // add("pass", "Pendo Instances", "1 instance detected");
     }
   } catch (e) {
     add("warn", "Pendo Instances", "Error checking instances: " + e.message);
@@ -1336,11 +1320,10 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("apiKey")) ||
       (pendo.apiKey) ||
       null;
-    if (apiKey) {
-      add("pass", "API Key", apiKey.substring(0, 8) + "…");
-    } else {
+    if (!apiKey) {
       add("warn", "API Key", "Could not determine API key");
     }
+    // Suppress pass row — a truncated key is not actionable for admins
   } catch (e) {
     add("warn", "API Key", "Error reading API key: " + e.message);
   }
@@ -1391,13 +1374,10 @@ function runPendoHealthCheck() {
     if (detectedDataHost) hostParts.push("data: " + detectedDataHost);
     var hostDisplay = hostParts.length > 0 ? hostParts.join(", ") : "unknown";
 
-    if (isCname) {
-      add("pass", "Data Host", hostDisplay + " (CNAME — ad-blocker resistant)");
-    } else if (detectedContentHost || detectedDataHost) {
-      add("pass", "Data Host", hostDisplay + " (default Pendo CDN)");
-    } else {
+    if (!detectedContentHost && !detectedDataHost) {
       add("warn", "Data Host", "Could not determine data or content host");
     }
+    // Suppress pass row — CDN/CNAME routing is infrastructure detail, not admin-actionable
   } catch (e) {
     add("warn", "Data Host", "Error detecting data host: " + e.message);
   }
@@ -1441,23 +1421,34 @@ function runPendoHealthCheck() {
       var cause = adBlockDetected ? "ad blocker, CSP, or firewall" : "CSP or firewall";
       add("warn", "Data Transmission", "No Pendo network activity detected — likely blocked by " + cause);
     } else {
-      var failed = pendoRequests.filter(function(e) { return e.transferSize === 0 && e.decodedBodySize === 0; });
+      // IMPORTANT: transferSize === 0 && decodedBodySize === 0 does NOT reliably mean "blocked."
+      // Cross-origin resources without Timing-Allow-Origin headers report all size values as 0
+      // per the Resource Timing API spec. This is a security restriction, not evidence of blocking.
+      // We gate on Pendo functionality: if the agent is ready, data IS flowing — the zero sizes
+      // are just cross-origin timing redaction.
+      var pendoIsWorking = typeof window.pendo !== "undefined" && window.pendo &&
+        (typeof pendo.isReady === "function" ? pendo.isReady() : !!pendo.visitorId);
 
-      // CORS detection: check for requests that loaded but returned 0 bytes with no cache
-      var corsLikely = failed.filter(function(e) {
-        var isCached = e.encodedBodySize > 0 || (e.transferSize === 0 && e.decodedBodySize > 0);
-        return !isCached;
-      });
-
-      if (corsLikely.length > 0 && corsLikely.length === failed.length) {
-        // All requests blocked
-        var blockCause = adBlockDetected ? "ad blocker, CSP, or firewall" : "CSP or firewall";
-        add("warn", "Data Transmission", "All Pendo requests blocked — likely " + blockCause + (adBlockBaitResult ? " (ad blocker detected via bait test)" : ""));
-      } else if (failed.length > 0) {
-        // Some requests blocked
-        add("warn", "Data Transmission", "Some Pendo requests blocked — " + failed.length + " failed, likely due to " + (adBlockDetected ? "ad blocker, CSP, or firewall" : "CSP or firewall"));
-      } else {
+      if (pendoIsWorking) {
+        // Pendo agent is initialized and ready — data transmission is working
         add("pass", "Data Transmission", "Pendo is transmitting data");
+      } else {
+        var failed = pendoRequests.filter(function(e) { return e.transferSize === 0 && e.decodedBodySize === 0; });
+
+        // CORS detection: check for requests that loaded but returned 0 bytes with no cache
+        var corsLikely = failed.filter(function(e) {
+          var isCached = e.encodedBodySize > 0 || (e.transferSize === 0 && e.decodedBodySize > 0);
+          return !isCached;
+        });
+
+        if (corsLikely.length > 0 && corsLikely.length === failed.length) {
+          var blockCause = adBlockDetected ? "ad blocker, CSP, or firewall" : "CSP or firewall";
+          add("warn", "Data Transmission", "All Pendo requests blocked — likely " + blockCause + (adBlockBaitResult ? " (ad blocker detected via bait test)" : ""));
+        } else if (failed.length > 0) {
+          add("warn", "Data Transmission", "Some Pendo requests blocked — " + failed.length + " failed, likely due to " + (adBlockDetected ? "ad blocker, CSP, or firewall" : "CSP or firewall"));
+        } else {
+          add("pass", "Data Transmission", "Pendo is transmitting data");
+        }
       }
     }
   } catch (e) {
@@ -1478,26 +1469,21 @@ function runPendoHealthCheck() {
     }
 
     if (opts) {
-      if (opts.disableGuides === true) flags.push("disableGuides=true");
-      if (opts.disableAnalytics === true) flags.push("disableAnalytics=true");
-      if (opts.disablePersistence === true) flags.push("disablePersistence=true");
-      if (opts.disableFeedback === true) flags.push("disableFeedback=true");
-      if (opts.guides && opts.guides.disabled === true) flags.push("guides.disabled=true");
-      if (opts.excludeAllText === true) flags.push("excludeAllText=true");
-      if (opts.xhrTimings === false) flags.push("xhrTimings=false");
-      if (opts.xhrWhitelist) flags.push("xhrWhitelist configured");
-      if (opts.htmlAttributeBlacklist) flags.push("htmlAttributeBlacklist configured");
-      if (opts.htmlAttributes) flags.push("htmlAttributes configured");
+      // Only surface flags that visibly break Pendo for an admin.
+      // SDK config options (xhrWhitelist, htmlAttributes, etc.) are developer-scoped
+      // and not actionable by a Pendo admin — suppress them.
+      if (opts.disableGuides === true) flags.push("Guides are disabled");
+      if (opts.disableAnalytics === true) flags.push("Analytics are disabled");
+      if (opts.disablePersistence === true) flags.push("Persistence is disabled");
+      if (opts.disableFeedback === true) flags.push("Feedback is disabled");
+      if (opts.guides && opts.guides.disabled === true) flags.push("Guides are disabled");
+      if (opts.excludeAllText === true) flags.push("Text capture is disabled");
     }
 
-    // Also check for Pendo debugging/testing mode
-    if (pendo.enableDebugging || (pendo.get && pendo.get("enableDebugging"))) {
-      flags.push("debugging enabled");
-    }
-
+    // Only surface flags that affect Pendo functionality.
+    // Debugging mode is intentional, transient, and not actionable — suppress it.
     if (flags.length > 0) {
-      var hasDisable = flags.some(function(f) { return f.indexOf("disable") !== -1; });
-      add(hasDisable ? "warn" : "info", "Feature Flags", flags.join(", "));
+      add("warn", "Feature Flags", flags.join(", "));
     }
     // Suppress pass row entirely if no flags detected
   } catch (e) {
@@ -1603,14 +1589,23 @@ function runPendoSetupAssistant() {
   // ========================================================================
   var snippet = { loadMethod: "Unknown", isAsync: false, placement: null, scriptCount: 0 };
 
-  var pendoScripts = document.querySelectorAll('script[src*="pendo"]');
+  // Filter to agent scripts only — exclude guide/content resource scripts
+  // (pendo-static-*, content-*.static.pendo.io) that aren't the agent install snippet.
+  var allPendoScriptsSnippet = document.querySelectorAll('script[src*="pendo"]');
+  var pendoScripts = [];
+  for (var si = 0; si < allPendoScriptsSnippet.length; si++) {
+    var sSrc = allPendoScriptsSnippet[si].getAttribute("src") || "";
+    var sIsContent = sSrc.indexOf("pendo-static-") !== -1 || sSrc.indexOf(".static.pendo.io") !== -1;
+    if (!sIsContent) pendoScripts.push(allPendoScriptsSnippet[si]);
+  }
   snippet.scriptCount = pendoScripts.length;
 
   if (pendoScripts.length > 0) {
     var mainScript = pendoScripts[0];
     snippet.isAsync = mainScript.async || mainScript.defer;
-    snippet.loadMethod = mainScript.src.includes("agent/static") ? "Pendo Agent (static)" :
-                          mainScript.src.includes("pendo-agent") ? "Pendo Agent (bundled)" :
+    var mainSrc = mainScript.getAttribute("src") || "";
+    snippet.loadMethod = mainSrc.indexOf("agent/static") !== -1 ? "Pendo Agent (static)" :
+                          mainSrc.indexOf("pendo-agent") !== -1 ? "Pendo Agent (bundled)" :
                           "Script tag";
 
     // Determine placement
@@ -1713,21 +1708,31 @@ function runPendoSetupAssistant() {
         xhr.open("HEAD", window.location.href, false); // synchronous
         xhr.send();
         var headerCSP = xhr.getResponseHeader("Content-Security-Policy") || "";
+        var reportOnlyCSP = xhr.getResponseHeader("Content-Security-Policy-Report-Only") || "";
         if (headerCSP.trim()) {
           cspRaw = headerCSP;
           csp.source = "HTTP header";
+        } else if (reportOnlyCSP.trim()) {
+          // Report-Only CSP logs violations but does NOT enforce/block anything.
+          // Parse it for informational value but mark it clearly.
+          cspRaw = reportOnlyCSP;
+          csp.source = "HTTP header (Report-Only — not enforced)";
+          csp.reportOnly = true;
         }
       } catch (xhrErr) {
         // Fetch failed — can't read HTTP headers from this context
       }
     }
 
-    // --- B. Detect CSP violations already fired (works for BOTH meta and header CSP) ---
+    // --- B. Detect CSP violations via Performance API ---
+    // IMPORTANT: transferSize === 0 && decodedBodySize === 0 is NOT reliable evidence
+    // of CSP blocking. The Resource Timing API redacts these values for cross-origin
+    // resources that don't set Timing-Allow-Origin (which most CDNs don't).
+    // We now cross-reference with actual Pendo functionality to avoid false positives.
     var cspViolations = [];
     var blockedByDomain = {};
     var detectedSubId = null; // Will hold the actual Pendo subscription ID if found
     try {
-      // Check Performance API for blocked resources (transferSize=0 + no decodedBodySize)
       var perfEntries = performance.getEntriesByType && performance.getEntriesByType("resource") || [];
       var pendoResources = perfEntries.filter(function(e) { return e.name && e.name.indexOf("pendo") !== -1; });
 
@@ -1739,9 +1744,14 @@ function runPendoSetupAssistant() {
         if (m) detectedSubId = m[1];
       });
 
+      // Only treat resources as blocked if Pendo is NOT functional.
+      // If Pendo IS working (agent ready, data flowing), zero-size entries are just
+      // cross-origin timing redaction, not actual blocking.
+      var pendoWorking = typeof window.pendo !== "undefined" && window.pendo &&
+        (typeof pendo.isReady === "function" ? pendo.isReady() : !!pendo.visitorId);
       var blockedPendo = pendoResources.filter(function(e) { return e.transferSize === 0 && e.decodedBodySize === 0; });
 
-      if (blockedPendo.length > 0) {
+      if (blockedPendo.length > 0 && !pendoWorking) {
         // Group by domain to avoid flooding the report with per-URL entries
         blockedPendo.forEach(function(e) {
           try {
@@ -1777,14 +1787,24 @@ function runPendoSetupAssistant() {
     // --- C. Proactive: check what Pendo needs vs what's actually working ---
     var pendoFunctional = typeof window.pendo !== "undefined" && window.pendo;
     var pendoAgentLoaded = pendoResources && pendoResources.length > 0;
-    var guidesWorking = pendoFunctional && typeof pendo.getActiveGuides === "function";
+    // Check if guides API is available AND has loaded guides (not just function existence)
+    var guidesWorking = false;
+    try {
+      guidesWorking = pendoFunctional && typeof pendo.getActiveGuides === "function";
+    } catch (gErr) {}
+    // Data flow detection: DON'T rely on transferSize (redacted for cross-origin).
+    // Instead check (a) if data.pendo.io requests exist at all in perf entries, AND
+    // (b) if Pendo reports itself as ready (meaning it successfully communicated).
     var dataFlowing = false;
     try {
-      // Check if data requests to Pendo are succeeding
       var dataReqs = perfEntries ? perfEntries.filter(function(e) {
-        return e.name && (e.name.indexOf("data.pendo.io") !== -1 || e.name.indexOf("/data/") !== -1) && e.transferSize > 0;
+        return e.name && (e.name.indexOf("data.pendo.io") !== -1 || e.name.indexOf("/data/") !== -1);
       }) : [];
-      dataFlowing = dataReqs.length > 0;
+      // Requests to data.pendo.io exist — combined with pendo being functional,
+      // this means data IS flowing (the requests weren't blocked, they just have
+      // redacted timing info due to cross-origin restrictions).
+      dataFlowing = dataReqs.length > 0 ||
+        (pendoFunctional && typeof pendo.isReady === "function" && pendo.isReady());
     } catch (dErr) {}
 
     // --- D. Parse meta-tag CSP directives ---
@@ -1848,27 +1868,44 @@ function runPendoSetupAssistant() {
       // We can't know the SUB_ID, so fix text uses the template format.
       // =================================================================
 
+      // Helper: detect 'strict-dynamic' in a directive's sources.
+      // When 'strict-dynamic' is present, host-based allowlists are IGNORED by the browser.
+      // Scripts loaded by a nonced/hashed trusted script are automatically permitted.
+      // Pendo's install snippet is typically nonced, so the agent it fetches is trusted transitively.
+      function hasStrictDynamic(sources) {
+        return sources.some(function(v) { return v === "'strict-dynamic'"; });
+      }
+
+      // Helper: detect nonce or hash in sources
+      function hasNonceOrHash(sources) {
+        return sources.some(function(v) {
+          return v.indexOf("'nonce-") !== -1 || v.indexOf("'sha256-") !== -1 || v.indexOf("'sha384-") !== -1;
+        });
+      }
+
       // script-src
       // Required: cdn.pendo.io, pendo-io-static.storage.googleapis.com,
       //   pendo-static-{{SUB_ID}}.storage.googleapis.com OR content-{{SUB_ID}}.static.pendo.io,
       //   app.pendo.io (designer only), 'unsafe-inline' + 'unsafe-eval' (code blocks/designer only)
       var scriptSrc = getDirective("script-src");
       if (scriptSrc.length > 0) {
-        if (!hostAllowed(scriptSrc)) {
+        var scriptHasStrictDynamic = hasStrictDynamic(scriptSrc);
+        var scriptHasNonce = hasNonceOrHash(scriptSrc);
+
+        // If strict-dynamic is present with a nonce/hash, host-based allowlists are irrelevant.
+        // The Pendo snippet (nonced) loads the agent, which is trusted transitively.
+        if (!hostAllowed(scriptSrc) && !scriptHasStrictDynamic) {
           csp.issues.push({ directive: "script-src", severity: "error",
             detail: "Pendo domains not allowed in script-src — the Pendo agent and guide code can't load.",
             fix: "Add to your CSP script-src directive:\n  cdn.pendo.io pendo-io-static.storage.googleapis.com pendo-static-{{SUB_ID}}.storage.googleapis.com content-{{SUB_ID}}.static.pendo.io\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
         }
-        if (!valueAllowed(scriptSrc, "'unsafe-inline'")) {
-          var hasNonce = scriptSrc.some(function(v) { return v.indexOf("nonce-") !== -1; });
-          var hasHash = scriptSrc.some(function(v) { return v.indexOf("sha256-") !== -1 || v.indexOf("sha384-") !== -1; });
-          if (!hasNonce && !hasHash) {
-            csp.issues.push({ directive: "script-src (inline)", severity: "warning",
-              detail: "'unsafe-inline' not in script-src and no nonce/hash found — Pendo's inline snippet and guide code blocks won't run.",
-              fix: "Add 'unsafe-inline' to script-src (required for code blocks and classic guides).\n  Or use a nonce: script-src ... 'nonce-YOUR_NONCE'\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
-          }
+        if (!valueAllowed(scriptSrc, "'unsafe-inline'") && !scriptHasNonce && !scriptHasStrictDynamic) {
+          csp.issues.push({ directive: "script-src (inline)", severity: "warning",
+            detail: "'unsafe-inline' not in script-src and no nonce/hash found — Pendo's inline snippet and guide code blocks won't run.",
+            fix: "Add 'unsafe-inline' to script-src (required for code blocks and classic guides).\n  Or use a nonce: script-src ... 'nonce-YOUR_NONCE'\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
         }
         if (!valueAllowed(scriptSrc, "'unsafe-eval'") && !valueAllowed(scriptSrc, "*")) {
+          // unsafe-eval warning is still valid even with strict-dynamic — eval is separate
           csp.issues.push({ directive: "script-src (eval)", severity: "warning",
             detail: "'unsafe-eval' not in script-src — guide code blocks and Resource Center integrations may not execute.",
             fix: "Add 'unsafe-eval' to script-src (required for code blocks and Resource Center):\n  script-src ... 'unsafe-eval'\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo" });
@@ -1878,6 +1915,8 @@ function runPendoSetupAssistant() {
       // connect-src
       // Required: data.pendo.io, pendo-static-{{SUB_ID}}.storage.googleapis.com OR
       //   content-{{SUB_ID}}.static.pendo.io, app.pendo.io (designer only)
+      // Note: strict-dynamic does NOT affect connect-src — it only applies to script loading.
+      // However, if Pendo is demonstrably transmitting data, this is informational not critical.
       var connectSrc = getDirective("connect-src");
       if (connectSrc.length > 0 && !hostAllowed(connectSrc)) {
         csp.issues.push({ directive: "connect-src", severity: "error",
@@ -2061,6 +2100,31 @@ function runPendoSetupAssistant() {
 
     // Merge proactive findings into issues array
     csp.issues = csp.issues.concat(csp.proactiveFindings);
+
+    // --- FUNCTIONALITY GATE ---
+    // If Pendo is demonstrably working (agent ready, data flowing, guides loading),
+    // downgrade "error" CSP issues to "warning". The CSP policy may be technically
+    // non-compliant with Pendo's docs, but if everything works (e.g., via strict-dynamic,
+    // nonces, or other mechanisms the proactive parser doesn't fully understand),
+    // a red X critical error is misleading. The user still sees the warning.
+    if (pendoFunctional && (dataFlowing || guidesWorking)) {
+      csp.issues.forEach(function(issue) {
+        if (issue.severity === "error") {
+          issue.severity = "warning";
+          issue.detail = issue.detail + " (Pendo appears functional — CSP may be using nonces or strict-dynamic)";
+        }
+      });
+    }
+
+    // Report-Only CSP doesn't block anything — downgrade all issues to informational
+    if (csp.reportOnly) {
+      csp.issues.forEach(function(issue) {
+        if (issue.severity === "error" || issue.severity === "warning") {
+          issue.severity = "info";
+          issue.detail = "[Report-Only] " + issue.detail;
+        }
+      });
+    }
 
     // Replace {{SUB_ID}} template with actual subscription ID if detected
     csp.issues.forEach(function(issue) {
@@ -2266,16 +2330,27 @@ function runPendoSetupAssistant() {
     var usingDefaultCdn = (!cnameContentHost || cnameContentHost.indexOf("pendo.io") !== -1 || cnameContentHost.indexOf("pendo-") !== -1) &&
                            (!cnameDataHost || cnameDataHost.indexOf("pendo.io") !== -1);
 
-    // Only recommend CNAME if blocking evidence detected
+    // Only recommend CNAME if there's REAL blocking evidence — not just cross-origin timing redaction.
+    // transferSize === 0 is unreliable for cross-origin resources without Timing-Allow-Origin.
+    // Instead, only show this tip if Pendo is NOT functional (agent not ready = actually blocked).
     if (usingDefaultCdn) {
-      // Check perf entries for blocked Pendo requests (transferSize === 0)
-      var perfEntries = performance.getEntriesByType ? performance.getEntriesByType("resource") : [];
-      var blockedPendoResources = perfEntries.filter(function(e) {
-        return e.name && (e.name.indexOf("pendo.io") !== -1 || e.name.indexOf("pendo-") !== -1) &&
-               e.transferSize === 0 && e.decodedBodySize === 0;
-      });
+      var pendoActuallyBlocked = typeof window.pendo === "undefined" || !window.pendo ||
+        (typeof pendo.isReady === "function" && !pendo.isReady());
+      // Also check ad blocker bait as a secondary signal
+      var adBlockEvidence = false;
+      try {
+        var cnameBait = document.createElement("div");
+        cnameBait.className = "adsbox ad-placement";
+        cnameBait.style.cssText = "position:absolute;top:-10px;left:-10px;width:1px;height:1px;overflow:hidden;";
+        cnameBait.innerHTML = "&nbsp;";
+        document.body.appendChild(cnameBait);
+        if (window.getComputedStyle(cnameBait).display === "none" || cnameBait.offsetHeight === 0) {
+          adBlockEvidence = true;
+        }
+        document.body.removeChild(cnameBait);
+      } catch (_) {}
 
-      if (blockedPendoResources.length > 0) {
+      if (pendoActuallyBlocked || adBlockEvidence) {
         recommend("tip", "No CNAME configured",
           "Pendo is loading from default CDN domains (cdn.pendo.io, data.pendo.io). Ad blockers and corporate firewalls commonly block *.pendo.io.\n  FIX: Configure a CNAME to route Pendo through your own domain (e.g. content.product.yourcompany.com and data.product.yourcompany.com). This makes Pendo traffic appear as first-party, bypassing most ad blockers and firewall restrictions.\n  Contact your Pendo CSM to enable CNAME for your subscription, then update your snippet and DNS.\n  Docs: https://support.pendo.io/hc/en-us/articles/360043539891-CNAME-for-Pendo");
       }

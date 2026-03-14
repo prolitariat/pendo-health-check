@@ -437,7 +437,7 @@
       margin-bottom: 12px;
     }
 
-    /* === Tab Panels === */
+    /* === Main Panel === */
     .tab-panel {
       display: none;
       padding: 10px 12px;
@@ -500,7 +500,7 @@
     .check-row {
       display: flex;
       gap: 8px;
-      padding: 7px 8px;
+      padding: 5px 8px;
       border-bottom: 1px solid var(--muted);
       transition: background 0.1s;
     }
@@ -806,18 +806,18 @@
     #grade-card {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 12px 14px;
-      margin: 4px 0 8px;
+      gap: 12px;
+      padding: 10px 12px;
+      margin: 4px 0 6px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: var(--card);
     }
     #grade-letter {
-      font-size: 36px;
+      font-size: 32px;
       font-weight: 700;
       line-height: 1;
-      min-width: 48px;
+      min-width: 44px;
       text-align: center;
     }
     #grade-details { flex: 1; }
@@ -899,11 +899,7 @@
   <!-- Pendo Status Section -->
   <div id="pendo-status" style="display:none; flex-shrink: 0;"></div>
 
-  <!-- Tab Bar -->
-  <div id="tab-bar" role="tablist">
-    <div class="tab" data-tab="report" role="tab" tabindex="0" aria-selected="true" aria-controls="panel-report">Report</div>
-    <div class="tab" data-tab="tools" role="tab" tabindex="-1" aria-selected="false" aria-controls="panel-tools">Tools</div>
-  </div>
+  <!-- Tab bar removed — single scrollable view -->
 
   <!-- Loading View -->
   <div id="loading">
@@ -930,8 +926,8 @@
     </div>
   </div>
 
-  <!-- Report Panel (merged Health Check + Setup Assistant) -->
-  <div id="panel-report" class="tab-panel active" role="tabpanel" aria-labelledby="tab-report">
+  <!-- Single scrollable panel — report + tools in one view -->
+  <div id="panel-report" class="tab-panel active">
     <div id="grade-card" style="display:none">
       <div id="grade-letter">—</div>
       <div id="grade-details">
@@ -942,6 +938,48 @@
     <div id="checks-list"></div>
     <div id="health-summary">
       <div id="summary-counts"></div>
+    </div>
+
+    <!-- Developer Tools — collapsible drawer -->
+    <div id="dev-tools-drawer" style="margin-top:4px;border-top:1px solid var(--border)">
+      <div id="dev-tools-toggle" style="display:flex;align-items:center;gap:6px;padding:8px 4px;cursor:pointer;user-select:none;font-size:12px;font-weight:600;color:var(--muted-foreground);letter-spacing:-0.01em;transition:background 0.1s" tabindex="0" role="button" aria-expanded="false">
+        <span class="setup-chevron" style="font-size:9px;width:12px;text-align:center;transition:transform 0.15s">▶</span>
+        <span>Developer Tools</span>
+      </div>
+      <div id="dev-tools-body" style="display:none;padding:0 4px 8px">
+        <!-- Launch Debugger -->
+        <div style="padding:0 0 8px">
+          <button class="tool-btn" id="tool-launch-debug" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
+            <span class="tool-icon" style="font-size:18px">🐛</span>
+            <div style="text-align:left;flex:1">
+              <span class="tool-label">Toggle Pendo Debugger</span>
+              <span class="tool-desc" style="display:block">Open/close on-page overlay</span>
+            </div>
+          </button>
+        </div>
+        <!-- Validate buttons -->
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <button class="tool-btn" id="tool-validate-install" style="flex:1;flex-direction:row;padding:8px 10px;gap:8px">
+            <span class="tool-icon" style="font-size:15px">🔍</span>
+            <div style="text-align:left">
+              <span class="tool-label" style="font-size:11px">Validate Install</span>
+              <span class="tool-desc" style="display:block">Identity & metadata</span>
+            </div>
+          </button>
+          <button class="tool-btn" id="tool-validate-env" style="flex:1;flex-direction:row;padding:8px 10px;gap:8px">
+            <span class="tool-icon" style="font-size:15px">🧪</span>
+            <div style="text-align:left">
+              <span class="tool-label" style="font-size:11px">Validate Environment</span>
+              <span class="tool-desc" style="display:block">Config & error audit</span>
+            </div>
+          </button>
+        </div>
+        <div id="tool-status"></div>
+        <div id="validate-results-wrap">
+          <button class="copy-result-btn" id="copy-validate-result" title="Copy output">Copy</button>
+          <div id="validate-results"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -959,57 +997,14 @@
     </button>
   </div>
 
-  <!-- Tools Panel -->
-  <div id="panel-tools" class="tab-panel" role="tabpanel" aria-labelledby="tab-tools">
-    <!-- Launch Debugger -->
-    <div style="padding:12px 4px;border-bottom:1px solid var(--border)">
-      <button class="tool-btn" id="tool-launch-debug" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
-        <span class="tool-icon" style="font-size:18px">🐛</span>
-        <div style="text-align:left;flex:1">
-          <span class="tool-label">Toggle Pendo Debugger</span>
-          <span class="tool-desc" style="display:block">Open/close on-page overlay: alerts, config, events, guides</span>
-        </div>
-      </button>
-    </div>
-    <!-- Developer Tools -->
-    <div style="padding:10px 4px 4px">
-      <div style="font-size:10px;color:var(--muted-foreground);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Developer Console</div>
-      <div style="display:flex;gap:8px">
-        <button class="tool-btn" id="tool-validate-install" style="flex:1;flex-direction:row;padding:8px 10px;gap:8px">
-          <span class="tool-icon" style="font-size:15px">🔍</span>
-          <div style="text-align:left">
-            <span class="tool-label" style="font-size:11px">Validate Install</span>
-            <span class="tool-desc" style="display:block">Identity & metadata</span>
-          </div>
-        </button>
-        <button class="tool-btn" id="tool-validate-env" style="flex:1;flex-direction:row;padding:8px 10px;gap:8px">
-          <span class="tool-icon" style="font-size:15px">🧪</span>
-          <div style="text-align:left">
-            <span class="tool-label" style="font-size:11px">Validate Environment</span>
-            <span class="tool-desc" style="display:block">Config & error audit</span>
-          </div>
-        </button>
-      </div>
-    </div>
-    <div id="tool-status"></div>
-    <div id="validate-results-wrap">
-      <button class="copy-result-btn" id="copy-validate-result" title="Copy output">Copy</button>
-      <div id="validate-results"></div>
-    </div>
-    <!-- Settings -->
-    <div style="margin-top:auto;padding:10px 4px 4px;border-top:1px solid var(--border)">
-      <div style="font-size:10px;color:var(--muted-foreground);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Settings</div>
-      <label id="badge-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--foreground);padding:4px 0">
-        <input type="checkbox" id="badge-enabled" checked style="accent-color:var(--pendo-pink);width:14px;height:14px;cursor:pointer">
-        <span>Show issue count on extension icon</span>
-      </label>
-    </div>
-  </div>
-
   <!-- Feedback Bar -->
   <div id="feedback-bar">
     <span id="version-label"></span>
     <div id="feedback-bar-actions">
+      <label id="badge-toggle" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--muted-foreground)" title="Show issue count on extension icon">
+        <input type="checkbox" id="badge-enabled" checked style="accent-color:var(--pendo-pink);width:12px;height:12px;cursor:pointer">
+        <span>Badge</span>
+      </label>
       <button id="feedback-btn">Feedback</button>
     </div>
   </div>
