@@ -348,6 +348,13 @@ function renderChecks(checks) {
 
   // Passed checks omitted — grade card summary already shows the count.
   // Summary line removed — grade card already displays the same breakdown.
+
+  // Reveal results: hide loading, fade in content
+  var loading = document.getElementById("report-loading");
+  var content = document.getElementById("report-content");
+  if (loading) loading.style.display = "none";
+  if (content) content.style.opacity = "1";
+
   showView("__none__");
   showTabs();
   setTimeout(updateScrollFade, 50); // after DOM settles
@@ -462,6 +469,12 @@ function renderGradeCard(grade) {
   letterEl.className = grade.cssClass;
   document.getElementById("grade-score").textContent = grade.score + " / 100";
   document.getElementById("grade-summary").textContent = grade.summary;
+
+  // Reveal results: hide loading indicator, fade in report content
+  var loading = document.getElementById("report-loading");
+  var content = document.getElementById("report-content");
+  if (loading) loading.style.display = "none";
+  if (content) content.style.opacity = "1";
 }
 
 // ---------------------------------------------------------------------------

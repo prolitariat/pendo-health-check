@@ -82,6 +82,18 @@
       border-radius: var(--radius-sm);
     }
 
+    .loading-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted-foreground);
+      animation: pulse-dot 1s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
     body {
       width: 380px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -928,14 +940,18 @@
 
   <!-- Single scrollable panel — report + tools in one view -->
   <div id="panel-report" class="tab-panel active">
-    <div id="grade-card" style="display:none">
-      <div id="grade-letter">—</div>
-      <div id="grade-details">
-        <div id="grade-score"></div>
-        <div id="grade-summary"></div>
-      </div>
+    <div id="report-loading" style="display:flex;align-items:center;justify-content:center;padding:32px 0;color:var(--muted-foreground);font-size:12px;gap:8px">
+      <span class="loading-dot"></span> Analyzing Pendo installation…
     </div>
-    <div id="checks-list"></div>
+    <div id="report-content" style="opacity:0;transition:opacity 0.2s ease-in">
+      <div id="grade-card" style="display:none">
+        <div id="grade-letter">—</div>
+        <div id="grade-details">
+          <div id="grade-score"></div>
+          <div id="grade-summary"></div>
+        </div>
+      </div>
+      <div id="checks-list"></div>
 
     <!-- Developer Tools — collapsible drawer -->
     <div id="dev-tools-drawer" style="margin-top:4px;border-top:1px solid var(--border)">
@@ -978,6 +994,7 @@
         </div>
       </div>
     </div>
+    </div><!-- /report-content -->
   </div>
 
   <!-- Scroll fade — visual cue that more content is below -->
