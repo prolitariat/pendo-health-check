@@ -347,21 +347,7 @@ function renderChecks(checks) {
   }
 
   // Passed checks omitted — grade card summary already shows the count.
-  // Keeping the view focused on actionable issues only.
-
-  // Summary: lead with problems if any exist
-  const issues = fail + warn;
-  if (issues > 0) {
-    document.getElementById("summary-counts").innerHTML =
-      (fail > 0 ? `<span class="fail">${fail} failed</span> · ` : "") +
-      (warn > 0 ? `<span class="warn">${warn} warning${warn !== 1 ? "s" : ""}</span> · ` : "") +
-      `<span class="pass">${pass} passed</span>`;
-  } else {
-    document.getElementById("summary-counts").innerHTML =
-      `<span class="pass">All ${pass} checks passed</span>`;
-  }
-
-  document.getElementById("health-summary").style.display = "flex";
+  // Summary line removed — grade card already displays the same breakdown.
   showView("__none__");
   showTabs();
   setTimeout(updateScrollFade, 50); // after DOM settles
