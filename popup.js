@@ -365,11 +365,11 @@ function renderChecks(checks) {
 
 const REMEDIATION_MAP = {
   "Pendo Agent Loaded": {
-    fail: "FIX: The Pendo snippet is not on this page. Add it to your <head>:\n  <script async src='https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js'></script>\n  Find your API key: app.pendo.io → Settings → Subscription Settings → App Details\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
+    fail: "FIX: The Pendo snippet is not on this page. Add it to your <head>:\n  <script async src='https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js'></script>\n  Find your API key: app.pendo.io → Settings → Subscription Settings → App Details\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Pendo Ready": {
     warn: "FIX: pendo.isReady() is false — pendo.initialize() hasn't been called, or it ran before the script finished loading. Ensure initialize() runs after the Pendo script loads.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script",
-    fail: "FIX: pendo.isReady() threw an error. Clear browser cache, hard reload, and verify your snippet URL matches your subscription.\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
+    fail: "FIX: pendo.isReady() threw an error. Clear browser cache, hard reload, and verify your snippet URL matches your subscription.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Visitor ID": {
     warn: "FIX: Anonymous visitor ID detected. Pass a stable, unique ID from your auth system (e.g. user.id, email, UUID) via pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } }).\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script",
@@ -379,7 +379,7 @@ const REMEDIATION_MAP = {
     warn: "FIX: No account ID. For B2B apps, pass the organization/tenant ID via pendo.initialize({ account: { id: 'ACCOUNT_ID' } }). Single-user apps can skip this.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Pendo Instances": {
-    warn: "FIX: Multiple Pendo instances detected — causes double-counted analytics and guide conflicts. Check for duplicate <script> tags (View Source → search 'pendo'), duplicate bundler imports, or GTM + hardcoded snippet overlap.\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
+    warn: "FIX: Multiple Pendo instances detected — causes double-counted analytics and guide conflicts. Check for duplicate <script> tags (View Source → search 'pendo'), duplicate bundler imports, or GTM + hardcoded snippet overlap.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Data Transmission": {
     warn: "FIX: Pendo requests are blocked. Disable your ad blocker for this domain, or ask IT to allowlist *.pendo.io. If using a corporate proxy/VPN, verify data.pendo.io and cdn.pendo.io are reachable.\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
@@ -1170,11 +1170,10 @@ function buildIssuesReport() {
     const sourceLabels = {
       "360032209131": "Content Security Policy for Pendo",
       "360046272771": "Developer's Guide to Implementing Pendo",
-      "21397042498571": "Install Pendo on a Single Page Application",
-      "360032207332": "Manage Visitor and Account Metadata",
+      "360031862272": "Install Pendo on a Single-Page Web Application",
+      "360031832072": "Configure Visitor and Account Metadata",
       "360043539891": "CNAME for Pendo",
-      "360031867272": "Configure Pendo with a Cookie Consent Manager",
-      "21362607043355": "Install Pendo on Your Website or App"
+      "360031867272": "Configure Pendo with a Cookie Consent Manager"
     };
     sources.forEach(url => {
       // Extract article ID to generate a human-readable label
@@ -2221,7 +2220,7 @@ function runPendoSetupAssistant() {
   // Async loading
   if (result.snippet && !result.snippet.isAsync && result.snippet.loadMethod.indexOf("npm") === -1) {
     recommend("warning", "Script not loaded async",
-      "The Pendo snippet is loaded synchronously, which blocks page rendering until it finishes downloading.\n  FIX: Add the async attribute to your Pendo <script> tag:\n    <script async src=\"https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js\"></script>\n  If you're using the classic snippet with inline code, add async to the script block that creates the <script> element.\n  Docs: https://support.pendo.io/hc/en-us/articles/21397042498571-Install-Pendo-on-a-single-page-application");
+      "The Pendo snippet is loaded synchronously, which blocks page rendering until it finishes downloading.\n  FIX: Add the async attribute to your Pendo <script> tag:\n    <script async src=\"https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js\"></script>\n  If you're using the classic snippet with inline code, add async to the script block that creates the <script> element.\n  Docs: https://support.pendo.io/hc/en-us/articles/360031862272-Install-Pendo-on-a-single-page-web-application");
   }
 
   // Duplicate scripts and dual initialization: owned by Health Check tab
@@ -2239,7 +2238,7 @@ function runPendoSetupAssistant() {
   }
   if (sensitiveFields.length > 0) {
     recommend("error", "Potentially sensitive metadata detected",
-      "Fields that may contain sensitive data: " + sensitiveFields.join(", ") + ".\n  FIX: Remove these fields from your pendo.initialize() call, or replace them with non-sensitive equivalents (e.g. use a hashed email instead of a raw email).\n  To exclude fields in Pendo: Settings → Subscription Settings → Data Mappings → find the field → toggle it off.\n  If these fields are intentional, ensure you have a Data Processing Agreement with Pendo covering PII.\n  Docs: https://support.pendo.io/hc/en-us/articles/360032207332-Manage-visitor-and-account-metadata");
+      "Fields that may contain sensitive data: " + sensitiveFields.join(", ") + ".\n  FIX: Remove these fields from your pendo.initialize() call, or replace them with non-sensitive equivalents (e.g. use a hashed email instead of a raw email).\n  To exclude fields in Pendo: Settings → Subscription Settings → Data Mappings → find the field → toggle it off.\n  If these fields are intentional, ensure you have a Data Processing Agreement with Pendo covering PII.\n  Docs: https://support.pendo.io/hc/en-us/articles/360031832072-Configure-visitor-and-account-metadata");
   }
 
   // Nested or array fields
@@ -2260,17 +2259,17 @@ function runPendoSetupAssistant() {
   if (fw.name.indexOf("React") !== -1 || fw.name.indexOf("Next") !== -1) {
     if (!init.hasVisitorId) {
       recommend("tip", "React initialization timing",
-        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: Call pendo.initialize() inside a useEffect that depends on your auth state:\n    useEffect(() => {\n      if (user?.id) {\n        pendo.initialize({ visitor: { id: user.id }, account: { id: user.accountId } });\n      }\n    }, [user]);\n  Docs: https://support.pendo.io/hc/en-us/articles/21397042498571-Install-Pendo-on-a-single-page-application");
+        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: Call pendo.initialize() inside a useEffect that depends on your auth state:\n    useEffect(() => {\n      if (user?.id) {\n        pendo.initialize({ visitor: { id: user.id }, account: { id: user.accountId } });\n      }\n    }, [user]);\n  Docs: https://support.pendo.io/hc/en-us/articles/360031862272-Install-Pendo-on-a-single-page-web-application");
     }
   } else if (fw.name.indexOf("Vue") !== -1 || fw.name.indexOf("Nuxt") !== -1) {
     if (!init.hasVisitorId) {
       recommend("tip", "Vue initialization timing",
-        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: In Vue, call pendo.initialize() in a route guard or in mounted() after the user is authenticated:\n    mounted() {\n      if (this.$auth.user) {\n        pendo.initialize({ visitor: { id: this.$auth.user.id } });\n      }\n    }\n  Docs: https://support.pendo.io/hc/en-us/articles/21397042498571-Install-Pendo-on-a-single-page-application");
+        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: In Vue, call pendo.initialize() in a route guard or in mounted() after the user is authenticated:\n    mounted() {\n      if (this.$auth.user) {\n        pendo.initialize({ visitor: { id: this.$auth.user.id } });\n      }\n    }\n  Docs: https://support.pendo.io/hc/en-us/articles/360031862272-Install-Pendo-on-a-single-page-web-application");
     }
   } else if (fw.name.indexOf("Angular") !== -1) {
     if (!init.hasVisitorId) {
       recommend("tip", "Angular initialization timing",
-        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: In Angular, call pendo.initialize() in an AfterViewInit lifecycle hook or route resolver after fetching user data:\n    ngAfterViewInit() {\n      this.authService.user$.subscribe(user => {\n        pendo.initialize({ visitor: { id: user.id } });\n      });\n    }\n  Docs: https://support.pendo.io/hc/en-us/articles/21397042498571-Install-Pendo-on-a-single-page-application");
+        "No visitor ID detected — likely pendo.initialize() is being called before your auth flow resolves.\n  FIX: In Angular, call pendo.initialize() in an AfterViewInit lifecycle hook or route resolver after fetching user data:\n    ngAfterViewInit() {\n      this.authService.user$.subscribe(user => {\n        pendo.initialize({ visitor: { id: user.id } });\n      });\n    }\n  Docs: https://support.pendo.io/hc/en-us/articles/360031862272-Install-Pendo-on-a-single-page-web-application");
     }
   }
 
