@@ -539,34 +539,7 @@ function extractSetupIssues(data) {
 // Render Setup Issues into Unified Report
 // ---------------------------------------------------------------------------
 
-function renderSetupIssues(setupIssues) {
-  var container = document.getElementById("setup-issues-list");
-  if (!container || setupIssues.length === 0) return;
-
-  container.innerHTML = "";
-
-  setupIssues.forEach(function(issue) {
-    var row = document.createElement("div");
-    row.className = "check-row";
-
-    var statusIcon;
-    if (issue.severity === "error" || issue.severity === "fail") {
-      statusIcon = "❌";
-    } else if (issue.severity === "warning" || issue.severity === "warn") {
-      statusIcon = "⚠️";
-    } else {
-      statusIcon = "ℹ️";
-    }
-
-    row.innerHTML =
-      '<div class="check-status">' + statusIcon + '</div>' +
-      '<div class="check-info">' +
-        '<div class="check-label">' + escapeHtml(issue.label) + '</div>' +
-        '<div class="check-detail">' + escapeHtml(issue.detail) + '</div>' +
-      '</div>';
-    container.appendChild(row);
-  });
-}
+// renderSetupIssues removed — setup issues now merge into renderChecks() as one sorted list
 
 // (Old per-tab buildPlainTextReport / buildSetupPlainText removed —
 //  replaced by unified buildIssuesReport() in Tools section below)
@@ -822,9 +795,16 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               window.__lastSetup = setupData;
               lastSetupData = setupData;
 
-              // Extract setup issues and add to unified report
+              // Extract setup issues and merge into unified report
               const setupIssues = extractSetupIssues(setupData);
-              renderSetupIssues(setupIssues);
+              // Convert setup issues to check format and re-render as one sorted list
+              const setupAsChecks = setupIssues.map(function(si) {
+                var status = (si.severity === "error" || si.severity === "fail") ? "fail"
+                           : (si.severity === "warning" || si.severity === "warn") ? "warn"
+                           : "info";
+                return { status: status, label: si.label, detail: si.detail };
+              });
+              renderChecks(data.checks.concat(setupAsChecks));
 
               // Compute final grade from both HC and setup data
               const finalGrade = computeGrade(data.checks, setupIssues);
