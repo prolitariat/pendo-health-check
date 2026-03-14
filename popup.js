@@ -251,23 +251,51 @@ let activeTabId = "report"; // Single view — always report
 let lastHealthData = null;
 let lastSetupData = null;
 
-// Developer Tools drawer toggle
+// Developer Tools drawer toggle + auto-expand when space allows
 (function() {
   const toggle = document.getElementById("dev-tools-toggle");
   const body = document.getElementById("dev-tools-body");
   const chevron = toggle ? toggle.querySelector(".setup-chevron") : null;
   if (toggle && body) {
+    function openDrawer() {
+      body.style.display = "block";
+      if (chevron) chevron.style.transform = "rotate(90deg)";
+      toggle.setAttribute("aria-expanded", "true");
+    }
+    function closeDrawer() {
+      body.style.display = "none";
+      if (chevron) chevron.style.transform = "";
+      toggle.setAttribute("aria-expanded", "false");
+    }
     function toggleDrawer() {
-      const isOpen = body.style.display !== "none";
-      body.style.display = isOpen ? "none" : "block";
-      if (chevron) chevron.style.transform = isOpen ? "" : "rotate(90deg)";
-      toggle.setAttribute("aria-expanded", !isOpen);
+      var isOpen = body.style.display !== "none";
+      if (isOpen) closeDrawer(); else openDrawer();
       trackEvent("dev_tools_toggle", { open: !isOpen });
     }
     toggle.addEventListener("click", toggleDrawer);
     toggle.addEventListener("keydown", function(e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDrawer(); }
     });
+
+    // Auto-expand if there's room — called after checks render
+    window.__autoExpandDevTools = function() {
+      // Measure available space: popup height minus current scroll height of content
+      var scrollContainer = document.getElementById("panel-report");
+      if (!scrollContainer) return;
+      var slack = scrollContainer.clientHeight - scrollContainer.scrollHeight;
+      // Temporarily show body to measure its height
+      body.style.display = "block";
+      body.style.visibility = "hidden";
+      var toolsHeight = body.offsetHeight;
+      body.style.visibility = "";
+      if (slack >= toolsHeight) {
+        // Enough room — keep it open
+        openDrawer();
+      } else {
+        // Not enough room — collapse
+        closeDrawer();
+      }
+    };
   }
 })();
 
@@ -788,6 +816,8 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               const finalGrade = computeGrade(data.checks, setupIssues);
               renderGradeCard(finalGrade);
               setTimeout(updateScrollFade, 50);
+              // Auto-expand dev tools if there's room after full render
+              setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
 
               // Set badge on icon — send full analysis to background
               window.__lastTotalIssues = finalGrade.criticals + finalGrade.warnings;
@@ -802,6 +832,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
                 document.getElementById("grade-card").style.display === "none") {
               var fallbackGrade = window.__prelimGrade || computeGrade(data.checks, []);
               renderGradeCard(fallbackGrade);
+              setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
               window.__lastTotalIssues = (fallbackGrade.criticals || 0) + (fallbackGrade.warnings || 0);
               window.__lastCriticals = fallbackGrade.criticals || 0;
               window.__lastWarnings = fallbackGrade.warnings || 0;
