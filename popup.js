@@ -278,20 +278,18 @@ let lastSetupData = null;
     });
 
     // Auto-expand if there's room — called after checks render.
-    // Strategy: open the drawer, then check if the container overflows.
-    // If it does, close it back.
+    // Strategy: open the drawer, wait for layout to settle, then check
+    // if the container overflows. If it does, close it back.
+    // Using setTimeout(50) because rAF is unreliable in Chrome popup context.
     window.__autoExpandDevTools = function() {
       var scrollContainer = document.getElementById("panel-report");
       if (!scrollContainer) return;
       openDrawer();
-      // Double rAF ensures layout reflow is complete before measuring
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          if (scrollContainer.scrollHeight > scrollContainer.clientHeight + 2) {
-            closeDrawer();
-          }
-        });
-      });
+      setTimeout(function() {
+        if (scrollContainer.scrollHeight > scrollContainer.clientHeight + 2) {
+          closeDrawer();
+        }
+      }, 50);
     };
   }
 })();
@@ -1315,7 +1313,10 @@ function runPendoHealthCheck() {
       var isAgent = (scriptSrc.indexOf("cdn.pendo.io") !== -1 || scriptSrc.indexOf("/agent/") !== -1 ||
                     (scriptSrc.indexOf("pendo-io-static") !== -1 && scriptSrc.indexOf("pendo.js") !== -1));
       var isContent = scriptSrc.indexOf("pendo-static-") !== -1 || scriptSrc.indexOf(".static.pendo.io") !== -1;
-      if (isAgent && !isContent) agentScripts++;
+      var isTooling = scriptSrc.indexOf("debugger") !== -1 || scriptSrc.indexOf("debug.") !== -1 ||
+                      scriptSrc.indexOf("designer") !== -1 || scriptSrc.indexOf("app.pendo.io") !== -1 ||
+                      scriptSrc.indexOf("pendo-designer") !== -1;
+      if (isAgent && !isContent && !isTooling) agentScripts++;
     }
 
     if (instanceCount > 1) {
@@ -1632,7 +1633,10 @@ function runPendoSetupAssistant() {
   for (var si = 0; si < allPendoScriptsSnippet.length; si++) {
     var sSrc = allPendoScriptsSnippet[si].getAttribute("src") || "";
     var sIsContent = sSrc.indexOf("pendo-static-") !== -1 || sSrc.indexOf(".static.pendo.io") !== -1;
-    if (!sIsContent) pendoScripts.push(allPendoScriptsSnippet[si]);
+    var sIsTooling = sSrc.indexOf("debugger") !== -1 || sSrc.indexOf("debug.") !== -1 ||
+                     sSrc.indexOf("designer") !== -1 || sSrc.indexOf("app.pendo.io") !== -1 ||
+                     sSrc.indexOf("pendo-designer") !== -1;
+    if (!sIsContent && !sIsTooling) pendoScripts.push(allPendoScriptsSnippet[si]);
   }
   snippet.scriptCount = pendoScripts.length;
 
