@@ -19,5 +19,18 @@
   },
   "background": {
     "service_worker": "background.js"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["probe-bridge.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["probe-main.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    }
+  ]
 }

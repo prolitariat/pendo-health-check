@@ -7,13 +7,16 @@ const STATUS_ICONS = { pass: "✅", warn: "⚠️", fail: "❌", info: "ℹ️" 
 var badgeEnabled = true; // default on
 function applyBadge() {
   var count = window.__lastTotalIssues || 0;
-  if (badgeEnabled && count > 0) {
-    chrome.action.setBadgeText({ text: String(count) });
-    chrome.action.setBadgeBackgroundColor({ color: "#FEF484" });
-    chrome.action.setBadgeTextColor({ color: "#000000" });
-  } else {
-    chrome.action.setBadgeText({ text: "" });
-  }
+  var crits = window.__lastCriticals || 0;
+  var warns = window.__lastWarnings || 0;
+  // Let background handle badge rendering — send full analysis results
+  chrome.runtime.sendMessage({
+    type: "pendo-badge-update",
+    tabId: currentTabId,
+    issues: count,
+    criticals: crits,
+    warnings: warns,
+  });
 }
 
 // Load preference and wire toggle
@@ -25,6 +28,7 @@ chrome.storage.local.get("badgeEnabled", function(result) {
     checkbox.addEventListener("change", function() {
       badgeEnabled = checkbox.checked;
       chrome.storage.local.set({ badgeEnabled: badgeEnabled });
+      chrome.runtime.sendMessage({ type: "badge-pref-changed" });
       applyBadge();
     });
   }
@@ -784,8 +788,10 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               renderGradeCard(finalGrade);
               setTimeout(updateScrollFade, 50);
 
-              // Set badge on icon — respects user preference
+              // Set badge on icon — send full analysis to background
               window.__lastTotalIssues = finalGrade.criticals + finalGrade.warnings;
+              window.__lastCriticals = finalGrade.criticals;
+              window.__lastWarnings = finalGrade.warnings;
               applyBadge();
             }
           })
@@ -793,8 +799,11 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
             // Setup failed — show grade from HC data only
             if (!document.getElementById("grade-card").style.display ||
                 document.getElementById("grade-card").style.display === "none") {
-              renderGradeCard(window.__prelimGrade || computeGrade(data.checks, []));
-              window.__lastTotalIssues = (window.__prelimGrade || {}).criticals + (window.__prelimGrade || {}).warnings || 0;
+              var fallbackGrade = window.__prelimGrade || computeGrade(data.checks, []);
+              renderGradeCard(fallbackGrade);
+              window.__lastTotalIssues = (fallbackGrade.criticals || 0) + (fallbackGrade.warnings || 0);
+              window.__lastCriticals = fallbackGrade.criticals || 0;
+              window.__lastWarnings = fallbackGrade.warnings || 0;
               applyBadge();
             }
           });
