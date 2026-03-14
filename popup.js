@@ -392,30 +392,30 @@ function renderChecks(checks) {
 
 const REMEDIATION_MAP = {
   "Pendo Agent Loaded": {
-    fail: "FIX: The Pendo snippet is not installed on this page. Add the Pendo install script to your <head> tag, or verify your npm/yarn package imports pendo-io correctly.\n  Code: <script async src='https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js'></script>\n  → Find your API key: app.pendo.io → Settings → Subscription Settings → App Details\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
+    fail: "FIX: The Pendo snippet is not on this page. Add it to your <head>:\n  <script async src='https://cdn.pendo.io/agent/static/YOUR_API_KEY/pendo.js'></script>\n  Find your API key: app.pendo.io → Settings → Subscription Settings → App Details\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
   "Pendo Ready": {
-    warn: "FIX: The agent script loaded but pendo.isReady() returns false — pendo.initialize() hasn't been called yet, or it fired before the script finished loading. Ensure initialize() runs AFTER the Pendo script loads.\n  Code: pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } });\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script",
-    fail: "FIX: pendo.isReady() threw an error — the agent may be corrupted or an incompatible version. Clear browser cache, hard reload, and verify your CDN snippet URL matches your subscription.\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
+    warn: "FIX: pendo.isReady() is false — pendo.initialize() hasn't been called, or it ran before the script finished loading. Ensure initialize() runs after the Pendo script loads.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script",
+    fail: "FIX: pendo.isReady() threw an error. Clear browser cache, hard reload, and verify your snippet URL matches your subscription.\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
   "Visitor ID": {
-    warn: "FIX: You're sending an anonymous or auto-generated visitor ID. Pendo can't track individual users without a stable, unique ID tied to your auth system.\n  Code: pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })\n  → Use whatever unique identifier your app assigns at login (e.g. user.id, email, UUID).\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script",
-    fail: "FIX: No visitor ID found. pendo.initialize() must be called with a visitor.id parameter after the user authenticates.\n  Code: pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } })\n  → Call this AFTER your login/auth flow resolves — not on page load before the user is known.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    warn: "FIX: Anonymous visitor ID detected. Pass a stable, unique ID from your auth system (e.g. user.id, email, UUID) via pendo.initialize({ visitor: { id: 'YOUR_USER_ID' } }).\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script",
+    fail: "FIX: No visitor ID. Call pendo.initialize() with a visitor.id after the user authenticates — not on page load before the user is known.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Account ID": {
-    warn: "FIX: No account ID set. If your app is B2B (multi-tenant), Pendo needs the account ID for company-level analytics, NPS by account, and account-based guide targeting.\n  Code: pendo.initialize({ visitor: { id: 'USER_ID' }, account: { id: 'ACCOUNT_ID' } })\n  → Use your app's organization/tenant/company ID. Single-user apps can skip this.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    warn: "FIX: No account ID. For B2B apps, pass the organization/tenant ID via pendo.initialize({ account: { id: 'ACCOUNT_ID' } }). Single-user apps can skip this.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Pendo Instances": {
-    warn: "FIX: Multiple Pendo agent instances or duplicate <script> tags detected. This causes double-counted analytics, guide conflicts, and memory leaks.\n  → Check for duplicate <script> tags in your HTML (View Source → search 'pendo')\n  → Check your bundler config for duplicate pendo-io imports\n  → If using a tag manager (GTM), ensure the snippet isn't also hardcoded in your app\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
+    warn: "FIX: Multiple Pendo instances detected — causes double-counted analytics and guide conflicts. Check for duplicate <script> tags (View Source → search 'pendo'), duplicate bundler imports, or GTM + hardcoded snippet overlap.\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
   "Data Transmission": {
-    warn: "FIX: Pendo network requests are failing or absent. Common causes:\n  1. Ad blocker or privacy extension blocking *.pendo.io → allowlist pendo.io domains\n  2. Corporate proxy/firewall blocking pendo.io → request IT to allowlist: data.pendo.io, cdn.pendo.io, app.pendo.io\n  3. CSP connect-src missing data.pendo.io → see CSP fixes below if present\n  4. VPN/DNS issue → try with VPN off, or verify pendo.io resolves\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
+    warn: "FIX: Pendo requests are blocked. Disable your ad blocker for this domain, or ask IT to allowlist *.pendo.io. If using a corporate proxy/VPN, verify data.pendo.io and cdn.pendo.io are reachable.\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
   },
   "Feature Flags": {
-    warn: "FIX: One or more Pendo features are explicitly disabled in your configuration. Check your pendo.initialize() options for these flags and remove them if unintentional:\n  disableGuides: true      → blocks all in-app guides\n  disableAnalytics: true   → stops all event tracking\n  disableFeedback: true    → hides the Feedback module\n  disablePersistence: true → prevents visitor/account caching\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    warn: "FIX: Pendo features are explicitly disabled in your config. Review your pendo.initialize() options and remove disable flags if unintentional.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
   "Data Host": {
-    warn: "FIX: Could not determine Pendo's content or data host. This may indicate the agent hasn't fully initialized, or the configuration is non-standard.\n  Check your pendo.initialize() call for contentHost and dataHost options, or verify the Pendo script src URL.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    warn: "FIX: Could not determine Pendo's data or content host. The agent may not be fully initialized. Check your pendo.initialize() call for contentHost and dataHost options.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   }
 };
 
@@ -1065,7 +1065,7 @@ function buildIssuesReport() {
       const severity = c.status === "fail" ? "PROBLEM" : "WARNING";
       let fix;
 
-      if (c.label === "Network Requests" && hasCspIssues) {
+      if (c.label === "Data Transmission" && hasCspIssues) {
         fix = "Your Content-Security-Policy is blocking Pendo requests. See the CSP directive fixes below.";
       } else {
         const remap = REMEDIATION_MAP[c.label];
