@@ -543,12 +543,7 @@ function renderSetupIssues(setupIssues) {
   var container = document.getElementById("setup-issues-list");
   if (!container || setupIssues.length === 0) return;
 
-  // Add a section divider
   container.innerHTML = "";
-  var divider = document.createElement("div");
-  divider.style.cssText = "font-size:10px;color:var(--muted-foreground);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:8px 8px 4px;border-top:1px solid var(--border);margin-top:4px";
-  divider.textContent = "Setup Analysis";
-  container.appendChild(divider);
 
   setupIssues.forEach(function(issue) {
     var row = document.createElement("div");
