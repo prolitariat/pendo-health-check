@@ -258,32 +258,6 @@
       gap: 8px;
     }
 
-    #help-tour-btn {
-      width: 24px;
-      height: 24px;
-      padding: 0;
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 24px;
-      text-align: center;
-      border: 1px solid var(--border);
-      background: var(--background);
-      color: var(--muted-foreground);
-      border-radius: 50%;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s, color 0.15s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-    }
-    #help-tour-btn:hover {
-      background: var(--pendo-pink-light);
-      border-color: var(--pendo-pink-mid);
-      color: var(--pendo-pink);
-    }
-    #help-tour-btn:focus-visible {
-      outline: 2px solid var(--pendo-pink);
-      outline-offset: 2px;
-    }
-
     #feedback-btn {
       padding: 5px 12px;
       font-size: 12px;
@@ -818,108 +792,6 @@
       line-height: 1.5;
     }
 
-    /* === Onboarding Tour === */
-    /* Tour: single overlay with box-shadow cutout — no double-dim */
-    .tour-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      z-index: 2000;
-      /* transparent overlay just catches clicks outside spotlight */
-      background: transparent;
-      cursor: default;
-    }
-    .tour-spotlight {
-      position: fixed;
-      border-radius: var(--radius);
-      box-shadow: 0 0 0 4000px rgba(0,0,0,0.5);
-      z-index: 2001;
-      transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
-      pointer-events: none;
-    }
-    .tour-tooltip {
-      position: fixed;
-      z-index: 2002;
-      background: var(--card);
-      border: 1px solid var(--pendo-pink);
-      border-radius: var(--radius-lg);
-      padding: 14px 16px;
-      max-width: 280px;
-      width: calc(100% - 32px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 0 0 1px rgba(200,56,93,0.15);
-      animation: tour-fade-in 0.2s ease;
-    }
-    @keyframes tour-fade-in {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .tour-tooltip.arrow-top::before,
-    .tour-tooltip.arrow-bottom::before {
-      content: "";
-      position: absolute;
-      width: 10px; height: 10px;
-      background: var(--card);
-      border-left: 1px solid var(--pendo-pink);
-      border-top: 1px solid var(--pendo-pink);
-    }
-    .tour-tooltip.arrow-top::before { top: -6px; left: var(--arrow-left, 24px); transform: rotate(45deg); }
-    .tour-tooltip.arrow-bottom::before { bottom: -6px; left: var(--arrow-left, 24px); transform: rotate(225deg); }
-    .tour-title {
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 4px;
-      color: var(--foreground);
-    }
-    .tour-body {
-      font-size: 12px;
-      color: var(--muted-foreground);
-      line-height: 1.5;
-      margin-bottom: 12px;
-    }
-    .tour-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .tour-dots {
-      display: flex;
-      gap: 5px;
-    }
-    .tour-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--border);
-      transition: background 0.2s;
-    }
-    .tour-dot.active { background: var(--pendo-pink); }
-    .tour-actions { display: flex; gap: 6px; }
-    .tour-btn {
-      padding: 5px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: var(--background);
-      color: var(--foreground);
-      transition: all 0.15s;
-    }
-    .tour-btn:hover { background: var(--muted); }
-    .tour-btn-primary {
-      background: var(--pendo-pink-btn);
-      color: #fff;
-      border-color: transparent;
-    }
-    .tour-btn-primary:hover { opacity: 0.9; background: var(--pendo-pink-btn); }
-    .tour-skip {
-      font-size: 11px;
-      color: var(--muted-foreground);
-      cursor: pointer;
-      border: none;
-      background: none;
-      padding: 4px;
-    }
-    .tour-skip:hover { color: var(--foreground); }
-
     /* Copy button pulse */
     @keyframes copy-pulse {
       0%, 100% { box-shadow: 0 0 0 0 rgba(200,56,93,0.4); }
@@ -1139,7 +1011,6 @@
   <div id="feedback-bar">
     <span id="version-label"></span>
     <div id="feedback-bar-actions">
-      <button id="help-tour-btn" title="Show guided tour" aria-label="Show guided tour">?</button>
       <button id="feedback-btn">Feedback</button>
     </div>
   </div>

@@ -240,175 +240,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // First-Run Onboarding Tour
 // ---------------------------------------------------------------------------
 
-const TOUR_STEPS = [
-  {
-    target: null,
-    title: "Welcome to Pendo Health Check",
-    body: "This extension runs diagnostics on any page with Pendo installed. Let's take a quick look at what's here.",
-  },
-  {
-    target: "#grade-card",
-    title: "Installation Grade",
-    body: "Your Pendo installation gets an instant letter grade. Issues from both runtime checks and setup analysis are merged into one prioritized list.",
-    arrow: "top",
-  },
-  {
-    target: "#tool-copy-issues",
-    title: "Copy Issues to Clipboard",
-    body: "One click copies every problem and fix as plain text — ready to paste into Slack, Jira, or a support ticket.",
-    arrow: "bottom",
-  },
-  {
-    target: '[data-tab="tools"]',
-    title: "Tools",
-    body: "Toggle the Pendo debugger and run validate commands with inline results — no DevTools needed.",
-    arrow: "top",
-  },
-];
-
-let tourActive = false;
-let tourStep = 0;
-
-function startTour() {
-  tourActive = true;
-  tourStep = 0;
-  showTourStep(0);
-  trackEvent("tour_start");
-}
-
-function showTourStep(idx) {
-  // Clean up previous
-  document.querySelectorAll(".tour-overlay, .tour-spotlight, .tour-tooltip").forEach(el => el.remove());
-
-  if (idx >= TOUR_STEPS.length) {
-    endTour();
-    return;
-  }
-
-  const step = TOUR_STEPS[idx];
-  tourStep = idx;
-
-  // Pre-action (e.g. switch tabs before measuring)
-  if (step.preAction) step.preAction();
-
-  // Wait for DOM to settle after tab switch (needs more than 80ms for paint)
-  setTimeout(() => {
-    const targetEl = step.target ? document.querySelector(step.target) : null;
-    if (step.target && !targetEl) { showTourStep(idx + 1); return; }
-
-    const popupW = document.documentElement.clientWidth || 380;
-    const popupH = document.documentElement.clientHeight || 540;
-    const tipW = Math.min(280, popupW - 32);
-
-    // Overlay — transparent click-catcher (spotlight handles dimming via box-shadow)
-    const overlay = document.createElement("div");
-    overlay.className = "tour-overlay";
-    document.body.appendChild(overlay);
-
-    if (targetEl) {
-      // Spotlight — fixed position, box-shadow creates the dim effect
-      const rect = targetEl.getBoundingClientRect();
-      const pad = 4;
-      const spot = document.createElement("div");
-      spot.className = "tour-spotlight";
-      spot.style.top = (rect.top - pad) + "px";
-      spot.style.left = (rect.left - pad) + "px";
-      spot.style.width = (rect.width + pad * 2) + "px";
-      spot.style.height = (rect.height + pad * 2) + "px";
-      document.body.appendChild(spot);
-    } else {
-      // No target — full-screen dim via overlay background instead of spotlight
-      overlay.style.background = "rgba(0,0,0,0.5)";
-    }
-
-    // Tooltip — fixed position, clamped to viewport
-    const tip = document.createElement("div");
-    const arrowDir = step.arrow || null;
-    tip.className = "tour-tooltip" + (arrowDir ? " arrow-" + arrowDir : "");
-
-    if (targetEl) {
-      const rect = targetEl.getBoundingClientRect();
-      const pad = 4;
-
-      // Horizontal: center under target, clamped to 8px from edges
-      let tipLeft = Math.round(rect.left + rect.width / 2 - tipW / 2);
-      tipLeft = Math.max(8, Math.min(tipLeft, popupW - tipW - 8));
-      tip.style.left = tipLeft + "px";
-      tip.style.width = tipW + "px";
-
-      // Vertical: below target (arrow-top) or above target (arrow-bottom)
-      const gap = 12;
-      if (arrowDir === "top") {
-        tip.style.top = (rect.bottom + gap) + "px";
-      } else if (arrowDir === "bottom") {
-        tip.style.bottom = (popupH - rect.top + gap) + "px";
-      }
-
-      // Arrow position: point toward center of target
-      const arrowLeft = Math.max(16, Math.min(rect.left + rect.width / 2 - tipLeft, tipW - 16));
-      tip.style.setProperty("--arrow-left", arrowLeft + "px");
-    } else {
-      // Centered modal — no arrow, vertically centered
-      tip.style.left = Math.round((popupW - tipW) / 2) + "px";
-      tip.style.width = tipW + "px";
-      tip.style.top = Math.round(popupH * 0.3) + "px";
-    }
-
-    // Step indicator and buttons
-    const dots = TOUR_STEPS.map((_, i) =>
-      `<div class="tour-dot${i === idx ? " active" : ""}"></div>`
-    ).join("");
-
-    const isLast = idx === TOUR_STEPS.length - 1;
-    const stepLabel = `${idx + 1} of ${TOUR_STEPS.length}`;
-    tip.innerHTML = `
-      <div class="tour-title">${step.title}</div>
-      <div class="tour-body">${step.body}</div>
-      <div class="tour-footer">
-        <div class="tour-dots">${dots}</div>
-        <div class="tour-actions">
-          <button class="tour-skip" id="tour-skip">Skip</button>
-          ${idx > 0 ? '<button class="tour-btn" id="tour-back">Back</button>' : ''}
-          <button class="tour-btn tour-btn-primary" id="tour-next">${isLast ? "Done" : "Next"}</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(tip);
-
-    // Event handlers
-    document.getElementById("tour-next").addEventListener("click", () => showTourStep(idx + 1));
-    document.getElementById("tour-skip")?.addEventListener("click", () => endTour());
-    document.getElementById("tour-back")?.addEventListener("click", () => showTourStep(idx - 1));
-
-    // Keyboard: Escape to skip, arrow right/enter to advance
-    const keyHandler = (e) => {
-      if (e.key === "Escape") { document.removeEventListener("keydown", keyHandler); endTour(); }
-      else if (e.key === "ArrowRight" || e.key === "Enter") { document.removeEventListener("keydown", keyHandler); showTourStep(idx + 1); }
-      else if (e.key === "ArrowLeft" && idx > 0) { document.removeEventListener("keydown", keyHandler); showTourStep(idx - 1); }
-    };
-    document.addEventListener("keydown", keyHandler);
-  }, 200);
-}
-
-function endTour() {
-  tourActive = false;
-  document.querySelectorAll(".tour-overlay, .tour-spotlight, .tour-tooltip").forEach(el => el.remove());
-  chrome.storage?.local?.set({ tourComplete: true });
-  trackEvent("tour_complete", { step: tourStep, total: TOUR_STEPS.length });
-
-  // Return to report tab
-  const reportTab = document.querySelector('[data-tab="report"]');
-  if (reportTab) activateTab(reportTab);
-}
-
-function maybeStartTour() {
-  chrome.storage?.local?.get(["tourComplete"], (result) => {
-    if (!result.tourComplete) {
-      // Delay slightly so the UI has settled
-      setTimeout(() => startTour(), 600);
-    }
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Tab switching
@@ -553,9 +384,6 @@ function renderChecks(checks) {
   // Grade card stays hidden until setup analysis finishes (avoids flash).
   var prelimGrade = computeGrade(checks, []);
   window.__prelimGrade = prelimGrade;
-
-  // First-run tour
-  maybeStartTour();
 }
 
 // ---------------------------------------------------------------------------
@@ -580,20 +408,14 @@ const REMEDIATION_MAP = {
   "Pendo Instances": {
     warn: "FIX: Multiple Pendo agent instances or duplicate <script> tags detected. This causes double-counted analytics, guide conflicts, and memory leaks.\n  → Check for duplicate <script> tags in your HTML (View Source → search 'pendo')\n  → Check your bundler config for duplicate pendo-io imports\n  → If using a tag manager (GTM), ensure the snippet isn't also hardcoded in your app\n  Docs: https://support.pendo.io/hc/en-us/articles/21362607043355-Install-Pendo-on-your-website-or-app"
   },
-  "Network Requests": {
+  "Data Transmission": {
     warn: "FIX: Pendo network requests are failing or absent. Common causes:\n  1. Ad blocker or privacy extension blocking *.pendo.io → allowlist pendo.io domains\n  2. Corporate proxy/firewall blocking pendo.io → request IT to allowlist: data.pendo.io, cdn.pendo.io, app.pendo.io\n  3. CSP connect-src missing data.pendo.io → see CSP fixes below if present\n  4. VPN/DNS issue → try with VPN off, or verify pendo.io resolves\n  Docs: https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
   },
   "Feature Flags": {
     warn: "FIX: One or more Pendo features are explicitly disabled in your configuration. Check your pendo.initialize() options for these flags and remove them if unintentional:\n  disableGuides: true      → blocks all in-app guides\n  disableAnalytics: true   → stops all event tracking\n  disableFeedback: true    → hides the Feedback module\n  disablePersistence: true → prevents visitor/account caching\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
   },
-  "Ad Blocker": {
-    warn: "FIX: An ad blocker or privacy extension is interfering with Pendo. This commonly breaks:\n  → Visual Design Studio (can't tag features)\n  → Guide rendering (guides won't appear)\n  → Analytics data collection (events silently dropped)\n  → Resource Center and NPS surveys\n  To fix: disable your ad blocker for this domain, or add these to your allowlist:\n  *.pendo.io, pendo-io-static.storage.googleapis.com, pendo-static-*.storage.googleapis.com\n  Best long-term solution: configure a CNAME so Pendo traffic routes through your own domain.\n  Docs: https://support.pendo.io/hc/en-us/articles/360043539891-CNAME-for-Pendo"
-  },
   "Data Host": {
     warn: "FIX: Could not determine Pendo's content or data host. This may indicate the agent hasn't fully initialized, or the configuration is non-standard.\n  Check your pendo.initialize() call for contentHost and dataHost options, or verify the Pendo script src URL.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
-  },
-  "Consent (CMP)": {
-    warn: "FIX: No Consent Management Platform detected but EU locale suggests GDPR may apply. Pendo collects visitor and usage data — initializing without consent in the EU violates GDPR.\n  → Integrate with your CMP (OneTrust, Cookiebot, Didomi, etc.) and only call pendo.initialize() AFTER the user grants consent for analytics/functional cookies.\n  Code example with OneTrust:\n    OneTrust.OnConsentChanged(function() {\n      if (OnetrustActiveGroups.includes('C0002')) { // Performance cookies\n        pendo.initialize({ visitor: { id: user.id } });\n      }\n    });\n  Docs: https://support.pendo.io/hc/en-us/articles/360031867272-Configure-Pendo-with-a-cookie-consent-manager"
   }
 };
 
@@ -788,36 +610,15 @@ function renderSetup(data) {
     else healthySections.push({ title, badge: badgeHtml, body: bodyHtml });
   }
 
-  // 1. Framework Detection
-  let fwHasIssue = false;
-  let fwBadge, fwBody;
-  if (data.framework && data.framework.name !== "Unknown") {
-    fwBadge = `<span class="badge badge-blue">${escapeHtml(data.framework.name)}${data.framework.version ? ` ${escapeHtml(data.framework.version)}` : ""}</span>`;
-    fwBody = `<div class="detail-row"><span class="detail-key">Framework</span><span class="detail-val">${escapeHtml(data.framework.name)}${data.framework.version ? ` <span class="badge badge-blue">${escapeHtml(data.framework.version)}</span>` : ""}</span></div>`;
-    if (data.framework.renderer) fwBody += `<div class="detail-row"><span class="detail-key">Renderer</span><span class="detail-val">${escapeHtml(data.framework.renderer)}</span></div>`;
-    if (data.framework.mode) fwBody += `<div class="detail-row"><span class="detail-key">Mode</span><span class="detail-val">${escapeHtml(data.framework.mode)}</span></div>`;
-  } else {
-    fwHasIssue = true;
-    fwBadge = `<span class="badge badge-yellow">Unknown</span>`;
-    fwBody = `<div class="detail-row"><span class="detail-key">Framework</span><span class="detail-val">Could not detect — may be vanilla JS or server-rendered</span></div>`;
-  }
-  makeSection("Framework", fwBadge, fwBody, fwHasIssue);
-
-  // 2. Snippet Analysis
-  if (data.snippet) {
-    const asyncOk = data.snippet.isAsync;
-    const snipBadge = asyncOk
-      ? `<span class="badge badge-green">Async</span>`
-      : `<span class="badge badge-yellow">Sync</span>`;
-    let snipBody = `
-      <div class="detail-row"><span class="detail-key">Load method</span><span class="detail-val">${escapeHtml(data.snippet.loadMethod)}</span></div>
-      <div class="detail-row"><span class="detail-key">Async</span><span class="detail-val">${asyncOk ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-yellow">No</span>'}</span></div>`;
-    if (data.snippet.placement) snipBody += `<div class="detail-row"><span class="detail-key">Placement</span><span class="detail-val">${escapeHtml(data.snippet.placement)}</span></div>`;
-    if (data.snippet.scriptCount !== undefined) snipBody += `<div class="detail-row"><span class="detail-key">Script tags</span><span class="detail-val">${data.snippet.scriptCount}</span></div>`;
-    makeSection("Snippet", snipBadge, snipBody, !asyncOk);
+  // 1. Snippet Analysis
+  if (data.snippet && !data.snippet.isAsync && data.snippet.loadMethod.indexOf("npm") === -1) {
+    // Only show if snippet is NOT async (warning case)
+    const snipBadge = `<span class="badge badge-yellow">Sync</span>`;
+    const snipBody = `<div class="detail-row"><span class="detail-key">Issue</span><span class="detail-val">Pendo snippet is loaded synchronously — add the async attribute to avoid blocking page render</span></div>`;
+    makeSection("Snippet", snipBadge, snipBody, true);
   }
 
-  // 3. Initialization
+  // 2. Initialization
   if (data.initialization) {
     const initBadge = `<span class="badge badge-green">${escapeHtml(data.initialization.method)}</span>`;
     let initBody = `<div class="detail-row"><span class="detail-key">Method</span><span class="detail-val">${escapeHtml(data.initialization.method)}</span></div>`;
@@ -825,7 +626,7 @@ function renderSetup(data) {
     makeSection("Initialization", initBadge, initBody, false);
   }
 
-  // 4. CSP Analysis
+  // 3. CSP Analysis
   if (data.csp) {
     let cspBadge, cspBody;
     const cspHasIssues = data.csp.detected && data.csp.issues && data.csp.issues.length > 0;
@@ -854,7 +655,7 @@ function renderSetup(data) {
     makeSection("Content Security Policy", cspBadge, cspBody, cspHasIssues);
   }
 
-  // 5. Visitor Metadata
+  // 4. Visitor Metadata
   if (Array.isArray(data.visitorFields) && data.visitorFields.length > 0) {
     const vWarns = data.visitorFields.filter(f => (f.warnings || []).length > 0).length;
     const vBadge = vWarns > 0
@@ -872,7 +673,7 @@ function renderSetup(data) {
     makeSection(`Visitor Metadata`, vBadge, vBody, vWarns > 0);
   }
 
-  // 6. Account Metadata
+  // 5. Account Metadata
   if (Array.isArray(data.accountFields) && data.accountFields.length > 0) {
     const aWarns = data.accountFields.filter(f => (f.warnings || []).length > 0).length;
     const aBadge = aWarns > 0
@@ -905,7 +706,7 @@ function renderSetup(data) {
   if (Array.isArray(data.visitorFields)) data.visitorFields.forEach(f => { if ((f.warnings || []).length > 0) warnings++; });
   if (Array.isArray(data.accountFields)) data.accountFields.forEach(f => { if ((f.warnings || []).length > 0) warnings++; });
 
-  // 7. Recommendations
+  // 6. Recommendations
   if (data.recommendations && data.recommendations.length > 0) {
     let recErrors = 0, recWarnings = 0, recTips = 0;
     data.recommendations.forEach((r) => {
@@ -1515,19 +1316,7 @@ function runPendoHealthCheck() {
     add("fail", "Account ID", "Error reading account ID: " + e.message);
   }
 
-  // 5. Active Guides
-  try {
-    var guides = pendo.guides;
-    if (Array.isArray(guides)) {
-      add("pass", "Active Guides", guides.length + " guide(s) loaded");
-    } else {
-      add("warn", "Active Guides", "pendo.guides is not available");
-    }
-  } catch (e) {
-    add("warn", "Active Guides", "Error reading guides: " + e.message);
-  }
-
-  // 7. Number of Pendo instances
+  // 6. Number of Pendo instances
   try {
     var instanceCount = 0;
     if (window.pendo) instanceCount++;
@@ -1553,7 +1342,12 @@ function runPendoHealthCheck() {
       pendo.VERSION ||
       null;
     if (version) {
-      add("pass", "Agent Version", version);
+      // Only show as check if old (major < 2), otherwise suppress
+      var parts = version.split(".");
+      var major = parseInt(parts[0], 10);
+      if (major < 2) {
+        add("warn", "Agent Version", "Agent version outdated (v" + version + ")");
+      }
     } else {
       add("warn", "Agent Version", "Could not determine agent version");
     }
@@ -1568,7 +1362,7 @@ function runPendoHealthCheck() {
       (pendo.apiKey) ||
       null;
     if (apiKey) {
-      add("pass", "API Key", apiKey);
+      add("pass", "API Key", apiKey.substring(0, 8) + "…");
     } else {
       add("warn", "API Key", "Could not determine API key");
     }
@@ -1633,7 +1427,7 @@ function runPendoHealthCheck() {
     add("warn", "Data Host", "Error detecting data host: " + e.message);
   }
 
-  // 10b. Network request validation (CNAME-aware)
+  // 10b. Data Transmission validation (CNAME-aware) — includes ad blocker diagnosis
   try {
     var perfEntries = performance.getEntriesByType ? performance.getEntriesByType("resource") : [];
     // Build match list: default Pendo domains + any detected CNAME domains
@@ -1651,38 +1445,48 @@ function runPendoHealthCheck() {
       return false;
     });
 
+    // Ad blocker bait test — merged into this check
+    var adBlockDetected = false;
+    var adBlockBaitResult = false;
+    try {
+      var bait = document.createElement("div");
+      bait.className = "adsbox ad-placement ad-banner pub_300x250";
+      bait.style.cssText = "position:absolute;top:-10px;left:-10px;width:1px;height:1px;overflow:hidden;pointer-events:none;";
+      bait.innerHTML = "&nbsp;";
+      document.body.appendChild(bait);
+      var baitStyle = window.getComputedStyle(bait);
+      if (baitStyle.display === "none" || baitStyle.visibility === "hidden" || bait.offsetHeight === 0) {
+        adBlockDetected = true;
+        adBlockBaitResult = true;
+      }
+      document.body.removeChild(bait);
+    } catch (_) {}
+
     if (pendoRequests.length === 0) {
-      add("warn", "Network Requests", "No Pendo network requests detected" + (isCname ? " (checked CNAME domains too)" : "") + ". Data may not be transmitting, or requests completed before page load.");
+      var cause = adBlockDetected ? "ad blocker, CSP, or firewall" : "CSP or firewall";
+      add("warn", "Data Transmission", "No Pendo network activity detected — likely blocked by " + cause);
     } else {
       var failed = pendoRequests.filter(function(e) { return e.transferSize === 0 && e.decodedBodySize === 0; });
-      var categories = {};
-      pendoRequests.forEach(function(e) {
-        var host = "unknown";
-        try { host = new URL(e.name).hostname; } catch(_) {}
-        if (!categories[host]) categories[host] = 0;
-        categories[host]++;
-      });
-      var summary = Object.keys(categories).map(function(h) { return h + " (" + categories[h] + ")"; }).join(", ");
 
       // CORS detection: check for requests that loaded but returned 0 bytes with no cache
       var corsLikely = failed.filter(function(e) {
-        // transferSize 0 + decodedBodySize 0 + not from cache = likely CORS block
         var isCached = e.encodedBodySize > 0 || (e.transferSize === 0 && e.decodedBodySize > 0);
         return !isCached;
       });
 
       if (corsLikely.length > 0 && corsLikely.length === failed.length) {
-        // All requests blocked — emphasize the diagnosis, not the count
-        add("warn", "Network Requests", "All " + pendoRequests.length + " Pendo requests returned 0 bytes — likely blocked by CORS policy, ad blocker, or firewall. Hosts: " + summary);
+        // All requests blocked
+        var blockCause = adBlockDetected ? "ad blocker, CSP, or firewall" : "CSP or firewall";
+        add("warn", "Data Transmission", "All Pendo requests blocked — likely " + blockCause + (adBlockBaitResult ? " (ad blocker detected via bait test)" : ""));
       } else if (failed.length > 0) {
-        var pct = Math.round((failed.length / pendoRequests.length) * 100);
-        add("warn", "Network Requests", failed.length + " of " + pendoRequests.length + " Pendo requests failed (" + pct + "% returned 0 bytes). Hosts: " + summary);
+        // Some requests blocked
+        add("warn", "Data Transmission", "Some Pendo requests blocked — " + failed.length + " failed, likely due to " + (adBlockDetected ? "ad blocker, CSP, or firewall" : "CSP or firewall"));
       } else {
-        add("pass", "Network Requests", pendoRequests.length + " successful request(s). Hosts: " + summary);
+        add("pass", "Data Transmission", "Pendo is transmitting data");
       }
     }
   } catch (e) {
-    add("warn", "Network Requests", "Could not analyze network requests: " + e.message);
+    add("warn", "Data Transmission", "Could not analyze network requests: " + e.message);
   }
 
   // 11. Feature flags
@@ -1719,136 +1523,12 @@ function runPendoHealthCheck() {
     if (flags.length > 0) {
       var hasDisable = flags.some(function(f) { return f.indexOf("disable") !== -1; });
       add(hasDisable ? "warn" : "info", "Feature Flags", flags.join(", "));
-    } else {
-      add("pass", "Feature Flags", "No feature flags detected — all Pendo features appear enabled");
     }
+    // Suppress pass row entirely if no flags detected
   } catch (e) {
     add("info", "Feature Flags", "Could not inspect feature flags: " + e.message);
   }
 
-  // 12. Ad Blocker Detection
-  try {
-    var adBlockDetected = false;
-    var adBlockSignals = [];
-
-    // Technique 1: Bait element — adblockers hide elements with ad-related class names
-    var bait = document.createElement("div");
-    bait.className = "adsbox ad-placement ad-banner pub_300x250";
-    bait.style.cssText = "position:absolute;top:-10px;left:-10px;width:1px;height:1px;overflow:hidden;pointer-events:none;";
-    bait.innerHTML = "&nbsp;";
-    document.body.appendChild(bait);
-
-    // Give adblocker CSS rules a moment to apply (they're usually synchronous)
-    var baitStyle = window.getComputedStyle(bait);
-    if (baitStyle.display === "none" || baitStyle.visibility === "hidden" || bait.offsetHeight === 0) {
-      adBlockDetected = true;
-      adBlockSignals.push("ad-class elements hidden");
-    }
-    document.body.removeChild(bait);
-
-    // Technique 2: Check if Pendo CDN/data domains are missing from network traffic
-    // despite the agent being loaded (agent could have been cached or bundled)
-    var resources = performance.getEntriesByType("resource");
-    var hasPendoCdn = resources.some(function(r) { return r.name.indexOf("cdn.pendo.io") !== -1; });
-    var hasPendoData = resources.some(function(r) { return r.name.indexOf("data.pendo.io") !== -1; });
-    var hasPendoStatic = resources.some(function(r) { return r.name.indexOf("pendo-static") !== -1; });
-
-    if (!hasPendoData && !hasPendoStatic && checks.length >= 10) {
-      // Pendo is loaded but no data traffic — something is blocking it
-      var netCheck = checks.find(function(c) { return c.label === "Network Requests"; });
-      if (netCheck && (netCheck.status === "warn" || netCheck.status === "fail")) {
-        adBlockSignals.push("Pendo network traffic blocked");
-        adBlockDetected = true;
-      }
-    }
-
-    if (adBlockDetected) {
-      add("warn", "Ad Blocker", "Ad blocker detected (" + adBlockSignals.join("; ") + "). " +
-        "Ad blockers can block Pendo CDN/data requests, break Visual Design Studio, and prevent guides from rendering. " +
-        "Disable your ad blocker for this domain or allowlist *.pendo.io to ensure full functionality.");
-    } else {
-      add("pass", "Ad Blocker", "No ad blocker interference detected");
-    }
-  } catch (e) {
-    add("info", "Ad Blocker", "Could not check for ad blockers: " + e.message);
-  }
-
-  // 13. Consent Management Platform (CMP) / GDPR detection
-  try {
-    var cmpDetected = null;
-    var cmpSignals = [];
-
-    // OneTrust (most common enterprise CMP)
-    if (window.OneTrust || window.OptanonWrapper || window.OnetrustActiveGroups) {
-      cmpDetected = "OneTrust";
-      if (window.OnetrustActiveGroups) cmpSignals.push("Active groups: " + window.OnetrustActiveGroups);
-    }
-    // Cookiebot
-    else if (window.Cookiebot || window.CookieConsent) {
-      cmpDetected = "Cookiebot";
-      if (window.Cookiebot && window.Cookiebot.consent) {
-        var cb = window.Cookiebot.consent;
-        cmpSignals.push("Statistics: " + (cb.statistics ? "granted" : "denied") + ", Marketing: " + (cb.marketing ? "granted" : "denied"));
-      }
-    }
-    // Didomi
-    else if (window.Didomi || window.didomiOnReady) {
-      cmpDetected = "Didomi";
-    }
-    // Osano
-    else if (window.Osano) {
-      cmpDetected = "Osano";
-    }
-    // TrustArc / TRUSTe
-    else if (window.truste || document.querySelector('#truste-consent-track')) {
-      cmpDetected = "TrustArc";
-    }
-    // Quantcast Choice
-    else if (window.__cmp || window.quantserve) {
-      cmpDetected = "Quantcast Choice";
-    }
-    // IAB TCF v2 (standard consent API used by many CMPs)
-    else if (window.__tcfapi) {
-      cmpDetected = "IAB TCF v2 compatible CMP";
-      try {
-        window.__tcfapi("getTCData", 2, function(tcData, success) {
-          if (success && tcData) {
-            cmpSignals.push("GDPR applies: " + (tcData.gdprApplies ? "yes" : "no"));
-          }
-        });
-      } catch (_) {}
-    }
-    // Generic cookie consent banners (banner element detection)
-    else if (document.querySelector('[class*="cookie-consent"], [class*="cookie-banner"], [id*="cookie-consent"], [id*="cookie-banner"], [class*="gdpr"], [id*="gdpr"]')) {
-      cmpDetected = "Generic cookie consent banner";
-    }
-
-    var pendoInitialized = typeof pendo.isReady === "function" ? pendo.isReady() : !!pendo.visitorId;
-
-    if (cmpDetected) {
-      var cmpMsg = cmpDetected + " detected" + (cmpSignals.length > 0 ? " (" + cmpSignals.join("; ") + ")" : "");
-      if (pendoInitialized) {
-        add("pass", "Consent (CMP)", cmpMsg + ". Pendo is active — consent appears to have been granted.");
-      } else {
-        add("info", "Consent (CMP)", cmpMsg + ". Pendo is NOT active — likely waiting for user consent before initialization (this is correct GDPR behavior).");
-      }
-    } else {
-      // No CMP found — check if this matters
-      // Look for signals the app is EU/GDPR-relevant
-      var lang = (navigator.language || "").toLowerCase();
-      var isEuLocale = /^(de|fr|es|it|nl|pt|pl|sv|da|fi|el|cs|sk|hu|ro|bg|hr|sl|lt|lv|et|mt|ga|lb)/.test(lang);
-      var htmlLang = (document.documentElement.lang || "").toLowerCase();
-      var isEuHtml = /^(de|fr|es|it|nl|pt|pl|sv|da|fi|el|cs|sk|hu|ro|bg|hr|sl|lt|lv|et|mt|ga|lb)/.test(htmlLang);
-
-      if (isEuLocale || isEuHtml) {
-        add("warn", "Consent (CMP)", "No Consent Management Platform detected, but EU locale (" + (lang || htmlLang) + ") suggests GDPR may apply. Pendo should only initialize after user consent is obtained.");
-      } else {
-        add("info", "Consent (CMP)", "No CMP detected. If this app serves EU users, Pendo should be conditionally initialized based on consent.");
-      }
-    }
-  } catch (e) {
-    add("info", "Consent (CMP)", "Could not check for consent management: " + e.message);
-  }
 
   return { pendoDetected: true, checks: checks };
 }
@@ -2586,7 +2266,7 @@ function runPendoSetupAssistant() {
       "Pendo is initialized without visitor or account metadata. Without metadata, you can't segment users by role, plan, company, or other attributes.\n  FIX: Add metadata fields to your pendo.initialize() call:\n    pendo.initialize({\n      visitor: { id: 'USER_ID', email: 'user@example.com', role: 'admin', created_at: '2024-01-15' },\n      account: { id: 'ACCOUNT_ID', name: 'Acme Corp', plan_level: 'enterprise', is_paying: true }\n    });\n  Start with: email, role, plan_level, created_at, is_paying — these cover 80% of segmentation needs.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
   }
 
-  // CNAME recommendation — check if using default Pendo domains
+  // CNAME recommendation — only show if blocking evidence detected
   try {
     var cnameContentHost = null;
     var cnameDataHost = null;
@@ -2611,9 +2291,19 @@ function runPendoSetupAssistant() {
     var usingDefaultCdn = (!cnameContentHost || cnameContentHost.indexOf("pendo.io") !== -1 || cnameContentHost.indexOf("pendo-") !== -1) &&
                            (!cnameDataHost || cnameDataHost.indexOf("pendo.io") !== -1);
 
+    // Only recommend CNAME if blocking evidence detected
     if (usingDefaultCdn) {
-      recommend("tip", "No CNAME configured",
-        "Pendo is loading from default CDN domains (cdn.pendo.io, data.pendo.io). Ad blockers and corporate firewalls commonly block *.pendo.io.\n  FIX: Configure a CNAME to route Pendo through your own domain (e.g. content.product.yourcompany.com and data.product.yourcompany.com). This makes Pendo traffic appear as first-party, bypassing most ad blockers and firewall restrictions.\n  Contact your Pendo CSM to enable CNAME for your subscription, then update your snippet and DNS.\n  Docs: https://support.pendo.io/hc/en-us/articles/360043539891-CNAME-for-Pendo");
+      // Check perf entries for blocked Pendo requests (transferSize === 0)
+      var perfEntries = performance.getEntriesByType ? performance.getEntriesByType("resource") : [];
+      var blockedPendoResources = perfEntries.filter(function(e) {
+        return e.name && (e.name.indexOf("pendo.io") !== -1 || e.name.indexOf("pendo-") !== -1) &&
+               e.transferSize === 0 && e.decodedBodySize === 0;
+      });
+
+      if (blockedPendoResources.length > 0) {
+        recommend("tip", "No CNAME configured",
+          "Pendo is loading from default CDN domains (cdn.pendo.io, data.pendo.io). Ad blockers and corporate firewalls commonly block *.pendo.io.\n  FIX: Configure a CNAME to route Pendo through your own domain (e.g. content.product.yourcompany.com and data.product.yourcompany.com). This makes Pendo traffic appear as first-party, bypassing most ad blockers and firewall restrictions.\n  Contact your Pendo CSM to enable CNAME for your subscription, then update your snippet and DNS.\n  Docs: https://support.pendo.io/hc/en-us/articles/360043539891-CNAME-for-Pendo");
+      }
     }
   } catch (_) {}
 
@@ -2624,16 +2314,7 @@ function runPendoSetupAssistant() {
 // ---------------------------------------------------------------------------
 // Feedback System
 // ---------------------------------------------------------------------------
-// Help Tour Button — manual tour launch
-(function initHelpTourBtn() {
-  const btn = document.getElementById("help-tour-btn");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    if (typeof startTour === "function") startTour();
-  });
-})();
 
-// ---------------------------------------------------------------------------
 (function initFeedback() {
   const feedbackBtn = document.getElementById("feedback-btn");
   const feedbackModal = document.getElementById("feedback-modal");
