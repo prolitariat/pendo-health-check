@@ -279,16 +279,18 @@ let lastSetupData = null;
 
     // Auto-expand if there's room — called after checks render.
     // Strategy: open the drawer, then check if the container overflows.
-    // If it does, close it back. Simple and bulletproof.
+    // If it does, close it back.
     window.__autoExpandDevTools = function() {
       var scrollContainer = document.getElementById("panel-report");
       if (!scrollContainer) return;
       openDrawer();
-      // Give layout a tick to settle
+      // Double rAF ensures layout reflow is complete before measuring
       requestAnimationFrame(function() {
-        if (scrollContainer.scrollHeight > scrollContainer.clientHeight) {
-          closeDrawer();
-        }
+        requestAnimationFrame(function() {
+          if (scrollContainer.scrollHeight > scrollContainer.clientHeight + 2) {
+            closeDrawer();
+          }
+        });
       });
     };
   }
