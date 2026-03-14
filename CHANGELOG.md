@@ -2,105 +2,104 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [2.2.0] — 2026-03-14
+
+### Changed
+- **Single-view layout** — removed two-tab layout (Report + Tools). Everything is now in one scrollable panel with no tab switching. Developer Tools are in a collapsible drawer that auto-expands when vertical space allows.
+- **Loading transition** — popup now shows "Analyzing Pendo installation…" with a pulsing dot while checks run, then fades in results (200ms ease-in). Eliminates the empty-then-snap-in feel.
+- **Background badge management** — badge now clears automatically when you navigate to a new page (no stale data). Updates correctly when switching between tabs. Background service worker caches results per tab.
+- **Red vs yellow badge** — red badge for critical failures, yellow for warnings only.
+- **Removed onboarding tour** — was adding cognitive load, not reducing it.
+- **Removed redundant summary line** — grade card already shows the breakdown.
+- **Plain language** — replaced SDK jargon (`window.pendo is present`, `pendo.isReady() returned true`) with plain text (`Pendo is installed on this page`, `Pendo is initialized and running`).
+- **Feature Flags narrowed** — only surfaces disabled user-facing features (guides off, analytics off, etc.). Removed debugging mode and SDK config internals that don't help admins.
+- **Pass-state noise suppressed** — API Key, Data Host, and Pendo Instances checks only appear when there's a problem.
+
+### Fixed
+- **CSP false positives** — `transferSize === 0` for cross-origin resources is timing redaction (security spec), not evidence of CSP blocking. Added `pendo.isReady()` gate: if Pendo is working, don't flag CSP as blocking.
+- **CSP strict-dynamic awareness** — when `strict-dynamic` is present in `script-src`, host-based allowlists are irrelevant. Pendo's snippet is typically nonced.
+- **CSP Report-Only detection** — `Content-Security-Policy-Report-Only` headers are non-enforcing. Downgrades issues from these to info-level with a `[Report-Only]` prefix.
+- **Data Transmission false positive** — same `transferSize === 0` bug in a separate code path. Now checks `pendo.isReady()` first.
+- **Pendo Instances false positive** — `script[src*="pendo"]` was matching guide content scripts, debugger scripts, and designer scripts. Now filters to agent-only scripts.
+- **CNAME recommendation noise** — was firing on every non-CNAME site. Now gated on actual Pendo functionality and ad blocker detection.
+- **Snippet analysis wrong script** — same broad selector was evaluating content/tooling scripts instead of the agent.
+- **Dead Pendo support links** — replaced 3 dead article URLs (`21362607043355`, `21397042498571`, `360032207332`) with live replacements.
+- **sendMessage error** — silenced "Receiving end does not exist" error when MV3 service worker is asleep during popup load.
+
+### Added
+- `tabs` permission for badge clearing on navigation and tab switching.
+
+## [2.1.0] — 2026-03-13
+
+### Changed
+- **Trimmed report** — removed 6 checks that added noise without diagnostic value, merged ad blocker detection into Data Transmission.
+- **Data Transmission rewrite** — single check that diagnoses blocked requests, ad blockers, and network failures coherently.
+
 ## [2.0.0] — 2026-03-12
 
 ### Changed
-- **Unified Report view** — Health Check and Setup Assistant merged into a single "Report" tab. All runtime checks and setup analysis findings appear in one prioritized list. No more switching between tabs to understand your Pendo installation.
-- **Installation Grade** — every popup open now shows an instant letter grade (A–F) computed from runtime health checks and setup analysis. Graded on a curve so F means "badly broken" — fail/error = −10, warn = −3, info/tip = −1; thresholds: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F < 40.
-- **Two-tab layout** — simplified from three tabs (Health Check, Setup Assistant, Tools) to two (Report, Tools). The Report tab is the default landing view.
-- **Icon badge** — the extension icon now shows a red badge with the count of critical issues, or an orange badge for warnings. Clears automatically when no issues are detected.
-- **Inline Validate results** — Validate Install and Validate Environment output now renders inline in the Tools tab instead of requiring DevTools (Cmd+Option+J).
-- **Onboarding tour updated** — reduced from 5 steps to 4 steps to match the new two-tab layout.
-- **Updated Pendo doc link** — replaced dead `support.pendo.io/hc/en-us/articles/21374706009883` link with working Developer's Guide URL.
+- **Unified Report view** — Health Check and Setup Assistant merged into a single "Report" tab with one prioritized list.
+- **Installation Grade** — instant letter grade (A–F) from runtime checks and setup analysis.
+- **Two-tab layout** — simplified from three tabs to two (Report, Tools).
+- **Icon badge** — shows issue count on the extension icon.
+- **Inline Validate results** — output renders in the popup, no DevTools needed.
 
 ### Fixed
-- **Debugger toggle only works once** — replaced unreliable DOM element detection with `data-pendo-debug-active` attribute on `document.body` that persists between `executeScript` injections.
+- **Debugger toggle** — replaced DOM detection with `data-pendo-debug-active` attribute.
 
 ## [1.6.0] — 2026-03-12
 
 ### Changed
-- **Copy Issues promoted to Health Check tab** — the "Copy Issues to Clipboard" button is now pinned at the bottom of the Health Check tab (the first tab you see), rather than buried in the Tools tab. One click copies every problem and fix as plain text.
-- **Smarter network request messaging** — when all Pendo requests are blocked (CORS, ad blocker, firewall), the extension shows a single diagnosis instead of repeating every individual failure count.
-- **Tab layout redesigned** — tabs reordered: Health Check → Setup Assistant → Tools. The Tools tab is now focused solely on interactive Pendo commands (debugger toggle, validate install, validate environment).
-- **Onboarding tour updated** — tour steps reordered to match the new tab layout; Copy Issues step now highlights the Health Check tab button.
-
-### Fixed
-- **CI workflow stabilized** — GitHub Actions QA workflow switched to manual-only (`workflow_dispatch`). Puppeteer tests require Chrome with extension sideloading, which standard GH Actions runners don't support.
-- **Defensive `renderSetup` guards** — Setup Assistant renderer handles partial or malformed data objects without crashing.
-- **Tour arrow positioning** — fixed CSS for tour tooltip arrows.
+- Copy Issues promoted to Health Check tab.
+- Smarter network request messaging.
+- Tab layout redesigned.
 
 ### Removed
-- **Easy Mode / Glassmorphism UI** — experimental feature removed before release. Chrome extension popups are opaque OS-level windows, making `backdrop-filter: blur()` ineffective.
+- Easy Mode / Glassmorphism UI.
 
 ## [1.5.0] — 2026-03-07
 
 ### Added
-- **QA Test Harness** (`test-harness.html`) — self-hosted HTML page for regression testing every extension check without a live Pendo installation. 8 preset scenarios (Healthy, Broken, CSP Blocked, GDPR Waiting, CNAME, Ad Blocked, Partial Setup, React SPA) with granular sidebar toggles for Pendo agent state, identity/metadata, network/hosting, CSP modes, CMP/GDPR platforms, EU locale, and framework globals.
-- **First-Run Onboarding Tour** — 5-step spotlight tour on first install covering each tab and the copy button. Persisted via `chrome.storage.local`. Supports keyboard navigation (arrows, Escape, Enter).
-- **Copy Button Pulse** — when the health check detects warnings or failures, the "Copy Issues" button pulses pink (3 cycles) to draw attention.
-- `storage` permission added to `manifest.json` for tour state persistence.
+- QA Test Harness (`test-harness.html`) with 8 preset scenarios.
+- First-Run Onboarding Tour (5-step spotlight).
+- Copy Button Pulse animation.
 
 ## [1.4.0] — 2026-03-07
 
 ### Added
-- **CNAME-Aware Host Detection** — Setup Assistant recognizes custom CNAME domains for Pendo CDN and data endpoints by inspecting `performance.getEntriesByType` and `pendo._config`.
-- **CMP / GDPR Consent Detection** — detects 6 Consent Management Platforms (OneTrust, Cookiebot, Didomi, Osano, TrustArc, TCF v2.0), generic cookie banners, and EU locale. Reports platform, readiness state, and potential Pendo blocking.
-- **CORS Error Detection** — inspects resource timing entries for `transferSize === 0` and `responseStatus === 0` (CORS fingerprint). Warns with actionable remediation.
-- **Priority-Sorted Clipboard** — clipboard report now sorts issues: critical failures first, then warnings, then passes.
+- CNAME-aware host detection.
+- CMP / GDPR consent detection (6 platforms).
+- CORS error detection.
+- Priority-sorted clipboard.
 
 ## [1.3.4] — 2026-03-06
 
 ### Changed
-- **Complete clipboard remediation rewrite.** Every check now includes context-aware remediation text. CSP violations include per-directive fix instructions with auto-detected subscription IDs. Reports structured as plain text suitable for Slack, Jira, or email.
+- Complete clipboard remediation rewrite with context-aware fix text.
 
-## [1.3.3] — 2026-03-06
-
-### Changed
-- Use Pendo yellow (`#FEF484`) in dark mode for warnings and badges.
-
-## [1.3.2] — 2026-03-06
-
-### Changed
-- Unified hover states across all interactive elements.
-
-## [1.3.1] — 2026-03-06
+## [1.3.1 – 1.3.3] — 2026-03-06
 
 ### Added
-- Full keyboard accessibility: `focus-visible` rings on all interactive elements.
-- ARIA `role="tablist"` / `role="tab"` / `role="tabpanel"` attributes.
-- Section-level keyboard navigation.
-- Centered equal-width tab layout.
-- Tab hover states: pink background wash + underline preview on inactive tabs.
+- Full keyboard accessibility (focus-visible, ARIA roles).
+- Pendo yellow in dark mode.
+- Unified hover states.
 
 ## [1.2.0] — 2026-03-05
 
 ### Added
-- **Pendo Service Status** — live service status badge from `status.pendo.io` with auto-detected realm (US/EU/US1/JP).
-- **Network Request Validation** (Check #10) — inspects `performance.getEntriesByType('resource')` for Pendo network traffic.
-- **Feature Flag Detection** (Check #11) — inspects `pendo.getOptions()` for non-default settings.
-- **Per-Directive CSP Fix Instructions** — maps blocked Pendo domains to specific CSP directives with copy-pasteable fixes. Auto-detects subscription IDs.
-- **Tools Tab** — third tab with Pendo console commands: Validate Install, Validate Environment, Enable/Disable Debugger.
-- **Smart Remediation** — copied reports include per-check remediation suggestions from curated `REMEDIATION_MAP`.
-- **Feedback System** — PII-scrubbed feedback via GitHub Issues or email.
+- Pendo Service Status (live from status.pendo.io).
+- Network Request Validation (Check #10).
+- Feature Flag Detection (Check #11).
+- Per-directive CSP fix instructions.
+- Tools tab with Pendo console commands.
+- Feedback system with PII scrubbing.
 
 ## [1.1.0] — 2026-03-04
 
 ### Added
-- Setup Assistant tab with framework detection, snippet analysis, initialization audit, CSP analysis, and metadata field validation.
-- Copy Report functionality for Setup Assistant.
-- Background pre-loading of Setup Assistant results.
+- Setup Assistant tab (framework detection, snippet analysis, CSP analysis, metadata validation).
 
 ## [1.0.0] — 2026-03-03
 
 ### Added
-- Initial release.
-- 9 health checks: Pendo Agent Loaded, Pendo Ready, Visitor ID, Account ID, Active Guides, Pendo Instances, Agent Version, API Key, Data Host.
-- Tab-based UI with Health Check tab.
-- Copy Results to clipboard.
-- Manifest V3 with `activeTab` and `scripting` permissions.
-
-## Post-1.5.0 Patches
-
-### [1.5.0+fix1] — 2026-03-07
-- **Health Check single-column layout** — removed 2-column CSS grid that created dead space on odd item counts.
-- **Fixed header/tabs with scrollable panels** — restructured from `max-height + overflow-y` on body to flex column layout. Header, tab bar, and footer are pinned; only the active tab panel scrolls.
+- Initial release with 9 health checks, tab-based UI, and copy results.
