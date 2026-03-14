@@ -277,27 +277,19 @@ let lastSetupData = null;
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDrawer(); }
     });
 
-    // Auto-expand if there's room — called after checks render
+    // Auto-expand if there's room — called after checks render.
+    // Strategy: open the drawer, then check if the container overflows.
+    // If it does, close it back. Simple and bulletproof.
     window.__autoExpandDevTools = function() {
       var scrollContainer = document.getElementById("panel-report");
       if (!scrollContainer) return;
-      // Ensure drawer is collapsed so we get a clean content-only measurement
-      closeDrawer();
-      // scrollHeight with drawer closed = content height without tools body
-      var contentHeight = scrollContainer.scrollHeight;
-      // Temporarily show tools body to measure it
-      body.style.display = "block";
-      body.style.visibility = "hidden";
-      body.style.position = "absolute";
-      var toolsHeight = body.offsetHeight;
-      body.style.position = "";
-      body.style.visibility = "";
-      body.style.display = "none";
-      // Available space = container visible area minus current content
-      var available = scrollContainer.clientHeight - contentHeight;
-      if (available >= toolsHeight) {
-        openDrawer();
-      }
+      openDrawer();
+      // Give layout a tick to settle
+      requestAnimationFrame(function() {
+        if (scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+          closeDrawer();
+        }
+      });
     };
   }
 })();
