@@ -3,7 +3,7 @@
   "name": "Pendo Health Check",
   "version": "2.2.0",
   "description": "Instant Pendo installation grade with prioritized diagnostics, one-click issue export, inline debugger, and live service status.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -19,18 +19,5 @@
   },
   "background": {
     "service_worker": "background.js"
-  },
-  "content_scripts": [
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["probe-bridge.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["probe-main.js"],
-      "world": "MAIN",
-      "run_at": "document_idle"
-    }
-  ]
+  }
 }
