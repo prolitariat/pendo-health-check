@@ -279,21 +279,24 @@ let lastSetupData = null;
 
     // Auto-expand if there's room — called after checks render
     window.__autoExpandDevTools = function() {
-      // Measure available space: popup height minus current scroll height of content
       var scrollContainer = document.getElementById("panel-report");
       if (!scrollContainer) return;
-      var slack = scrollContainer.clientHeight - scrollContainer.scrollHeight;
-      // Temporarily show body to measure its height
+      // Ensure drawer is collapsed so we get a clean content-only measurement
+      closeDrawer();
+      // scrollHeight with drawer closed = content height without tools body
+      var contentHeight = scrollContainer.scrollHeight;
+      // Temporarily show tools body to measure it
       body.style.display = "block";
       body.style.visibility = "hidden";
+      body.style.position = "absolute";
       var toolsHeight = body.offsetHeight;
+      body.style.position = "";
       body.style.visibility = "";
-      if (slack >= toolsHeight) {
-        // Enough room — keep it open
+      body.style.display = "none";
+      // Available space = container visible area minus current content
+      var available = scrollContainer.clientHeight - contentHeight;
+      if (available >= toolsHeight) {
         openDrawer();
-      } else {
-        // Not enough room — collapse
-        closeDrawer();
       }
     };
   }
