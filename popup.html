@@ -894,6 +894,260 @@
       line-height: 1.5;
     }
 
+    /* === v3: Header grade pill + score-diff badge === */
+    .header-grade {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .grade-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      border: none;
+      color: #fafafa;
+      cursor: default;
+      font-family: inherit;
+    }
+    .grade-pill.grade-a { color: #4ade80; }
+    .grade-pill.grade-b { color: #93c5fd; }
+    .grade-pill.grade-c { color: var(--pendo-highlight); }
+    .grade-pill.grade-d { color: #fdba74; }
+    .grade-pill.grade-f { color: #fca5a5; }
+    .score-diff-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      background: rgba(255,255,255,0.08);
+      color: #fafafa;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
+    .score-diff-badge:hover { background: rgba(255,255,255,0.16); }
+    .score-diff-badge.up { color: #4ade80; }
+    .score-diff-badge.down { color: #fca5a5; }
+    .score-diff-badge.flat { color: #d4d4d8; }
+
+    /* === v3: Section titles === */
+    .section-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted-foreground);
+      padding: 8px 2px 4px;
+    }
+
+    /* === v3: Quick Copy chips === */
+    #quick-copy {
+      display: none;
+      padding: 0 0 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .chip-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 0;
+    }
+    .chip {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      padding: 6px 9px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--background);
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      transition: background 0.1s, border-color 0.1s;
+      min-width: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .chip:hover:not(.empty) {
+      background: var(--pendo-pink-light);
+      border-color: var(--pendo-pink-mid);
+    }
+    .chip:focus-visible {
+      outline-offset: -1px;
+    }
+    .chip-label {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted-foreground);
+      line-height: 1.2;
+    }
+    .chip-value {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 11px;
+      color: var(--foreground);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.4;
+    }
+    .chip.empty { cursor: default; }
+    .chip.empty .chip-value { color: var(--muted-foreground); opacity: 0.55; }
+    .chip.empty:hover { background: var(--background); border-color: var(--border); }
+    .chip-copied-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--pendo-pink-mid);
+      color: var(--pendo-pink);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s;
+    }
+    .chip.copied .chip-copied-overlay { opacity: 1; }
+    .more-chips-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 4px 2px;
+      margin-top: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+      user-select: none;
+    }
+    .more-chips-toggle:hover { color: var(--foreground); }
+    .more-chips-toggle.open .more-chevron { transform: rotate(90deg); }
+    .more-chevron {
+      font-size: 9px;
+      transition: transform 0.15s;
+      width: 10px;
+      text-align: center;
+      display: inline-block;
+    }
+    #more-chip-grid { margin-top: 6px; }
+
+    /* === v3: Diagnostics drawer wraps the existing checks list === */
+    #diagnostics-drawer {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin-top: 4px;
+    }
+    #diagnostics-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 4px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted-foreground);
+      letter-spacing: -0.01em;
+      transition: background 0.1s;
+    }
+    #diagnostics-toggle:hover { background: var(--muted); }
+    #diagnostics-toggle.open .setup-chevron { transform: rotate(90deg); }
+    #diagnostics-body { display: none; padding: 0 0 4px; }
+    #diagnostics-drawer.open #diagnostics-body { display: block; }
+    .diag-issue-count {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted-foreground);
+      font-weight: 500;
+    }
+
+    /* === v3: Copy Issues format row === */
+    .copy-format-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 0 6px;
+    }
+    .copy-format-label {
+      font-size: 11px;
+      color: var(--muted-foreground);
+    }
+    .copy-format-select {
+      padding: 4px 8px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--background);
+      color: var(--foreground);
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    /* === v3: Score history popover === */
+    #score-history-popover {
+      display: none;
+      position: absolute;
+      top: 44px;
+      right: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      z-index: 50;
+      min-width: 220px;
+      font-size: 11px;
+    }
+    #score-history-popover .popover-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted-foreground);
+      margin-bottom: 6px;
+    }
+    .history-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--muted);
+    }
+    .history-row:last-child { border-bottom: none; }
+    .history-grade {
+      font-weight: 700;
+      width: 16px;
+      flex-shrink: 0;
+    }
+    .history-when {
+      color: var(--muted-foreground);
+      font-size: 10px;
+      flex: 1;
+    }
+    .history-score {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      flex-shrink: 0;
+    }
+
+    /* v3: hide legacy in-panel grade card; the grade now lives in the header */
+    #grade-card { display: none !important; }
+
   </style>
 </head>
 <body>
@@ -903,6 +1157,10 @@
       <img class="header-icon" src="icons/icon48.png" alt="">
       <span class="header-text">Pendo Health Check</span>
     </div>
+    <div class="header-grade">
+      <button id="score-diff" class="score-diff-badge" style="display:none" aria-label="Score change since last visit"></button>
+      <span id="grade-pill" class="grade-pill" style="display:none" aria-label="Installation grade"></span>
+    </div>
   </div>
 
   <!-- Page URL — hidden; value used by clipboard report and feedback -->
@@ -910,6 +1168,20 @@
 
   <!-- Pendo Status Section -->
   <div id="pendo-status" style="display:none; flex-shrink: 0;"></div>
+
+  <!-- v3: Quick Copy chips — one-click values for fast handoff -->
+  <div id="quick-copy">
+    <div class="section-title">Quick Copy</div>
+    <div id="chip-grid" class="chip-grid"></div>
+    <div id="more-chips-toggle" class="more-chips-toggle" role="button" tabindex="0" aria-expanded="false">
+      <span class="more-chevron">▶</span>
+      <span>More</span>
+    </div>
+    <div id="more-chip-grid" class="chip-grid" style="display:none"></div>
+  </div>
+
+  <!-- v3: Score history popover (toggled by score-diff badge) -->
+  <div id="score-history-popover"></div>
 
   <!-- Tab bar removed — single scrollable view -->
 
@@ -944,6 +1216,7 @@
       <span class="loading-dot"></span> Analyzing Pendo installation…
     </div>
     <div id="report-content" style="opacity:0;transition:opacity 0.2s ease-in">
+      <!-- Legacy grade card — kept for popup.js compatibility but hidden via CSS in v3 -->
       <div id="grade-card" style="display:none">
         <div id="grade-letter">—</div>
         <div id="grade-details">
@@ -951,7 +1224,17 @@
           <div id="grade-summary"></div>
         </div>
       </div>
-      <div id="checks-list"></div>
+      <!-- v3: Diagnostics drawer — collapsed by default; user opens "Why this grade" when they want detail -->
+      <div id="diagnostics-drawer">
+        <div id="diagnostics-toggle" tabindex="0" role="button" aria-expanded="false">
+          <span class="setup-chevron">▶</span>
+          <span>Why this grade</span>
+          <span class="diag-issue-count" id="diag-issue-count"></span>
+        </div>
+        <div id="diagnostics-body">
+          <div id="checks-list"></div>
+        </div>
+      </div>
 
     <!-- Developer Tools — collapsible drawer -->
     <div id="dev-tools-drawer" style="margin-top:4px;border-top:1px solid var(--border)">
@@ -1002,11 +1285,18 @@
 
   <!-- Copy Issues — pinned outside scroll area so it's always visible -->
   <div id="health-copy-bar">
+    <div class="copy-format-row">
+      <span class="copy-format-label">Format:</span>
+      <select id="copy-format-select" class="copy-format-select" aria-label="Copy format">
+        <option value="plain">Plain text</option>
+        <option value="ai">AI prompt</option>
+      </select>
+    </div>
     <button class="tool-btn" id="tool-copy-issues" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
       <span class="tool-icon" style="font-size:18px">📋</span>
       <div style="text-align:left;flex:1">
         <span class="tool-label">Copy Issues to Clipboard</span>
-        <span class="tool-desc" style="display:block">Plain language problems &amp; fixes — paste into Slack, Jira, etc.</span>
+        <span class="tool-desc" style="display:block">Plain text or AI prompt — paste into Slack, Jira, or a chat</span>
       </div>
     </button>
   </div>

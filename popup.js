@@ -461,6 +461,8 @@ function computeGrade(hcChecks, setupIssues) {
 function renderGradeCard(grade) {
   var card = document.getElementById("grade-card");
   if (!card) return;
+  // v3: legacy card kept for compatibility but hidden via CSS — still populate
+  // its fields in case anything else references them.
   card.style.display = "flex";
   var letterEl = document.getElementById("grade-letter");
   letterEl.textContent = grade.letter;
@@ -468,12 +470,319 @@ function renderGradeCard(grade) {
   document.getElementById("grade-score").textContent = grade.score + " / 100";
   document.getElementById("grade-summary").textContent = grade.summary;
 
+  // v3: surface the grade in the header pill (the visible representation)
+  var pill = document.getElementById("grade-pill");
+  if (pill) {
+    pill.textContent = grade.letter;
+    pill.className = "grade-pill " + grade.cssClass;
+    pill.style.display = "inline-flex";
+    pill.title = grade.score + " / 100 · " + grade.summary;
+  }
+
   // Reveal results: hide loading indicator, fade in report content
   var loading = document.getElementById("report-loading");
   var content = document.getElementById("report-content");
   if (loading) loading.style.display = "none";
   if (content) content.style.opacity = "1";
 }
+
+// ===========================================================================
+// v3: Quick Copy chips + score history + AI prompt mode
+// All v3-specific UI lives below so the legacy code above is untouched.
+// ===========================================================================
+
+var V3_CHIPS_MAIN = [
+  { key: "visitorId",      label: "Visitor ID" },
+  { key: "accountId",      label: "Account ID" },
+  { key: "subscriptionId", label: "Subscription ID" },
+  { key: "sessionId",      label: "Session ID" },
+  { key: "version",        label: "Agent Version" },
+  { key: "dataHost",       label: "Data Host" },
+  { key: "realm",          label: "Realm" },
+  { key: "activeGuides",   label: "Active Guides", format: "number" },
+  { key: "framework",      label: "Framework" },
+  { key: "ready",          label: "Ready",          format: "boolean" }
+];
+var V3_CHIPS_MORE = [
+  { key: "apiKey",      label: "API Key" },
+  { key: "contentHost", label: "Content Host" }
+];
+
+function v3FormatChipValue(value, format) {
+  if (value === null || value === undefined || value === "") return null;
+  if (format === "number") {
+    if (typeof value === "number") return String(value);
+    var n = parseInt(value, 10);
+    return isNaN(n) ? String(value) : String(n);
+  }
+  if (format === "boolean") return value ? "yes" : "no";
+  return String(value);
+}
+
+function v3RenderChip(spec, values) {
+  var raw = values[spec.key];
+  var display = v3FormatChipValue(raw, spec.format);
+  var btn = document.createElement("button");
+  btn.className = "chip" + (display === null ? " empty" : "");
+  btn.type = "button";
+  btn.setAttribute("data-key", spec.key);
+
+  var labelEl = document.createElement("span");
+  labelEl.className = "chip-label";
+  labelEl.textContent = spec.label;
+
+  var valueEl = document.createElement("span");
+  valueEl.className = "chip-value";
+  valueEl.textContent = display !== null ? display : "—";
+  valueEl.title = display !== null ? display : "Not available on this page";
+
+  var overlay = document.createElement("span");
+  overlay.className = "chip-copied-overlay";
+  overlay.textContent = "Copied";
+
+  btn.appendChild(labelEl);
+  btn.appendChild(valueEl);
+  btn.appendChild(overlay);
+
+  if (display !== null) {
+    btn.addEventListener("click", function () {
+      navigator.clipboard.writeText(display).then(function () {
+        btn.classList.add("copied");
+        try { trackEvent("copy_chip", { key: spec.key }); } catch (_) {}
+        setTimeout(function () { btn.classList.remove("copied"); }, 900);
+      });
+    });
+  } else {
+    btn.setAttribute("aria-disabled", "true");
+  }
+
+  return btn;
+}
+
+function v3RenderQuickCopy(values) {
+  var section = document.getElementById("quick-copy");
+  var mainGrid = document.getElementById("chip-grid");
+  var moreGrid = document.getElementById("more-chip-grid");
+  if (!section || !mainGrid || !moreGrid) return;
+
+  mainGrid.innerHTML = "";
+  moreGrid.innerHTML = "";
+  V3_CHIPS_MAIN.forEach(function (spec) { mainGrid.appendChild(v3RenderChip(spec, values || {})); });
+  V3_CHIPS_MORE.forEach(function (spec) { moreGrid.appendChild(v3RenderChip(spec, values || {})); });
+
+  section.style.display = "block";
+}
+
+// --- v3: score history (chrome.storage.local, last 5 per hostname+path) ---
+
+function v3HistoryKey(urlString) {
+  try {
+    var u = new URL(urlString);
+    return "score_history::" + u.hostname + u.pathname;
+  } catch (_) {
+    return "score_history::" + String(urlString || "unknown");
+  }
+}
+
+function v3LoadHistory(urlString, cb) {
+  var key = v3HistoryKey(urlString);
+  try {
+    chrome.storage.local.get(key, function (result) {
+      var arr = (result && result[key]) || [];
+      cb(arr, key);
+    });
+  } catch (_) {
+    cb([], key);
+  }
+}
+
+function v3SaveHistory(urlString, entry, cb) {
+  v3LoadHistory(urlString, function (existing, key) {
+    var next = [entry].concat(existing).slice(0, 5);
+    var update = {};
+    update[key] = next;
+    try {
+      chrome.storage.local.set(update, function () { if (cb) cb(next); });
+    } catch (_) {
+      if (cb) cb(next);
+    }
+  });
+}
+
+function v3FormatRelative(ts) {
+  if (!ts) return "";
+  var diffMs = Date.now() - ts;
+  var minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return minutes + "m ago";
+  var hours = Math.round(minutes / 60);
+  if (hours < 24) return hours + "h ago";
+  var days = Math.round(hours / 24);
+  if (days < 14) return days + "d ago";
+  return new Date(ts).toLocaleDateString();
+}
+
+function v3RenderScoreDiff(currentScore, history) {
+  var btn = document.getElementById("score-diff");
+  if (!btn) return;
+  // history[0] is the just-saved current entry; history[1] is the previous visit
+  var prev = history && history.length > 1 ? history[1] : null;
+  if (!prev || typeof prev.score !== "number") { btn.style.display = "none"; return; }
+  var delta = currentScore - prev.score;
+  var arrow, cls;
+  if (delta > 0) { arrow = "↑"; cls = "up"; }
+  else if (delta < 0) { arrow = "↓"; cls = "down"; }
+  else { arrow = "·"; cls = "flat"; }
+  btn.className = "score-diff-badge " + cls;
+  btn.textContent = arrow + " " + (delta > 0 ? "+" : "") + delta;
+  btn.title = "Previous: " + prev.letter + " (" + prev.score + ") · " + v3FormatRelative(prev.timestamp);
+  btn.style.display = "inline-flex";
+  // Cache history for popover render
+  window.__v3LastHistory = history;
+}
+
+function v3RenderHistoryPopover(history) {
+  var pop = document.getElementById("score-history-popover");
+  if (!pop) return;
+  pop.innerHTML = "";
+  var title = document.createElement("div");
+  title.className = "popover-title";
+  title.textContent = "Score history (this page)";
+  pop.appendChild(title);
+  if (!history || history.length === 0) {
+    var empty = document.createElement("div");
+    empty.textContent = "No prior visits recorded.";
+    empty.style.color = "var(--muted-foreground)";
+    pop.appendChild(empty);
+    return;
+  }
+  history.forEach(function (entry, idx) {
+    var row = document.createElement("div");
+    row.className = "history-row";
+    var g = document.createElement("span");
+    g.className = "history-grade " + (entry.cssClass || "");
+    g.textContent = entry.letter || "?";
+    var when = document.createElement("span");
+    when.className = "history-when";
+    when.textContent = (idx === 0 ? "now" : v3FormatRelative(entry.timestamp));
+    var score = document.createElement("span");
+    score.className = "history-score";
+    score.textContent = entry.score + "/100";
+    row.appendChild(g);
+    row.appendChild(when);
+    row.appendChild(score);
+    pop.appendChild(row);
+  });
+}
+
+function v3PersistAndRenderScore(finalGrade) {
+  var pageUrl = (document.getElementById("page-url") || {}).textContent || "";
+  if (!pageUrl) return;
+  var entry = {
+    score: finalGrade.score,
+    letter: finalGrade.letter,
+    cssClass: finalGrade.cssClass,
+    timestamp: Date.now(),
+    url: pageUrl
+  };
+  v3SaveHistory(pageUrl, entry, function (history) {
+    v3RenderScoreDiff(finalGrade.score, history);
+  });
+}
+
+// --- v3: AI prompt builder (wraps the plain-text report) ---
+
+function v3BuildAIPromptReport() {
+  var plain = "";
+  try { plain = buildIssuesReport(); } catch (e) { plain = "(report unavailable: " + e.message + ")"; }
+  var preamble = [
+    "You are debugging a Pendo installation. Below is a diagnostic report from",
+    "the Pendo Health Check Chrome extension (a side-project tool, not an",
+    "official Pendo product). Read it carefully, then:",
+    "",
+    "1. Identify the most likely root cause for each finding.",
+    "2. Order your fixes by severity (PROBLEM > WARNING > INFO).",
+    "3. For each fix, give a concrete code change, config change, or vendor-side",
+    "   action (CMP, CSP, etc.). Cite the documentation URLs already in the",
+    "   report. Do not invent new URLs.",
+    "4. Flag any finding where you would want more information before",
+    "   making a recommendation.",
+    "",
+    "── Report ──"
+  ].join("\n");
+  return preamble + "\n" + plain;
+}
+
+// --- v3: wireup for drawers, toggles, popover, and format-select persistence ---
+
+(function v3Wireup() {
+  // Diagnostics drawer ("Why this grade")
+  var diagToggle = document.getElementById("diagnostics-toggle");
+  var diagDrawer = document.getElementById("diagnostics-drawer");
+  if (diagToggle && diagDrawer) {
+    function toggleDiag() {
+      var open = diagDrawer.classList.toggle("open");
+      diagToggle.classList.toggle("open", open);
+      diagToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    diagToggle.addEventListener("click", toggleDiag);
+    diagToggle.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDiag(); }
+    });
+  }
+
+  // More chips toggle
+  var moreToggle = document.getElementById("more-chips-toggle");
+  var moreGrid = document.getElementById("more-chip-grid");
+  if (moreToggle && moreGrid) {
+    function toggleMore() {
+      var open = moreGrid.style.display !== "grid";
+      moreGrid.style.display = open ? "grid" : "none";
+      moreToggle.classList.toggle("open", open);
+      moreToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    moreToggle.addEventListener("click", toggleMore);
+    moreToggle.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleMore(); }
+    });
+  }
+
+  // Score-diff badge → toggle history popover
+  var diffBtn = document.getElementById("score-diff");
+  var pop = document.getElementById("score-history-popover");
+  if (diffBtn && pop) {
+    diffBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (pop.style.display === "block") {
+        pop.style.display = "none";
+        return;
+      }
+      v3RenderHistoryPopover(window.__v3LastHistory || []);
+      pop.style.display = "block";
+    });
+    // Click anywhere else closes the popover
+    document.addEventListener("click", function (e) {
+      if (pop.style.display === "block" && !pop.contains(e.target) && e.target !== diffBtn) {
+        pop.style.display = "none";
+      }
+    });
+  }
+
+  // Copy format select: remember last choice across popup opens
+  var fmtSel = document.getElementById("copy-format-select");
+  if (fmtSel) {
+    try {
+      chrome.storage.local.get("v3CopyFormat", function (r) {
+        if (r && r.v3CopyFormat) {
+          fmtSel.value = r.v3CopyFormat;
+        }
+      });
+    } catch (_) {}
+    fmtSel.addEventListener("change", function () {
+      try { chrome.storage.local.set({ v3CopyFormat: fmtSel.value }); } catch (_) {}
+    });
+  }
+})();
 
 // ---------------------------------------------------------------------------
 // Extract Setup Issues into Unified Format
@@ -771,8 +1080,13 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         return;
       }
       window.__lastChecks = data.checks;
+      window.__lastValues = data.values || {};
       activeTabId = "report";
       renderChecks(data.checks);
+
+      // v3: render chips immediately from the first analysis pass.
+      // Framework is unknown until setup completes; populated again below.
+      v3RenderQuickCopy(window.__lastValues);
 
       // Re-render status filtered to detected environment
       const env = detectEnvFromChecks(data.checks);
@@ -809,6 +1123,20 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               // Compute final grade from both HC and setup data
               const finalGrade = computeGrade(data.checks, setupIssues);
               renderGradeCard(finalGrade);
+
+              // v3: enrich chips with framework from setup data, then persist + diff
+              try {
+                var mergedValues = Object.assign({}, window.__lastValues || {});
+                if (setupData.framework && setupData.framework.name) {
+                  mergedValues.framework = setupData.framework.version
+                    ? (setupData.framework.name + " " + setupData.framework.version)
+                    : setupData.framework.name;
+                }
+                window.__lastValues = mergedValues;
+                v3RenderQuickCopy(mergedValues);
+              } catch (_) {}
+              try { v3PersistAndRenderScore(finalGrade); } catch (_) {}
+
               setTimeout(updateScrollFade, 50);
               // Auto-expand dev tools if there's room after full render
               setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
@@ -826,6 +1154,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
                 document.getElementById("grade-card").style.display === "none") {
               var fallbackGrade = window.__prelimGrade || computeGrade(data.checks, []);
               renderGradeCard(fallbackGrade);
+              try { v3PersistAndRenderScore(fallbackGrade); } catch (_) {}
               setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
               window.__lastTotalIssues = (fallbackGrade.criticals || 0) + (fallbackGrade.warnings || 0);
               window.__lastCriticals = fallbackGrade.criticals || 0;
@@ -1224,9 +1553,12 @@ function buildIssuesReport() {
 document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
   const btn = document.getElementById("tool-copy-issues");
   const label = btn.querySelector(".tool-label");
-  const text = buildIssuesReport();
+  // v3: respect Copy Issues format selector (plain text or AI prompt)
+  var formatSel = document.getElementById("copy-format-select");
+  var fmt = (formatSel && formatSel.value) || "plain";
+  var text = fmt === "ai" ? v3BuildAIPromptReport() : buildIssuesReport();
   navigator.clipboard.writeText(text).then(() => {
-    trackEvent("copy_report");
+    trackEvent("copy_report", { format: fmt });
     if (label) {
       label.textContent = "Copied!";
       setTimeout(() => { label.textContent = "Copy Issues to Clipboard"; }, 1500);
@@ -1240,6 +1572,23 @@ document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
 
 function runPendoHealthCheck() {
   var checks = [];
+  // v3: Aggregate raw scalar values for the Quick Copy chip grid in the popup.
+  // Each value is best-effort; missing ones surface as gray chips.
+  var values = {
+    pendoLoaded: false,
+    ready: null,
+    visitorId: null,
+    visitorAnonymous: null,
+    accountId: null,
+    version: null,
+    apiKey: null,
+    dataHost: null,
+    contentHost: null,
+    realm: null,
+    activeGuides: null,
+    subscriptionId: null,
+    sessionId: null
+  };
 
   function add(status, label, detail) {
     checks.push({ status: status, label: label, detail: String(detail) });
@@ -1248,13 +1597,15 @@ function runPendoHealthCheck() {
   // 1. Pendo agent loaded
   if (typeof window.pendo === "undefined" || !window.pendo) {
     add("fail", "Pendo Agent Loaded", "Pendo is not installed on this page");
-    return { pendoDetected: false, checks: checks };
+    return { pendoDetected: false, checks: checks, values: values };
   }
   add("pass", "Pendo Agent Loaded", "Pendo is installed on this page");
+  values.pendoLoaded = true;
 
   // 2. pendo.isReady()
   try {
     var ready = typeof pendo.isReady === "function" && pendo.isReady();
+    values.ready = !!ready;
     if (ready) {
       add("pass", "Pendo Ready", "Pendo is initialized and running");
     } else {
@@ -1271,11 +1622,14 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("visitor") && pendo.get("visitor").id) ||
       (pendo.visitorId) ||
       null;
+    values.visitorId = visitor;
     if (!visitor) {
       add("fail", "Visitor ID", "No visitor ID found");
     } else if (visitor.startsWith("VISITOR-") || visitor.startsWith("_PENDO_T_")) {
+      values.visitorAnonymous = true;
       add("warn", "Visitor ID", "Anonymous visitor: " + visitor);
     } else {
+      values.visitorAnonymous = false;
       add("pass", "Visitor ID", visitor);
     }
   } catch (e) {
@@ -1289,6 +1643,7 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("account") && pendo.get("account").id) ||
       (pendo.accountId) ||
       null;
+    values.accountId = account;
     if (!account) {
       add("warn", "Account ID", "No account ID found");
     } else {
@@ -1337,6 +1692,7 @@ function runPendoHealthCheck() {
       (pendo.getVersion && pendo.getVersion()) ||
       pendo.VERSION ||
       null;
+    values.version = version;
     if (version) {
       // Only show as check if old (major < 2), otherwise suppress
       var parts = version.split(".");
@@ -1357,6 +1713,7 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("apiKey")) ||
       (pendo.apiKey) ||
       null;
+    values.apiKey = apiKey;
     if (!apiKey) {
       add("warn", "API Key", "Could not determine API key");
     }
@@ -1415,6 +1772,19 @@ function runPendoHealthCheck() {
       add("warn", "Data Host", "Could not determine data or content host");
     }
     // Suppress pass row — CDN/CNAME routing is infrastructure detail, not admin-actionable
+    values.dataHost = detectedDataHost;
+    values.contentHost = detectedContentHost;
+    // Realm: derive from data host suffix. CNAME deployments fall back to "Custom".
+    try {
+      if (detectedDataHost) {
+        var dh = String(detectedDataHost).toLowerCase();
+        if (dh.indexOf("eu.pendo.io") !== -1) values.realm = "EU";
+        else if (dh.indexOf("us1.pendo.io") !== -1) values.realm = "US1";
+        else if (dh.indexOf("jp.pendo.io") !== -1 || dh.indexOf("jpn.pendo.io") !== -1) values.realm = "JP";
+        else if (dh.indexOf("pendo.io") !== -1) values.realm = "US";
+        else values.realm = "Custom CNAME";
+      }
+    } catch (_) {}
   } catch (e) {
     add("warn", "Data Host", "Error detecting data host: " + e.message);
   }
@@ -1527,8 +1897,33 @@ function runPendoHealthCheck() {
     add("info", "Feature Flags", "Could not inspect feature flags: " + e.message);
   }
 
+  // v3: Active guides count (chip only — not a graded check)
+  try {
+    var guides = null;
+    if (typeof pendo.getActiveGuides === "function") guides = pendo.getActiveGuides();
+    else if (Array.isArray(pendo.guides)) guides = pendo.guides;
+    if (guides && typeof guides.length === "number") values.activeGuides = guides.length;
+  } catch (_) {}
 
-  return { pendoDetected: true, checks: checks };
+  // v3: Subscription ID (chip only — what operators paste into Pendo tickets / API calls)
+  try {
+    var subId = null;
+    if (typeof pendo.getSubscriptionId === "function") subId = pendo.getSubscriptionId();
+    if (!subId && pendo._config && pendo._config.subscriptionId) subId = pendo._config.subscriptionId;
+    if (!subId && pendo.subscriptionId) subId = pendo.subscriptionId;
+    if (subId !== null && subId !== undefined) values.subscriptionId = String(subId);
+  } catch (_) {}
+
+  // v3: Session ID (chip only — what Pendo support asks for)
+  try {
+    var sid = null;
+    if (typeof pendo.getSessionId === "function") sid = pendo.getSessionId();
+    if (!sid && pendo._session && pendo._session.id) sid = pendo._session.id;
+    if (!sid && pendo.sessionId) sid = pendo.sessionId;
+    if (sid !== null && sid !== undefined) values.sessionId = String(sid);
+  } catch (_) {}
+
+  return { pendoDetected: true, checks: checks, values: values };
 }
 
 // ===========================================================================
