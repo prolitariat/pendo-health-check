@@ -77,7 +77,9 @@ function showView(id) {
 }
 
 function showTabs() {
-  // No tab bar — just show the copy bar
+  // No tab bar — just show the pinned action bars (debugger + copy issues)
+  const debuggerBar = document.getElementById("debugger-bar");
+  if (debuggerBar) debuggerBar.style.display = "block";
   const copyBar = document.getElementById("health-copy-bar");
   if (copyBar) copyBar.style.display = "block";
 }
@@ -251,49 +253,6 @@ let activeTabId = "report"; // Single view — always report
 let lastHealthData = null;
 let lastSetupData = null;
 
-// Developer Tools drawer toggle + auto-expand when space allows
-(function() {
-  const toggle = document.getElementById("dev-tools-toggle");
-  const body = document.getElementById("dev-tools-body");
-  const chevron = toggle ? toggle.querySelector(".setup-chevron") : null;
-  if (toggle && body) {
-    function openDrawer() {
-      body.style.display = "block";
-      if (chevron) chevron.style.transform = "rotate(90deg)";
-      toggle.setAttribute("aria-expanded", "true");
-    }
-    function closeDrawer() {
-      body.style.display = "none";
-      if (chevron) chevron.style.transform = "";
-      toggle.setAttribute("aria-expanded", "false");
-    }
-    function toggleDrawer() {
-      var isOpen = body.style.display !== "none";
-      if (isOpen) closeDrawer(); else openDrawer();
-      trackEvent("dev_tools_toggle", { open: !isOpen });
-    }
-    toggle.addEventListener("click", toggleDrawer);
-    toggle.addEventListener("keydown", function(e) {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDrawer(); }
-    });
-
-    // Auto-expand if there's room — called after checks render.
-    // Strategy: open the drawer, wait for layout to settle, then check
-    // if the container overflows. If it does, close it back.
-    // Using setTimeout(50) because rAF is unreliable in Chrome popup context.
-    window.__autoExpandDevTools = function() {
-      var scrollContainer = document.getElementById("panel-report");
-      if (!scrollContainer) return;
-      openDrawer();
-      setTimeout(function() {
-        if (scrollContainer.scrollHeight > scrollContainer.clientHeight + 2) {
-          closeDrawer();
-        }
-      }, 50);
-    };
-  }
-})();
-
 // ---------------------------------------------------------------------------
 // Health Check — rendering
 // ---------------------------------------------------------------------------
@@ -461,6 +420,8 @@ function computeGrade(hcChecks, setupIssues) {
 function renderGradeCard(grade) {
   var card = document.getElementById("grade-card");
   if (!card) return;
+  // v3: legacy card kept for compatibility but hidden via CSS — still populate
+  // its fields in case anything else references them.
   card.style.display = "flex";
   var letterEl = document.getElementById("grade-letter");
   letterEl.textContent = grade.letter;
@@ -468,12 +429,262 @@ function renderGradeCard(grade) {
   document.getElementById("grade-score").textContent = grade.score + " / 100";
   document.getElementById("grade-summary").textContent = grade.summary;
 
+  // v3: surface the grade in the header pill (the visible representation)
+  var pill = document.getElementById("grade-pill");
+  if (pill) {
+    pill.textContent = grade.letter;
+    pill.className = "grade-pill " + grade.cssClass;
+    pill.style.display = "inline-flex";
+    pill.title = grade.score + " / 100 · " + grade.summary;
+  }
+
   // Reveal results: hide loading indicator, fade in report content
   var loading = document.getElementById("report-loading");
   var content = document.getElementById("report-content");
   if (loading) loading.style.display = "none";
   if (content) content.style.opacity = "1";
 }
+
+// ===========================================================================
+// v3: Quick Copy chips + score history + AI prompt mode
+// All v3-specific UI lives below so the legacy code above is untouched.
+// ===========================================================================
+
+// v3: chip set is intentionally tight — only values an operator actually
+// pastes into a ticket, Slack, or API call. Diagnostic state (Framework,
+// Ready, Active Guides) is covered by the grade pill and "Why this grade"
+// drawer and does not belong here. Six entries → three clean rows in the
+// 2-column grid.
+var V3_CHIPS_MAIN = [
+  { key: "visitorId",      label: "Visitor ID" },
+  { key: "accountId",      label: "Account ID" },
+  { key: "subscriptionId", label: "Subscription ID" },
+  { key: "sessionId",      label: "Session ID" },
+  { key: "version",        label: "Agent Version" },
+  { key: "realm",          label: "Realm" }
+];
+
+function v3FormatChipValue(value, format) {
+  if (value === null || value === undefined || value === "") return null;
+  if (format === "number") {
+    if (typeof value === "number") return String(value);
+    var n = parseInt(value, 10);
+    return isNaN(n) ? String(value) : String(n);
+  }
+  if (format === "boolean") return value ? "yes" : "no";
+  return String(value);
+}
+
+function v3RenderChip(spec, values) {
+  var raw = values[spec.key];
+  var display = v3FormatChipValue(raw, spec.format);
+  var btn = document.createElement("button");
+  btn.className = "chip" + (display === null ? " empty" : "");
+  btn.type = "button";
+  btn.setAttribute("data-key", spec.key);
+
+  var labelEl = document.createElement("span");
+  labelEl.className = "chip-label";
+  labelEl.textContent = spec.label;
+
+  var valueEl = document.createElement("span");
+  valueEl.className = "chip-value";
+  valueEl.textContent = display !== null ? display : "—";
+  valueEl.title = display !== null ? display : "Not available on this page";
+
+  var overlay = document.createElement("span");
+  overlay.className = "chip-copied-overlay";
+  overlay.textContent = "Copied";
+
+  btn.appendChild(labelEl);
+  btn.appendChild(valueEl);
+  btn.appendChild(overlay);
+
+  if (display !== null) {
+    btn.addEventListener("click", function () {
+      navigator.clipboard.writeText(display).then(function () {
+        btn.classList.add("copied");
+        try { trackEvent("copy_chip", { key: spec.key }); } catch (_) {}
+        setTimeout(function () { btn.classList.remove("copied"); }, 900);
+      });
+    });
+  } else {
+    btn.setAttribute("aria-disabled", "true");
+  }
+
+  return btn;
+}
+
+function v3RenderQuickCopy(values) {
+  var section = document.getElementById("quick-copy");
+  var mainGrid = document.getElementById("chip-grid");
+  if (!section || !mainGrid) return;
+
+  mainGrid.innerHTML = "";
+  V3_CHIPS_MAIN.forEach(function (spec) { mainGrid.appendChild(v3RenderChip(spec, values || {})); });
+
+  section.style.display = "block";
+}
+
+// --- v3: score history (chrome.storage.local, last 5 per hostname+path) ---
+
+function v3HistoryKey(urlString) {
+  try {
+    var u = new URL(urlString);
+    return "score_history::" + u.hostname + u.pathname;
+  } catch (_) {
+    return "score_history::" + String(urlString || "unknown");
+  }
+}
+
+function v3LoadHistory(urlString, cb) {
+  var key = v3HistoryKey(urlString);
+  try {
+    chrome.storage.local.get(key, function (result) {
+      var arr = (result && result[key]) || [];
+      cb(arr, key);
+    });
+  } catch (_) {
+    cb([], key);
+  }
+}
+
+function v3SaveHistory(urlString, entry, cb) {
+  v3LoadHistory(urlString, function (existing, key) {
+    var next = [entry].concat(existing).slice(0, 5);
+    var update = {};
+    update[key] = next;
+    try {
+      chrome.storage.local.set(update, function () { if (cb) cb(next); });
+    } catch (_) {
+      if (cb) cb(next);
+    }
+  });
+}
+
+function v3FormatRelative(ts) {
+  if (!ts) return "";
+  var diffMs = Date.now() - ts;
+  var minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return minutes + "m ago";
+  var hours = Math.round(minutes / 60);
+  if (hours < 24) return hours + "h ago";
+  var days = Math.round(hours / 24);
+  if (days < 14) return days + "d ago";
+  return new Date(ts).toLocaleDateString();
+}
+
+function v3RenderScoreDiff(currentScore, history) {
+  var btn = document.getElementById("score-diff");
+  if (!btn) return;
+  // history[0] is the just-saved current entry; history[1] is the previous visit
+  var prev = history && history.length > 1 ? history[1] : null;
+  if (!prev || typeof prev.score !== "number") { btn.style.display = "none"; return; }
+  var delta = currentScore - prev.score;
+  var arrow, cls;
+  if (delta > 0) { arrow = "↑"; cls = "up"; }
+  else if (delta < 0) { arrow = "↓"; cls = "down"; }
+  else { arrow = "·"; cls = "flat"; }
+  btn.className = "score-diff-badge " + cls;
+  btn.textContent = arrow + " " + (delta > 0 ? "+" : "") + delta;
+  btn.title = "Previous: " + prev.letter + " (" + prev.score + ") · " + v3FormatRelative(prev.timestamp);
+  btn.style.display = "inline-flex";
+  // Cache history for popover render
+  window.__v3LastHistory = history;
+}
+
+function v3RenderHistoryPopover(history) {
+  var pop = document.getElementById("score-history-popover");
+  if (!pop) return;
+  pop.innerHTML = "";
+  var title = document.createElement("div");
+  title.className = "popover-title";
+  title.textContent = "Score history (this page)";
+  pop.appendChild(title);
+  if (!history || history.length === 0) {
+    var empty = document.createElement("div");
+    empty.textContent = "No prior visits recorded.";
+    empty.style.color = "var(--muted-foreground)";
+    pop.appendChild(empty);
+    return;
+  }
+  history.forEach(function (entry, idx) {
+    var row = document.createElement("div");
+    row.className = "history-row";
+    var g = document.createElement("span");
+    g.className = "history-grade " + (entry.cssClass || "");
+    g.textContent = entry.letter || "?";
+    var when = document.createElement("span");
+    when.className = "history-when";
+    when.textContent = (idx === 0 ? "now" : v3FormatRelative(entry.timestamp));
+    var score = document.createElement("span");
+    score.className = "history-score";
+    score.textContent = entry.score + "/100";
+    row.appendChild(g);
+    row.appendChild(when);
+    row.appendChild(score);
+    pop.appendChild(row);
+  });
+}
+
+function v3PersistAndRenderScore(finalGrade) {
+  var pageUrl = (document.getElementById("page-url") || {}).textContent || "";
+  if (!pageUrl) return;
+  var entry = {
+    score: finalGrade.score,
+    letter: finalGrade.letter,
+    cssClass: finalGrade.cssClass,
+    timestamp: Date.now(),
+    url: pageUrl
+  };
+  v3SaveHistory(pageUrl, entry, function (history) {
+    v3RenderScoreDiff(finalGrade.score, history);
+  });
+}
+
+// --- v3: AI prompt builder (wraps the plain-text report) ---
+
+// --- v3: wireup for drawers, toggles, and popover ---
+
+(function v3Wireup() {
+  // Diagnostics drawer ("Why this grade")
+  var diagToggle = document.getElementById("diagnostics-toggle");
+  var diagDrawer = document.getElementById("diagnostics-drawer");
+  if (diagToggle && diagDrawer) {
+    function toggleDiag() {
+      var open = diagDrawer.classList.toggle("open");
+      diagToggle.classList.toggle("open", open);
+      diagToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    diagToggle.addEventListener("click", toggleDiag);
+    diagToggle.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDiag(); }
+    });
+  }
+
+  // Score-diff badge → toggle history popover
+  var diffBtn = document.getElementById("score-diff");
+  var pop = document.getElementById("score-history-popover");
+  if (diffBtn && pop) {
+    diffBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (pop.style.display === "block") {
+        pop.style.display = "none";
+        return;
+      }
+      v3RenderHistoryPopover(window.__v3LastHistory || []);
+      pop.style.display = "block";
+    });
+    // Click anywhere else closes the popover
+    document.addEventListener("click", function (e) {
+      if (pop.style.display === "block" && !pop.contains(e.target) && e.target !== diffBtn) {
+        pop.style.display = "none";
+      }
+    });
+  }
+
+})();
 
 // ---------------------------------------------------------------------------
 // Extract Setup Issues into Unified Format
@@ -771,8 +982,13 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         return;
       }
       window.__lastChecks = data.checks;
+      window.__lastValues = data.values || {};
       activeTabId = "report";
       renderChecks(data.checks);
+
+      // v3: render chips immediately from the first analysis pass.
+      // Framework is unknown until setup completes; populated again below.
+      v3RenderQuickCopy(window.__lastValues);
 
       // Re-render status filtered to detected environment
       const env = detectEnvFromChecks(data.checks);
@@ -809,9 +1025,22 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               // Compute final grade from both HC and setup data
               const finalGrade = computeGrade(data.checks, setupIssues);
               renderGradeCard(finalGrade);
+
+              // v3: enrich chips with framework from setup data, then persist + diff
+              try {
+                var mergedValues = Object.assign({}, window.__lastValues || {});
+                if (setupData.framework && setupData.framework.name) {
+                  mergedValues.framework = setupData.framework.version
+                    ? (setupData.framework.name + " " + setupData.framework.version)
+                    : setupData.framework.name;
+                }
+                window.__lastValues = mergedValues;
+                v3RenderQuickCopy(mergedValues);
+              } catch (_) {}
+              try { v3PersistAndRenderScore(finalGrade); } catch (_) {}
+
               setTimeout(updateScrollFade, 50);
               // Auto-expand dev tools if there's room after full render
-              setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
 
               // Set badge on icon — send full analysis to background
               window.__lastTotalIssues = finalGrade.criticals + finalGrade.warnings;
@@ -826,7 +1055,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
                 document.getElementById("grade-card").style.display === "none") {
               var fallbackGrade = window.__prelimGrade || computeGrade(data.checks, []);
               renderGradeCard(fallbackGrade);
-              setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
+              try { v3PersistAndRenderScore(fallbackGrade); } catch (_) {}
               window.__lastTotalIssues = (fallbackGrade.criticals || 0) + (fallbackGrade.warnings || 0);
               window.__lastCriticals = fallbackGrade.criticals || 0;
               window.__lastWarnings = fallbackGrade.warnings || 0;
@@ -916,82 +1145,43 @@ function runPendoCommand(funcToInject, successMsg) {
     });
 }
 
-document.getElementById("tool-validate-install")?.addEventListener("click", () => {
-  if (!currentTabId) { setToolStatus("No active tab", "error"); return; }
-  setToolStatus("Running…", "");
-  chrome.scripting.executeScript({
+// v3: Run pendo.validateInstall() in the page's MAIN world and capture its
+// console output. Used by the Copy Issues handler to fold Pendo's own verdict
+// into the report. Returns "" if Pendo isn't on the page or the API isn't
+// available, so the caller can simply append-or-skip.
+function v3CaptureValidateInstall() {
+  if (!currentTabId) return Promise.resolve("");
+  return chrome.scripting.executeScript({
     target: { tabId: currentTabId },
-    func: function() {
+    func: function () {
       try {
-        if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-        if (typeof pendo.validateInstall !== "function") return { error: "pendo.validateInstall() not available" };
+        if (typeof pendo === "undefined") return { skipped: "Pendo agent not present on this page." };
+        if (typeof pendo.validateInstall !== "function") return { skipped: "pendo.validateInstall() not available on this agent version." };
         var captured = [];
         var origLog = console.log;
         var origWarn = console.warn;
-        console.log = function() { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
-        console.warn = function() { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
-        pendo.validateInstall();
-        console.log = origLog;
-        console.warn = origWarn;
-        return { output: captured.length > 0 ? captured.join("\n") : "validateInstall() completed — no console output captured." };
-      } catch(e) { return { error: e.message }; }
+        console.log = function () { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
+        console.warn = function () { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
+        try { pendo.validateInstall(); } finally {
+          console.log = origLog;
+          console.warn = origWarn;
+        }
+        return { output: captured.length > 0 ? captured.join("\n") : "validateInstall() completed with no console output." };
+      } catch (e) {
+        return { error: e.message };
+      }
     },
     world: "MAIN"
-  }).then(function(results) {
+  }).then(function (results) {
     var r = results && results[0] && results[0].result;
-    if (r && r.error) {
-      setToolStatus(r.error, "error");
-    } else if (r && r.output) {
-      setToolStatus("✅ validateInstall() executed", "success");
-      var resultsDiv = document.getElementById("validate-results");
-      if (resultsDiv) { resultsDiv.style.display = "block"; resultsDiv.textContent = r.output; }
-    }
-  }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
-});
-
-document.getElementById("tool-validate-env")?.addEventListener("click", () => {
-  if (!currentTabId) { setToolStatus("No active tab", "error"); return; }
-  setToolStatus("Running…", "");
-  chrome.scripting.executeScript({
-    target: { tabId: currentTabId },
-    func: function() {
-      try {
-        if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-        if (typeof pendo.validateEnvironment !== "function") return { error: "pendo.validateEnvironment() not available" };
-        var captured = [];
-        var origLog = console.log;
-        var origWarn = console.warn;
-        console.log = function() { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
-        console.warn = function() { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
-        pendo.validateEnvironment();
-        console.log = origLog;
-        console.warn = origWarn;
-        return { output: captured.length > 0 ? captured.join("\n") : "validateEnvironment() completed — no console output captured." };
-      } catch(e) { return { error: e.message }; }
-    },
-    world: "MAIN"
-  }).then(function(results) {
-    var r = results && results[0] && results[0].result;
-    if (r && r.error) {
-      setToolStatus(r.error, "error");
-    } else if (r && r.output) {
-      setToolStatus("✅ validateEnvironment() executed", "success");
-      var resultsDiv = document.getElementById("validate-results");
-      if (resultsDiv) { resultsDiv.style.display = "block"; resultsDiv.textContent = r.output; }
-    }
-  }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
-});
-
-// Copy validate output to clipboard
-document.getElementById("copy-validate-result")?.addEventListener("click", function() {
-  var resultsDiv = document.getElementById("validate-results");
-  if (!resultsDiv || !resultsDiv.textContent) return;
-  navigator.clipboard.writeText(resultsDiv.textContent).then(function() {
-    var btn = document.getElementById("copy-validate-result");
-    btn.textContent = "Copied!";
-    setTimeout(function() { btn.textContent = "Copy"; }, 1500);
+    if (!r) return "";
+    if (r.skipped) return r.skipped;
+    if (r.error) return "Error running pendo.validateInstall(): " + r.error;
+    return r.output || "";
+  }).catch(function (err) {
+    return "Error running pendo.validateInstall(): " + (err.message || "unknown");
   });
-});
+}
 
 document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
   runPendoCommand(function () {
@@ -1031,8 +1221,11 @@ document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
 function buildIssuesReport() {
   const url = document.getElementById("page-url").textContent || "unknown page";
   const lines = [];
-  lines.push(`Pendo Issues Report — ${url}`);
-  lines.push(`Generated: ${new Date().toLocaleString()}`);
+  // Preamble doubles as orientation for a human reader AND any LLM the user
+  // pastes this into. Keep it factual and short. No marketing.
+  lines.push(`Pendo Health Check report — ${url}`);
+  lines.push(`Generated: ${new Date().toLocaleString()} by github.com/prolitariat/pendo-health-check v3.0.0 (Chrome extension; side project, not an official Pendo product).`);
+  lines.push(`Findings are ordered by severity (PROBLEM > INCIDENT > WARNING > INFO > TIP). Doc URLs at the bottom are verified Pendo Help Center articles; CMP vendor URLs appear inline in the relevant fix.`);
   lines.push("");
 
   const reported = new Set(); // Track reported topics to avoid duplicates
@@ -1203,12 +1396,12 @@ function buildIssuesReport() {
     lines.push("");
     lines.push("── Sources ──");
     const sourceLabels = {
-      "360032209131": "Content Security Policy for Pendo",
-      "360046272771": "Developer's Guide to Implementing Pendo",
-      "360031862272": "Install Pendo on a Single-Page Web Application",
-      "360031832072": "Configure Visitor and Account Metadata",
-      "360043539891": "CNAME for Pendo",
-      "360031867272": "Configure Pendo with a Cookie Consent Manager"
+      "360032209131": "Content-Security-Policy (CSP)",
+      "360046272771": "Developer's guide to implementing Pendo using the install script",
+      "360031862272": "Installation for Single-Page Frameworks",
+      "360031832072": "Visitor and Account Metadata",
+      "360043539891": "CNAME for Pendo Insights and Guidance",
+      "21326554691227": "Data collection and compliance"
     };
     sources.forEach(url => {
       // Extract article ID to generate a human-readable label
@@ -1224,13 +1417,25 @@ function buildIssuesReport() {
 document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
   const btn = document.getElementById("tool-copy-issues");
   const label = btn.querySelector(".tool-label");
-  const text = buildIssuesReport();
-  navigator.clipboard.writeText(text).then(() => {
+  const origLabel = label ? label.textContent : null;
+  // v3: also run pendo.validateInstall() so the artifact contains both the
+  // extension's interpretation AND Pendo's own verdict. The whole thing is
+  // one plain-text blob; the preamble orients both humans and LLMs.
+  if (label) label.textContent = "Running validateInstall()…";
+  v3CaptureValidateInstall().then(function (validateOutput) {
+    let combined = buildIssuesReport();
+    if (validateOutput) {
+      combined += "\n\n── Pendo's official validateInstall() output ──\n" + validateOutput;
+    }
+    return navigator.clipboard.writeText(combined);
+  }).then(() => {
     trackEvent("copy_report");
     if (label) {
       label.textContent = "Copied!";
-      setTimeout(() => { label.textContent = "Copy Issues to Clipboard"; }, 1500);
+      setTimeout(() => { label.textContent = origLabel || "Copy Issues to Clipboard"; }, 1500);
     }
+  }).catch(() => {
+    if (label) label.textContent = origLabel || "Copy Issues to Clipboard";
   });
 });
 
@@ -1240,6 +1445,23 @@ document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
 
 function runPendoHealthCheck() {
   var checks = [];
+  // v3: Aggregate raw scalar values for the Quick Copy chip grid in the popup.
+  // Each value is best-effort; missing ones surface as gray chips.
+  var values = {
+    pendoLoaded: false,
+    ready: null,
+    visitorId: null,
+    visitorAnonymous: null,
+    accountId: null,
+    version: null,
+    apiKey: null,
+    dataHost: null,
+    contentHost: null,
+    realm: null,
+    activeGuides: null,
+    subscriptionId: null,
+    sessionId: null
+  };
 
   function add(status, label, detail) {
     checks.push({ status: status, label: label, detail: String(detail) });
@@ -1248,13 +1470,15 @@ function runPendoHealthCheck() {
   // 1. Pendo agent loaded
   if (typeof window.pendo === "undefined" || !window.pendo) {
     add("fail", "Pendo Agent Loaded", "Pendo is not installed on this page");
-    return { pendoDetected: false, checks: checks };
+    return { pendoDetected: false, checks: checks, values: values };
   }
   add("pass", "Pendo Agent Loaded", "Pendo is installed on this page");
+  values.pendoLoaded = true;
 
   // 2. pendo.isReady()
   try {
     var ready = typeof pendo.isReady === "function" && pendo.isReady();
+    values.ready = !!ready;
     if (ready) {
       add("pass", "Pendo Ready", "Pendo is initialized and running");
     } else {
@@ -1271,11 +1495,14 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("visitor") && pendo.get("visitor").id) ||
       (pendo.visitorId) ||
       null;
+    values.visitorId = visitor;
     if (!visitor) {
       add("fail", "Visitor ID", "No visitor ID found");
     } else if (visitor.startsWith("VISITOR-") || visitor.startsWith("_PENDO_T_")) {
+      values.visitorAnonymous = true;
       add("warn", "Visitor ID", "Anonymous visitor: " + visitor);
     } else {
+      values.visitorAnonymous = false;
       add("pass", "Visitor ID", visitor);
     }
   } catch (e) {
@@ -1289,6 +1516,7 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("account") && pendo.get("account").id) ||
       (pendo.accountId) ||
       null;
+    values.accountId = account;
     if (!account) {
       add("warn", "Account ID", "No account ID found");
     } else {
@@ -1337,6 +1565,7 @@ function runPendoHealthCheck() {
       (pendo.getVersion && pendo.getVersion()) ||
       pendo.VERSION ||
       null;
+    values.version = version;
     if (version) {
       // Only show as check if old (major < 2), otherwise suppress
       var parts = version.split(".");
@@ -1357,6 +1586,7 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("apiKey")) ||
       (pendo.apiKey) ||
       null;
+    values.apiKey = apiKey;
     if (!apiKey) {
       add("warn", "API Key", "Could not determine API key");
     }
@@ -1415,6 +1645,19 @@ function runPendoHealthCheck() {
       add("warn", "Data Host", "Could not determine data or content host");
     }
     // Suppress pass row — CDN/CNAME routing is infrastructure detail, not admin-actionable
+    values.dataHost = detectedDataHost;
+    values.contentHost = detectedContentHost;
+    // Realm: derive from data host suffix. CNAME deployments fall back to "Custom".
+    try {
+      if (detectedDataHost) {
+        var dh = String(detectedDataHost).toLowerCase();
+        if (dh.indexOf("eu.pendo.io") !== -1) values.realm = "EU";
+        else if (dh.indexOf("us1.pendo.io") !== -1) values.realm = "US1";
+        else if (dh.indexOf("jp.pendo.io") !== -1 || dh.indexOf("jpn.pendo.io") !== -1) values.realm = "JP";
+        else if (dh.indexOf("pendo.io") !== -1) values.realm = "US";
+        else values.realm = "Custom CNAME";
+      }
+    } catch (_) {}
   } catch (e) {
     add("warn", "Data Host", "Error detecting data host: " + e.message);
   }
@@ -1527,8 +1770,33 @@ function runPendoHealthCheck() {
     add("info", "Feature Flags", "Could not inspect feature flags: " + e.message);
   }
 
+  // v3: Active guides count (chip only — not a graded check)
+  try {
+    var guides = null;
+    if (typeof pendo.getActiveGuides === "function") guides = pendo.getActiveGuides();
+    else if (Array.isArray(pendo.guides)) guides = pendo.guides;
+    if (guides && typeof guides.length === "number") values.activeGuides = guides.length;
+  } catch (_) {}
 
-  return { pendoDetected: true, checks: checks };
+  // v3: Subscription ID (chip only — what operators paste into Pendo tickets / API calls)
+  try {
+    var subId = null;
+    if (typeof pendo.getSubscriptionId === "function") subId = pendo.getSubscriptionId();
+    if (!subId && pendo._config && pendo._config.subscriptionId) subId = pendo._config.subscriptionId;
+    if (!subId && pendo.subscriptionId) subId = pendo.subscriptionId;
+    if (subId !== null && subId !== undefined) values.subscriptionId = String(subId);
+  } catch (_) {}
+
+  // v3: Session ID (chip only — what Pendo support asks for)
+  try {
+    var sid = null;
+    if (typeof pendo.getSessionId === "function") sid = pendo.getSessionId();
+    if (!sid && pendo._session && pendo._session.id) sid = pendo._session.id;
+    if (!sid && pendo.sessionId) sid = pendo.sessionId;
+    if (sid !== null && sid !== undefined) values.sessionId = String(sid);
+  } catch (_) {}
+
+  return { pendoDetected: true, checks: checks, values: values };
 }
 
 // ===========================================================================
@@ -2331,7 +2599,7 @@ function runPendoSetupAssistant() {
       var major = parseInt(parts[0], 10);
       if (major < 2) {
         recommend("tip", "Agent version may be outdated",
-          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo-io/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
+          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
       }
     }
   } catch (e) {}
@@ -2394,6 +2662,124 @@ function runPendoSetupAssistant() {
         recommend("tip", "No CNAME configured",
           "Pendo is loading from default CDN domains (cdn.pendo.io, data.pendo.io). Ad blockers and corporate firewalls commonly block *.pendo.io.\n  FIX: Configure a CNAME to route Pendo through your own domain (e.g. content.product.yourcompany.com and data.product.yourcompany.com). This makes Pendo traffic appear as first-party, bypassing most ad blockers and firewall restrictions.\n  Contact your Pendo CSM to enable CNAME for your subscription, then update your snippet and DNS.\n  Docs: https://support.pendo.io/hc/en-us/articles/360043539891-CNAME-for-Pendo");
       }
+    }
+  } catch (_) {}
+
+  // ========================================================================
+  // 10. CMP CONSENT GATING (v3) — flag only when 5-of-5 conditions are met
+  // ========================================================================
+  //
+  // Goal: catch the case where Pendo is initialized and identifying a real
+  // user before the page's consent manager indicates analytics consent.
+  //
+  // Hard rules to avoid false flags:
+  //   (1) CMP global is present
+  //   (2) The CMP exposes a readable consent state for analytics
+  //   (3) That state says analytics consent is explicitly denied or pending
+  //   (4) Pendo agent is loaded AND pendo.isReady() === true
+  //   (5) Visitor ID is set AND is NOT anonymous
+  // If ANY of those is unknown, we say nothing. Anonymous-pre-consent
+  // buffering is a legitimate Pendo pattern and must not be flagged.
+  //
+  // TrustArc + TCF v2.0 are inform-only (their consent APIs are too
+  // inconsistent to read confidently from outside the integration).
+  // ========================================================================
+  try {
+    var cmp = null;            // detected platform name
+    var cmpReadable = false;   // can we read analytics consent state?
+    var cmpAnalyticsDenied = null;
+    var cmpRemediationUrl = null;
+    var cmpInformOnly = false;
+
+    // --- Cookiebot: Cookiebot.consent.statistics is a boolean ---
+    if (typeof window.Cookiebot !== "undefined" && window.Cookiebot && window.Cookiebot.consent) {
+      cmp = "Cookiebot";
+      if (typeof window.Cookiebot.consent.statistics === "boolean") {
+        cmpReadable = true;
+        cmpAnalyticsDenied = (window.Cookiebot.consent.statistics === false);
+      }
+      cmpRemediationUrl = "https://support.cookiebot.com/hc/en-us/articles/4405978132242-Manual-cookie-blocking";
+    }
+    // --- Didomi: purpose-level status ---
+    else if (typeof window.Didomi !== "undefined" && window.Didomi &&
+             typeof window.Didomi.getUserConsentStatusForPurpose === "function") {
+      cmp = "Didomi";
+      try {
+        var didomiAnalytics = window.Didomi.getUserConsentStatusForPurpose("analytics");
+        if (typeof didomiAnalytics === "boolean") {
+          cmpReadable = true;
+          cmpAnalyticsDenied = (didomiAnalytics === false);
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://developers.didomi.io/cmp/web-sdk/third-parties/no-tag-manager";
+    }
+    // --- Osano: getConsent returns an object keyed by category ---
+    else if (typeof window.Osano !== "undefined" && window.Osano && window.Osano.cm &&
+             typeof window.Osano.cm.getConsent === "function") {
+      cmp = "Osano";
+      try {
+        var osanoConsent = window.Osano.cm.getConsent();
+        if (osanoConsent && typeof osanoConsent.ANALYTICS === "string") {
+          cmpReadable = true;
+          cmpAnalyticsDenied = (osanoConsent.ANALYTICS === "DENY");
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://docs.osano.com/consent-management-getting-started";
+    }
+    // --- OneTrust: narrow read. Only flag when active groups string contains
+    // ONLY C0001 (strictly-necessary). Category IDs are customer-configurable,
+    // so anything broader invites false positives. ---
+    else if (typeof window.OneTrust !== "undefined") {
+      cmp = "OneTrust";
+      try {
+        var groups = window.OnetrustActiveGroups;
+        if (typeof groups === "string" && groups.length > 0) {
+          var parts = groups.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+          if (parts.length === 1 && parts[0] === "C0001") {
+            cmpReadable = true;
+            cmpAnalyticsDenied = true;
+          }
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://developer.onetrust.com/onetrust/docs/single-page-applications";
+    }
+    // --- TrustArc: inform-only ---
+    else if (typeof window.truste !== "undefined") {
+      cmp = "TrustArc";
+      cmpInformOnly = true;
+    }
+    // --- TCF v2.0: inform-only ---
+    else if (typeof window.__tcfapi === "function") {
+      cmp = "TCF v2.0";
+      cmpInformOnly = true;
+    }
+
+    if (cmp) {
+      if (cmpInformOnly) {
+        recommend("tip", "Consent manager detected (" + cmp + ")",
+          cmp + " is present on this page. The extension does not read " + cmp + "'s consent state automatically (the API varies across deployments). Verify manually that Pendo's initialization is gated on analytics consent for your jurisdiction.\n  Docs: https://support.pendo.io/hc/en-us/articles/21326554691227-Data-collection-and-compliance");
+      } else if (cmpReadable && cmpAnalyticsDenied) {
+        // Conditions 4 + 5: Pendo ready AND non-anonymous visitor
+        var pendoReady = false;
+        try { pendoReady = (typeof pendo.isReady === "function" && pendo.isReady()); } catch (_) {}
+
+        var cmpVisitorId = null;
+        try {
+          cmpVisitorId = (pendo.getVisitorId && pendo.getVisitorId()) ||
+                         (pendo.get && pendo.get("visitor") && pendo.get("visitor").id) ||
+                         pendo.visitorId || null;
+        } catch (_) {}
+        var nonAnonymousVisitor = !!(cmpVisitorId && typeof cmpVisitorId === "string" &&
+          !cmpVisitorId.startsWith("VISITOR-") && !cmpVisitorId.startsWith("_PENDO_T_"));
+
+        if (pendoReady && nonAnonymousVisitor) {
+          recommend("warning", "Pendo may be running without consent (" + cmp + ")",
+            cmp + " indicates analytics consent has not been granted, but Pendo is initialized and identifying a real visitor. This may be a compliance issue depending on your jurisdiction. Verify how Pendo is categorized in " + cmp + " and that initialization is gated on the analytics/statistics consent state.\n  FIX: Block Pendo's initialization until " + cmp + " signals consent. " + cmp + " remediation pattern: " + cmpRemediationUrl + "\n  Supplementary docs: https://support.pendo.io/hc/en-us/articles/21326554691227-Data-collection-and-compliance");
+        }
+        // Else: not flagged. Pendo not ready OR anonymous visitor → both
+        // legitimate pre-consent states under Pendo's own guidance.
+      }
+      // Else: CMP present but consent state unreadable → say nothing.
     }
   } catch (_) {}
 
