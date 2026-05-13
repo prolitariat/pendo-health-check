@@ -1,71 +1,77 @@
-=== CHROME WEB STORE LISTING CONTENT (v2.2.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v3.0.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
 
 --- SHORT DESCRIPTION (132 chars max) ---
-Instant Pendo installation grade with prioritized diagnostics, one-click issue export, inline debugger, and live service status.
+Side project, not an official Pendo product. Quick Copy chips, A to F install grade, score diff, and CMP consent-gating check.
 
 --- DETAILED DESCRIPTION ---
-Pendo Health Check gives your Pendo installation a letter grade from A to F. Open it on any page and get a single, prioritized diagnostic report — no guesswork, no DevTools.
+Heads up: this is a side project built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract, no guarantees. If something breaks, file a GitHub issue; please don't open a Pendo support ticket, because Pendo didn't ship this and can't help with it.
 
-Built for Pendo admins who need to prove what's wrong and hand it to engineering.
+Open it on any page with Pendo and get two things at once: a Quick Copy chip grid for the values you reach for most, and a letter grade (A to F) for the install. Built so Pendo admins, implementation engineers, and support folks can make decisions faster with less effort.
 
-INSTALLATION GRADE (A–F)
+QUICK COPY CHIPS
 
-Your Pendo installation is scored from A to F across runtime health checks and a deep setup analysis. Issues are sorted by severity so you know exactly where to start.
+One-click copy for the values you actually paste somewhere:
+• Visitor ID, Account ID, Subscription ID, Session ID
+• Agent Version, Data Host, Realm (US / EU / US1 / JP / Custom CNAME)
+• Active Guides count, Framework, Ready (yes/no)
+• Behind a "More" toggle: API Key, Content Host
 
-Health Checks:
-• Agent loaded — confirms pendo.js is on the page
-• Initialization — verifies the agent started via pendo.isReady()
-• Visitor ID — checks that a non-anonymous visitor ID is set
-• Account ID — validates account-level identity
-• Active Guides — reports loaded guide count and state
-• Duplicate detection — flags multiple Pendo instances or agent scripts
-• Agent Version — reports the running version
-• Data Transmission — validates that analytics data is reaching Pendo servers
-• Feature Flags — surfaces disabled features (guides off, analytics off, etc.)
+Empty values render grayed out and uncopyable so you can tell at a glance what's actually set vs. missing.
 
-Setup Analysis (merged into the same view):
+INSTALLATION GRADE (A to F)
+
+A compact pill in the header shows the current grade. A score-diff badge next to it shows the delta from your previous visit to the same page (history keyed by hostname + path, last five entries persisted locally). Click the badge to see recent grades for that page.
+
+WHY THIS GRADE (drawer)
+
+Open the "Why this grade" drawer to see the full prioritized findings list, sorted by severity. The drawer stays collapsed by default so the default view stays focused on the chips.
+
+Health checks:
+• Agent loaded, initialized, version
+• Visitor and Account ID validation (flags anonymous, missing, malformed)
+• Duplicate detection (multiple instances or agent scripts)
+• Data Transmission (catches ad blocker, CSP, firewall blocks)
+• Feature Flags (surfaces disabled features like guides off, analytics off)
+
+Setup analysis:
 • Framework detection (React, Angular, Vue, Ember, Svelte, Next.js, Nuxt, jQuery)
-• Snippet analysis — install method, placement, async loading
-• CSP compatibility — directive-by-directive check with strict-dynamic and nonce awareness
-• Report-Only CSP detection — won't flag non-enforcing policies as blocking errors
+• Snippet analysis (install method, placement, async loading)
+• CSP compatibility directive by directive, with strict-dynamic and nonce awareness; Report-Only CSP detected and not flagged as blocking
 • CNAME-aware host detection for custom CDN and data endpoints
-• CMP/GDPR consent detection (OneTrust, Cookiebot, Didomi, Osano, TrustArc, TCF v2.0)
-• Visitor and account metadata validation — PII detection, data types, field naming
-• Actionable recommendations with links to Pendo documentation
+• Visitor and account metadata validation (PII detection, data types, field naming)
 
-COPY TO CLIPBOARD
+CMP CONSENT-GATING CHECK
 
-One click exports a priority-sorted diagnostic report with remediation steps. Paste into Slack, Jira, or a support ticket. Includes grade, all issues, and Pendo service status.
+If a consent manager is on the page and Pendo is initialized with a non-anonymous visitor while the CMP reports analytics consent denied, the extension flags it with a warning and links to that CMP's remediation docs. Actionable detection on Cookiebot, Didomi, Osano, and a narrow OneTrust read. Inform-only on TrustArc and TCF v2.0. The check is intentionally conservative: any unknown signal suppresses the flag, so anonymous-pre-consent and strictly-necessary classifications never get falsely flagged.
 
-DEVELOPER TOOLS (collapsible)
+COPY ISSUES TO CLIPBOARD
 
-• Toggle Pendo Debugger — one click, no DevTools needed
-• Validate Install — runs pendo.validateInstall() with inline results
-• Validate Environment — runs pendo.validateEnvironment() with inline results
+Pick a format (Plain text or AI prompt) and click. Plain text is the report you've always copied: severity-sorted findings with remediation steps and verified doc links. AI prompt mode wraps it in a triage preamble for Claude or ChatGPT, telling the model to identify root causes, order fixes by severity, and not invent any URLs.
+
+DEVELOPER TOOLS
+
+• Toggle Pendo Debugger, one click, no DevTools needed
+• Validate Install, runs pendo.validateInstall() inline
+• Validate Environment, runs pendo.validateEnvironment() inline
 
 ICON BADGE
 
-• Yellow badge shows issue count after analysis
-• Red badge when critical problems are found
-• Clears automatically when you navigate to a new page — never shows stale data
-• Toggle the badge on or off from the feedback bar
+Yellow shows issue count after analysis; red shows critical problems. Clears when you change pages so it never shows stale data. Toggle from the footer.
 
 PENDO SERVICE STATUS
 
-• Live monitoring from status.pendo.io — only shown during outages or incidents
-• Per-component health (App, Data Pipeline, Guides, Integrations)
-• Included in copied diagnostic reports
+Live from status.pendo.io, surfaced only during incidents. Included in the copied report.
 
 PRIVACY
 
-• All checks run locally in your browser
-• No data is collected or sent to third parties
-• No account or login required
+All checks run locally in your browser. Score history is stored in chrome.storage.local on your device only. Nothing leaves the extension. No account, no login.
 
-Built for Pendo admins, implementation engineers, and customer success teams who need fast, accurate answers about agent health.
+SOURCE
+
+Source code, issue tracker, and changelog at github.com/prolitariat/pendo-health-check.
 
 --- CATEGORY ---
 Developer Tools
@@ -74,4 +80,4 @@ Developer Tools
 English
 
 --- SINGLE PURPOSE DESCRIPTION ---
-Diagnose and grade the health, configuration, and service status of the Pendo analytics agent on any webpage, with inline developer tools and one-click issue export.
+Surface common Pendo agent values as one-click copy chips and diagnose health, configuration, and consent-gating problems on any webpage with Pendo installed. Side project, not an official Pendo product.

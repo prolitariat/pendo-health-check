@@ -2792,6 +2792,124 @@ function runPendoSetupAssistant() {
     }
   } catch (_) {}
 
+  // ========================================================================
+  // 10. CMP CONSENT GATING (v3) — flag only when 5-of-5 conditions are met
+  // ========================================================================
+  //
+  // Goal: catch the case where Pendo is initialized and identifying a real
+  // user before the page's consent manager indicates analytics consent.
+  //
+  // Hard rules to avoid false flags:
+  //   (1) CMP global is present
+  //   (2) The CMP exposes a readable consent state for analytics
+  //   (3) That state says analytics consent is explicitly denied or pending
+  //   (4) Pendo agent is loaded AND pendo.isReady() === true
+  //   (5) Visitor ID is set AND is NOT anonymous
+  // If ANY of those is unknown, we say nothing. Anonymous-pre-consent
+  // buffering is a legitimate Pendo pattern and must not be flagged.
+  //
+  // TrustArc + TCF v2.0 are inform-only (their consent APIs are too
+  // inconsistent to read confidently from outside the integration).
+  // ========================================================================
+  try {
+    var cmp = null;            // detected platform name
+    var cmpReadable = false;   // can we read analytics consent state?
+    var cmpAnalyticsDenied = null;
+    var cmpRemediationUrl = null;
+    var cmpInformOnly = false;
+
+    // --- Cookiebot: Cookiebot.consent.statistics is a boolean ---
+    if (typeof window.Cookiebot !== "undefined" && window.Cookiebot && window.Cookiebot.consent) {
+      cmp = "Cookiebot";
+      if (typeof window.Cookiebot.consent.statistics === "boolean") {
+        cmpReadable = true;
+        cmpAnalyticsDenied = (window.Cookiebot.consent.statistics === false);
+      }
+      cmpRemediationUrl = "https://support.cookiebot.com/hc/en-us/articles/4405978132242-Manual-cookie-blocking";
+    }
+    // --- Didomi: purpose-level status ---
+    else if (typeof window.Didomi !== "undefined" && window.Didomi &&
+             typeof window.Didomi.getUserConsentStatusForPurpose === "function") {
+      cmp = "Didomi";
+      try {
+        var didomiAnalytics = window.Didomi.getUserConsentStatusForPurpose("analytics");
+        if (typeof didomiAnalytics === "boolean") {
+          cmpReadable = true;
+          cmpAnalyticsDenied = (didomiAnalytics === false);
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://developers.didomi.io/cmp/web-sdk/third-parties/no-tag-manager";
+    }
+    // --- Osano: getConsent returns an object keyed by category ---
+    else if (typeof window.Osano !== "undefined" && window.Osano && window.Osano.cm &&
+             typeof window.Osano.cm.getConsent === "function") {
+      cmp = "Osano";
+      try {
+        var osanoConsent = window.Osano.cm.getConsent();
+        if (osanoConsent && typeof osanoConsent.ANALYTICS === "string") {
+          cmpReadable = true;
+          cmpAnalyticsDenied = (osanoConsent.ANALYTICS === "DENY");
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://docs.osano.com/consent-management-getting-started";
+    }
+    // --- OneTrust: narrow read. Only flag when active groups string contains
+    // ONLY C0001 (strictly-necessary). Category IDs are customer-configurable,
+    // so anything broader invites false positives. ---
+    else if (typeof window.OneTrust !== "undefined") {
+      cmp = "OneTrust";
+      try {
+        var groups = window.OnetrustActiveGroups;
+        if (typeof groups === "string" && groups.length > 0) {
+          var parts = groups.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+          if (parts.length === 1 && parts[0] === "C0001") {
+            cmpReadable = true;
+            cmpAnalyticsDenied = true;
+          }
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://developer.onetrust.com/onetrust/docs/single-page-applications";
+    }
+    // --- TrustArc: inform-only ---
+    else if (typeof window.truste !== "undefined") {
+      cmp = "TrustArc";
+      cmpInformOnly = true;
+    }
+    // --- TCF v2.0: inform-only ---
+    else if (typeof window.__tcfapi === "function") {
+      cmp = "TCF v2.0";
+      cmpInformOnly = true;
+    }
+
+    if (cmp) {
+      if (cmpInformOnly) {
+        recommend("tip", "Consent manager detected (" + cmp + ")",
+          cmp + " is present on this page. The extension does not read " + cmp + "'s consent state automatically (the API varies across deployments). Verify manually that Pendo's initialization is gated on analytics consent for your jurisdiction.\n  Docs: https://support.pendo.io/hc/en-us/articles/21326554691227-Data-collection-and-compliance");
+      } else if (cmpReadable && cmpAnalyticsDenied) {
+        // Conditions 4 + 5: Pendo ready AND non-anonymous visitor
+        var pendoReady = false;
+        try { pendoReady = (typeof pendo.isReady === "function" && pendo.isReady()); } catch (_) {}
+
+        var cmpVisitorId = null;
+        try {
+          cmpVisitorId = (pendo.getVisitorId && pendo.getVisitorId()) ||
+                         (pendo.get && pendo.get("visitor") && pendo.get("visitor").id) ||
+                         pendo.visitorId || null;
+        } catch (_) {}
+        var nonAnonymousVisitor = !!(cmpVisitorId && typeof cmpVisitorId === "string" &&
+          !cmpVisitorId.startsWith("VISITOR-") && !cmpVisitorId.startsWith("_PENDO_T_"));
+
+        if (pendoReady && nonAnonymousVisitor) {
+          recommend("warning", "Pendo may be running without consent (" + cmp + ")",
+            cmp + " indicates analytics consent has not been granted, but Pendo is initialized and identifying a real visitor. This may be a compliance issue depending on your jurisdiction. Verify how Pendo is categorized in " + cmp + " and that initialization is gated on the analytics/statistics consent state.\n  FIX: Block Pendo's initialization until " + cmp + " signals consent. " + cmp + " remediation pattern: " + cmpRemediationUrl + "\n  Supplementary docs: https://support.pendo.io/hc/en-us/articles/21326554691227-Data-collection-and-compliance");
+        }
+        // Else: not flagged. Pendo not ready OR anonymous visitor → both
+        // legitimate pre-consent states under Pendo's own guidance.
+      }
+      // Else: CMP present but consent state unreadable → say nothing.
+    }
+  } catch (_) {}
+
   return result;
 }
 

@@ -2,6 +2,26 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [3.0.0] — 2026-05-13
+
+### Added
+- **Quick Copy chip grid.** One-click copy for Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Data Host, Realm, Active Guides, Framework, Ready. "More" toggle reveals API Key and Content Host. Empty values render grayed out and uncopyable so missing data is visible, not hidden.
+- **Subscription ID and Session ID extraction.** Values most often pasted into Pendo support tickets and API calls, surfaced as their own chips. Best-effort across `pendo.getSubscriptionId()` / `pendo._config.subscriptionId` / direct property paths and `pendo.getSessionId()` / `pendo._session.id` / `pendo.sessionId`.
+- **Realm chip.** Derives US / EU / US1 / JP / "Custom CNAME" from the detected data host suffix.
+- **AI prompt mode for Copy Issues.** Format selector next to the copy button. "AI prompt" wraps the existing report with a triage preamble for Claude / ChatGPT. Preamble explicitly tells the model not to invent URLs. Plain text remains the default. Last-used format persists across popup opens.
+- **Score diff with multi-history.** Per-page score history (last 5 entries, keyed by hostname + pathname) persisted to `chrome.storage.local`. A diff badge next to the grade pill shows the delta from the previous visit; clicking opens a popover with recent history.
+- **CMP consent-gating check.** Flags Pendo running with a non-anonymous visitor and `pendo.isReady() === true` while the consent manager reports analytics consent denied. Actionable detection on Cookiebot, Didomi, Osano, and a narrow OneTrust read (C0001-only). Inform-only on TrustArc and TCF v2.0. Five-of-five conditions must hold; any unknown signal suppresses the flag. Vendor remediation links are platform-specific (OneTrust, Cookiebot, Didomi, Osano docs) with Pendo's "Data collection and compliance" article as a supplementary link.
+
+### Changed
+- **Header grade pill.** The big in-panel grade card moves into a compact A–F pill in the header. The grade-letter colors port over from the existing `.grade-a` / `.grade-b` / etc. classes.
+- **Diagnostics drawer.** The prioritized checks list collapses behind a "Why this grade" drawer. Never auto-expands so the default view stays KISS. Re-uses the same chevron pattern as the existing Developer Tools drawer.
+- **Honest framing.** Store listing and manifest description now open with "Side project, not an official Pendo product." Disclaims Pendo affiliation/endorsement up front, redirects bug reports to GitHub, and asks users not to file Pendo support tickets for extension issues.
+- **Doc-label accuracy.** Six Pendo Help Center IDs in the sources map were audited against Google's index. Five labels updated to match canonical titles. The CMP doc ID `360031867272` ("Configure Pendo with a Cookie Consent Manager") was removed because no public record of it exists. Replaced with the verified `21326554691227` ("Data collection and compliance") for the CMP-related links.
+
+### Notes
+- v2.2.0's claim of "CMP/GDPR consent detection across 6 platforms" was vaporware: production code had no CMP read whatsoever (only a help-doc label). v3.0.0 ships actionable detection on 4 platforms and inform-only on 2, and the marketing copy now matches reality.
+- The CMP check is intentionally conservative: it errs on the side of saying nothing rather than flagging legitimate patterns (anonymous pre-consent buffering, strictly-necessary classification, opt-out CMP modes whose state we cannot read).
+
 ## [2.2.0] — 2026-03-14
 
 ### Changed
