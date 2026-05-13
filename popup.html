@@ -547,6 +547,16 @@
       padding: 12px 4px 4px;
       font-size: 12px;
       color: var(--fg);
+      gap: 12px;
+    }
+    .setting-row-stacked {
+      align-items: flex-start;
+    }
+    .setting-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .setting-sub {
+      font-size: 11px;
+      color: var(--muted-fg);
+      line-height: 1.4;
     }
     .switch {
       position: relative;
@@ -881,6 +891,19 @@
         <span>Show badge on extension icon</span>
         <label class="switch" aria-label="Show issue count badge on the extension icon">
           <input type="checkbox" id="badge-enabled" checked>
+          <span class="switch-track"></span>
+        </label>
+      </div>
+
+      <!-- v4.1: optional proactive checking. Toggling this on prompts Chrome
+           for the <all_urls> host permission at runtime. Default off. -->
+      <div class="setting-row setting-row-stacked">
+        <div class="setting-text">
+          <span>Auto-check pages on load</span>
+          <span class="setting-sub">Requires permission to read all pages. Badge updates without opening this popup.</span>
+        </div>
+        <label class="switch" aria-label="Auto-check pages on load">
+          <input type="checkbox" id="auto-check-enabled">
           <span class="switch-track"></span>
         </label>
       </div>

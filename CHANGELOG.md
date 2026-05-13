@@ -2,6 +2,22 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [4.1.0] — 2026-05-13
+
+### Added
+
+- **Optional proactive badge.** New "Auto-check pages on load" toggle in the Tools tab. Off by default. When the user flips it on, Chrome's permission prompt asks for `<all_urls>` host permission at runtime via `chrome.permissions.request`. If granted, `background.js` registers a `chrome.tabs.onUpdated` listener that injects a lightweight Pendo probe on every page-load completion and pushes badge counts to the existing badge code. Operators tab-hopping between several Pendo-instrumented apps can now scan their toolbar to see which tabs have Pendo and roughly how many issues without opening the popup.
+- **Lightweight probe in `background.js`.** Intentionally narrower than the popup's full `runPendoHealthCheck` — checks Pendo presence, ready state, visitor ID, account ID, and reports a simple criticals/warnings count. The popup's full analysis still updates the badge with higher fidelity when the user opens it; a popup-source result is never overwritten by a subsequent auto-check result on the same tab.
+
+### Changed
+
+- **`manifest.json` declares `"optional_host_permissions": ["<all_urls>"]`.** The default install footprint stays minimal (`activeTab` + `scripting` + `storage` + `tabs`). Broad host access is only granted at runtime, only on user opt-in, and is revoked automatically when the toggle is turned off.
+
+### Notes
+
+- The auto-check toggle's state is reconciled with Chrome's actual permission state on every popup open: if the user revoked the host permission via Chrome's settings, the toggle snaps back to off and the saved preference is normalized.
+- `auto-check-pref-changed` is a new message between popup and background; the service worker uses it to start or stop the proactive listener without a service-worker restart.
+
 ## [4.0.0] — 2026-05-13
 
 Visual redesign implementing **Direction C — Compact Dashboard** from the design handoff. Same data, same checks, same CMP consent-gating logic. Different shell.

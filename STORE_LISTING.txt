@@ -1,4 +1,4 @@
-=== CHROME WEB STORE LISTING CONTENT (v4.0.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v4.1.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
@@ -57,6 +57,10 @@ One click, one plain-text output. Behind the scenes the extension runs Pendo's o
 TOGGLE PENDO DEBUGGER
 
 Pinned top-level button next to Copy Issues. One click opens or closes Pendo's on-page debug overlay. The debugger is the daily tool for tagging operators, in-app content authors, and Pendo support staff, so it sits outside any "developer tools" framing.
+
+OPTIONAL AUTO-CHECK ON PAGE LOAD
+
+In the Tools tab, flip "Auto-check pages on load" to enable proactive checking. Chrome prompts for permission to read all pages; if granted, the extension runs a lightweight Pendo detection on every page-load completion and updates the toolbar badge automatically. Tab-hopping operators can see at a glance which tabs have Pendo issues without opening the popup. Off by default. Turning it off revokes the permission immediately.
 
 ICON BADGE
 

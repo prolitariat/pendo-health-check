@@ -35,6 +35,69 @@ chrome.storage.local.get("badgeEnabled", function(result) {
   }
 });
 
+// v4.1: "Auto-check pages on load" toggle (Tools tab).
+// Flipping it ON triggers chrome.permissions.request for <all_urls>. If the
+// user denies, we revert the toggle. Flipping OFF revokes the permission so
+// the install footprint shrinks back to default. background.js listens for
+// permission grants/revocations and starts/stops the proactive injection.
+(function v4WireAutoCheck() {
+  var checkbox = document.getElementById("auto-check-enabled");
+  if (!checkbox) return;
+  // Initial state must reflect both the stored preference AND whether the
+  // host permission is currently granted. If the user revoked the permission
+  // via Chrome settings, the toggle should snap back to off.
+  Promise.all([
+    new Promise(function (resolve) {
+      chrome.storage.local.get("autoCheckEnabled", function (r) {
+        resolve(r && r.autoCheckEnabled === true);
+      });
+    }),
+    new Promise(function (resolve) {
+      try {
+        chrome.permissions.contains({ origins: ["<all_urls>"] }, function (g) { resolve(!!g); });
+      } catch (_) { resolve(false); }
+    })
+  ]).then(function (results) {
+    var saved = results[0], granted = results[1];
+    var effective = saved && granted;
+    checkbox.checked = effective;
+    // If the saved pref disagrees with the actual permission state, normalize.
+    if (saved && !granted) {
+      try { chrome.storage.local.set({ autoCheckEnabled: false }); } catch (_) {}
+    }
+  });
+  checkbox.addEventListener("change", function () {
+    if (checkbox.checked) {
+      // Turning ON — request the host permission. Chrome shows the prompt.
+      try {
+        chrome.permissions.request({ origins: ["<all_urls>"] }, function (granted) {
+          if (granted) {
+            chrome.storage.local.set({ autoCheckEnabled: true });
+            chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
+            try { trackEvent("auto_check_enabled"); } catch (_) {}
+          } else {
+            checkbox.checked = false;
+          }
+        });
+      } catch (_) {
+        checkbox.checked = false;
+      }
+    } else {
+      // Turning OFF — revoke the host permission so we're not silently sitting
+      // on broad access the user is no longer using.
+      chrome.storage.local.set({ autoCheckEnabled: false });
+      try {
+        chrome.permissions.remove({ origins: ["<all_urls>"] }, function () {
+          chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
+          try { trackEvent("auto_check_disabled"); } catch (_) {}
+        });
+      } catch (_) {
+        chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
+      }
+    }
+  });
+})();
+
 // ---------------------------------------------------------------------------
 // Analytics — lightweight, privacy-first, fire-and-forget
 // Set to "" to disable. Deploy Worker from /analytics directory.
