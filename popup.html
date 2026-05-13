@@ -1053,28 +1053,6 @@
       font-weight: 500;
     }
 
-    /* === v3: Copy Issues format row === */
-    .copy-format-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 0 0 6px;
-    }
-    .copy-format-label {
-      font-size: 11px;
-      color: var(--muted-foreground);
-    }
-    .copy-format-select {
-      padding: 4px 8px;
-      font-size: 11px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--background);
-      color: var(--foreground);
-      cursor: pointer;
-      font-family: inherit;
-    }
-
     /* === v3: Score history popover === */
     #score-history-popover {
       display: none;
@@ -1259,18 +1237,11 @@
 
   <!-- Copy Issues — pinned outside scroll area so it's always visible -->
   <div id="health-copy-bar">
-    <div class="copy-format-row">
-      <span class="copy-format-label">Format:</span>
-      <select id="copy-format-select" class="copy-format-select" aria-label="Copy format">
-        <option value="plain">Plain text</option>
-        <option value="ai">AI prompt</option>
-      </select>
-    </div>
     <button class="tool-btn" id="tool-copy-issues" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
       <span class="tool-icon" style="font-size:18px">📋</span>
       <div style="text-align:left;flex:1">
         <span class="tool-label">Copy Issues to Clipboard</span>
-        <span class="tool-desc" style="display:block">Plain text or AI prompt — paste into Slack, Jira, or a chat</span>
+        <span class="tool-desc" style="display:block">Plain text with verified docs — paste into Slack, Jira, an AI chat, or anywhere</span>
       </div>
     </button>
   </div>

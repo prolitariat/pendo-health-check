@@ -8,7 +8,7 @@ All notable changes to the Pendo Health Check Chrome extension are documented he
 - **Quick Copy chip grid.** Six chips, one-click copy: Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Realm. The values an operator actually pastes into a ticket, Slack, or API call. Diagnostic state (Framework, Ready, Active Guides count) intentionally stays out of the chip grid because it isn't a copy-paste value; it lives in the grade pill and the "Why this grade" drawer. Empty values render grayed out and uncopyable so missing data is visible, not hidden.
 - **Subscription ID and Session ID extraction.** Values most often pasted into Pendo support tickets and API calls, surfaced as their own chips. Best-effort across `pendo.getSubscriptionId()` / `pendo._config.subscriptionId` / direct property paths and `pendo.getSessionId()` / `pendo._session.id` / `pendo.sessionId`.
 - **Realm chip.** Derives US / EU / US1 / JP / "Custom CNAME" from the detected data host suffix.
-- **AI prompt mode for Copy Issues.** Format selector next to the copy button. "AI prompt" wraps the existing report with a triage preamble for Claude / ChatGPT. Preamble explicitly tells the model not to invent URLs. Plain text remains the default. Last-used format persists across popup opens.
+- **Self-describing Copy Issues output.** One plain-text format, no dropdown. The report's preamble identifies the tool, version, and source repo, lists the severity ordering, and notes that doc URLs at the bottom are verified Pendo Help Center articles. That's enough orientation for both a human reader and an LLM the user pastes the report into. Drops the "AI prompt" format selector that was briefly added; the dropdown was complexity without clear payoff.
 - **Score diff with multi-history.** Per-page score history (last 5 entries, keyed by hostname + pathname) persisted to `chrome.storage.local`. A diff badge next to the grade pill shows the delta from the previous visit; clicking opens a popover with recent history.
 - **CMP consent-gating check.** Flags Pendo running with a non-anonymous visitor and `pendo.isReady() === true` while the consent manager reports analytics consent denied. Actionable detection on Cookiebot, Didomi, Osano, and a narrow OneTrust read (C0001-only). Inform-only on TrustArc and TCF v2.0. Five-of-five conditions must hold; any unknown signal suppresses the flag. Vendor remediation links are platform-specific (OneTrust, Cookiebot, Didomi, Osano docs) with Pendo's "Data collection and compliance" article as a supplementary link.
 
@@ -18,9 +18,13 @@ All notable changes to the Pendo Health Check Chrome extension are documented he
 - **Honest framing.** Store listing and manifest description now open with "Side project, not an official Pendo product." Disclaims Pendo affiliation/endorsement up front, redirects bug reports to GitHub, and asks users not to file Pendo support tickets for extension issues.
 - **Doc-label accuracy.** Six Pendo Help Center IDs in the sources map were audited against Google's index. Five labels updated to match canonical titles. The CMP doc ID `360031867272` ("Configure Pendo with a Cookie Consent Manager") was removed because no public record of it exists. Replaced with the verified `21326554691227` ("Data collection and compliance") for the CMP-related links.
 
+### Fixed
+- **Wrong npm package name in remediation text.** The "agent version outdated" recommendation pointed users to `npm update @pendo-io/agent`. The real npm package is `@pendo/agent` (the org is `pendo-io`, but the npm scope is `pendo`). The wrong command would have failed silently; corrected.
+
 ### Notes
 - v2.2.0's claim of "CMP/GDPR consent detection across 6 platforms" was vaporware: production code had no CMP read whatsoever (only a help-doc label). v3.0.0 ships actionable detection on 4 platforms and inform-only on 2, and the marketing copy now matches reality.
 - The CMP check is intentionally conservative: it errs on the side of saying nothing rather than flagging legitimate patterns (anonymous pre-consent buffering, strictly-necessary classification, opt-out CMP modes whose state we cannot read).
+- Every Pendo Help Center doc URL in the codebase was audited against Google's index. Every CSP host, agent API name, and remediation snippet was reviewed for fabrication before the v3 release.
 
 ## [2.2.0] — 2026-03-14
 

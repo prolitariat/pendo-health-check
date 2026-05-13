@@ -52,7 +52,7 @@ If a consent manager is on the page and Pendo is initialized with a non-anonymou
 
 COPY ISSUES TO CLIPBOARD
 
-Pick a format (Plain text or AI prompt) and click. Plain text is the report you've always copied: severity-sorted findings with remediation steps and verified doc links. AI prompt mode wraps it in a triage preamble for Claude or ChatGPT, telling the model to identify root causes, order fixes by severity, and not invent any URLs.
+One click, one plain-text output. The report's preamble identifies the tool, version, and source repo, lists the severity ordering, and notes that doc URLs at the bottom are verified Pendo Help Center articles. That orientation is enough for both a human reader (paste into Slack, Jira, a support ticket) and an LLM (paste into Claude or ChatGPT for triage assistance). No format selector to fiddle with.
 
 DEVELOPER TOOLS
 

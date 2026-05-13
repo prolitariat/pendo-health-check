@@ -686,28 +686,7 @@ function v3PersistAndRenderScore(finalGrade) {
 
 // --- v3: AI prompt builder (wraps the plain-text report) ---
 
-function v3BuildAIPromptReport() {
-  var plain = "";
-  try { plain = buildIssuesReport(); } catch (e) { plain = "(report unavailable: " + e.message + ")"; }
-  var preamble = [
-    "You are debugging a Pendo installation. Below is a diagnostic report from",
-    "the Pendo Health Check Chrome extension (a side-project tool, not an",
-    "official Pendo product). Read it carefully, then:",
-    "",
-    "1. Identify the most likely root cause for each finding.",
-    "2. Order your fixes by severity (PROBLEM > WARNING > INFO).",
-    "3. For each fix, give a concrete code change, config change, or vendor-side",
-    "   action (CMP, CSP, etc.). Cite the documentation URLs already in the",
-    "   report. Do not invent new URLs.",
-    "4. Flag any finding where you would want more information before",
-    "   making a recommendation.",
-    "",
-    "── Report ──"
-  ].join("\n");
-  return preamble + "\n" + plain;
-}
-
-// --- v3: wireup for drawers, toggles, popover, and format-select persistence ---
+// --- v3: wireup for drawers, toggles, and popover ---
 
 (function v3Wireup() {
   // Diagnostics drawer ("Why this grade")
@@ -746,20 +725,6 @@ function v3BuildAIPromptReport() {
     });
   }
 
-  // Copy format select: remember last choice across popup opens
-  var fmtSel = document.getElementById("copy-format-select");
-  if (fmtSel) {
-    try {
-      chrome.storage.local.get("v3CopyFormat", function (r) {
-        if (r && r.v3CopyFormat) {
-          fmtSel.value = r.v3CopyFormat;
-        }
-      });
-    } catch (_) {}
-    fmtSel.addEventListener("change", function () {
-      try { chrome.storage.local.set({ v3CopyFormat: fmtSel.value }); } catch (_) {}
-    });
-  }
 })();
 
 // ---------------------------------------------------------------------------
@@ -1338,8 +1303,11 @@ document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
 function buildIssuesReport() {
   const url = document.getElementById("page-url").textContent || "unknown page";
   const lines = [];
-  lines.push(`Pendo Issues Report — ${url}`);
-  lines.push(`Generated: ${new Date().toLocaleString()}`);
+  // Preamble doubles as orientation for a human reader AND any LLM the user
+  // pastes this into. Keep it factual and short. No marketing.
+  lines.push(`Pendo Health Check report — ${url}`);
+  lines.push(`Generated: ${new Date().toLocaleString()} by github.com/prolitariat/pendo-health-check v3.0.0 (Chrome extension; side project, not an official Pendo product).`);
+  lines.push(`Findings are ordered by severity (PROBLEM > INCIDENT > WARNING > INFO > TIP). Doc URLs at the bottom are verified Pendo Help Center articles; CMP vendor URLs appear inline in the relevant fix.`);
   lines.push("");
 
   const reported = new Set(); // Track reported topics to avoid duplicates
@@ -1531,12 +1499,11 @@ function buildIssuesReport() {
 document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
   const btn = document.getElementById("tool-copy-issues");
   const label = btn.querySelector(".tool-label");
-  // v3: respect Copy Issues format selector (plain text or AI prompt)
-  var formatSel = document.getElementById("copy-format-select");
-  var fmt = (formatSel && formatSel.value) || "plain";
-  var text = fmt === "ai" ? v3BuildAIPromptReport() : buildIssuesReport();
+  // v3: single plain-text output. The report's preamble is self-describing
+  // enough that pasting it into an LLM works without a separate "AI mode."
+  const text = buildIssuesReport();
   navigator.clipboard.writeText(text).then(() => {
-    trackEvent("copy_report", { format: fmt });
+    trackEvent("copy_report");
     if (label) {
       label.textContent = "Copied!";
       setTimeout(() => { label.textContent = "Copy Issues to Clipboard"; }, 1500);
@@ -2704,7 +2671,7 @@ function runPendoSetupAssistant() {
       var major = parseInt(parts[0], 10);
       if (major < 2) {
         recommend("tip", "Agent version may be outdated",
-          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo-io/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
+          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
       }
     }
   } catch (e) {}
