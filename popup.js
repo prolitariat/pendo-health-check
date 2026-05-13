@@ -1203,12 +1203,12 @@ function buildIssuesReport() {
     lines.push("");
     lines.push("── Sources ──");
     const sourceLabels = {
-      "360032209131": "Content Security Policy for Pendo",
-      "360046272771": "Developer's Guide to Implementing Pendo",
-      "360031862272": "Install Pendo on a Single-Page Web Application",
-      "360031832072": "Configure Visitor and Account Metadata",
-      "360043539891": "CNAME for Pendo",
-      "360031867272": "Configure Pendo with a Cookie Consent Manager"
+      "360032209131": "Content-Security-Policy (CSP)",
+      "360046272771": "Developer's guide to implementing Pendo using the install script",
+      "360031862272": "Installation for Single-Page Frameworks",
+      "360031832072": "Visitor and Account Metadata",
+      "360043539891": "CNAME for Pendo Insights and Guidance",
+      "21326554691227": "Data collection and compliance"
     };
     sources.forEach(url => {
       // Extract article ID to generate a human-readable label
