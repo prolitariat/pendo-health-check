@@ -2,7 +2,7 @@
 
 > **Side project, not an official Pendo product.** Built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract. If something breaks, file a GitHub issue here; please don't file a Pendo support ticket about it.
 
-A Manifest V3 Chrome extension that helps Pendo operators make decisions faster on any page with [Pendo](https://www.pendo.io/) installed. Click the toolbar icon and get two things at once: a **Quick Copy chip grid** for the values you reach for most (Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Data Host, Realm, Active Guides, Framework, Ready) and an **A–F installation grade** with a score-diff badge showing the delta from your last visit. The full prioritized findings list lives behind a "Why this grade" drawer that stays collapsed by default.
+A Manifest V3 Chrome extension that helps Pendo operators make decisions faster on any page with [Pendo](https://www.pendo.io/) installed. Click the toolbar icon and get two things at once: a **Quick Copy chip grid** of six values an operator actually pastes into a ticket, Slack, or API call (Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Realm) and an **A–F installation grade** with a score-diff badge showing the delta from your last visit. The full prioritized findings list lives behind a "Why this grade" drawer that stays collapsed by default.
 
 Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-setup-assistant). The ai-setup-assistant helps developers **install** Pendo into a codebase; this extension **validates and triages** the running installation from the browser.
 
@@ -58,7 +58,7 @@ To update later, just `git pull` and click the ↻ reload button on the extensio
 
 **Restricted Pages** — On `chrome://` pages and the Chrome Web Store, the extension shows an error state explaining the restriction.
 
-**Quick Copy chips** — The chip grid below the header surfaces ten commonly-needed values for one-click copy: Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Data Host, Realm, Active Guides, Framework, Ready. Chips for values that aren't set on this page render grayed out and uncopyable so missing data is visible, not hidden. A "More" toggle reveals API Key and Content Host.
+**Quick Copy chips** — The chip grid below the header surfaces six values an operator actually pastes into a ticket, Slack, or API call: Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Realm. Chips for values that aren't set on this page render grayed out and uncopyable so missing data is visible, not hidden. Diagnostic state (Framework, Ready, Active Guides count) stays out of the chip grid because it isn't a copy-paste value — it's already covered by the grade pill and the "Why this grade" drawer.
 
 **Score diff** — The grade pill in the header is paired with a score-diff badge (↑ +12 / ↓ −8 / · 0) showing the delta from your last visit to the same hostname + path. Click the badge for a popover with the last five scores. History is stored locally in `chrome.storage.local`; nothing leaves your browser.
 

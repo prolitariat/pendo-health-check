@@ -491,21 +491,18 @@ function renderGradeCard(grade) {
 // All v3-specific UI lives below so the legacy code above is untouched.
 // ===========================================================================
 
+// v3: chip set is intentionally tight — only values an operator actually
+// pastes into a ticket, Slack, or API call. Diagnostic state (Framework,
+// Ready, Active Guides) is covered by the grade pill and "Why this grade"
+// drawer and does not belong here. Six entries → three clean rows in the
+// 2-column grid.
 var V3_CHIPS_MAIN = [
   { key: "visitorId",      label: "Visitor ID" },
   { key: "accountId",      label: "Account ID" },
   { key: "subscriptionId", label: "Subscription ID" },
   { key: "sessionId",      label: "Session ID" },
   { key: "version",        label: "Agent Version" },
-  { key: "dataHost",       label: "Data Host" },
-  { key: "realm",          label: "Realm" },
-  { key: "activeGuides",   label: "Active Guides", format: "number" },
-  { key: "framework",      label: "Framework" },
-  { key: "ready",          label: "Ready",          format: "boolean" }
-];
-var V3_CHIPS_MORE = [
-  { key: "apiKey",      label: "API Key" },
-  { key: "contentHost", label: "Content Host" }
+  { key: "realm",          label: "Realm" }
 ];
 
 function v3FormatChipValue(value, format) {
@@ -562,13 +559,10 @@ function v3RenderChip(spec, values) {
 function v3RenderQuickCopy(values) {
   var section = document.getElementById("quick-copy");
   var mainGrid = document.getElementById("chip-grid");
-  var moreGrid = document.getElementById("more-chip-grid");
-  if (!section || !mainGrid || !moreGrid) return;
+  if (!section || !mainGrid) return;
 
   mainGrid.innerHTML = "";
-  moreGrid.innerHTML = "";
   V3_CHIPS_MAIN.forEach(function (spec) { mainGrid.appendChild(v3RenderChip(spec, values || {})); });
-  V3_CHIPS_MORE.forEach(function (spec) { moreGrid.appendChild(v3RenderChip(spec, values || {})); });
 
   section.style.display = "block";
 }
@@ -728,22 +722,6 @@ function v3BuildAIPromptReport() {
     diagToggle.addEventListener("click", toggleDiag);
     diagToggle.addEventListener("keydown", function (e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDiag(); }
-    });
-  }
-
-  // More chips toggle
-  var moreToggle = document.getElementById("more-chips-toggle");
-  var moreGrid = document.getElementById("more-chip-grid");
-  if (moreToggle && moreGrid) {
-    function toggleMore() {
-      var open = moreGrid.style.display !== "grid";
-      moreGrid.style.display = open ? "grid" : "none";
-      moreToggle.classList.toggle("open", open);
-      moreToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    }
-    moreToggle.addEventListener("click", toggleMore);
-    moreToggle.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleMore(); }
     });
   }
 

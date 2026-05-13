@@ -4,7 +4,7 @@
 Pendo Health Check
 
 --- SHORT DESCRIPTION (132 chars max) ---
-Side project, not an official Pendo product. Quick Copy chips, A to F install grade, score diff, and CMP consent-gating check.
+Side project, not an official Pendo product. Six Quick Copy chips, A to F install grade, score diff, CMP consent-gating check.
 
 --- DETAILED DESCRIPTION ---
 Heads up: this is a side project built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract, no guarantees. If something breaks, file a GitHub issue; please don't open a Pendo support ticket, because Pendo didn't ship this and can't help with it.
@@ -13,13 +13,16 @@ Open it on any page with Pendo and get two things at once: a Quick Copy chip gri
 
 QUICK COPY CHIPS
 
-One-click copy for the values you actually paste somewhere:
-• Visitor ID, Account ID, Subscription ID, Session ID
-• Agent Version, Data Host, Realm (US / EU / US1 / JP / Custom CNAME)
-• Active Guides count, Framework, Ready (yes/no)
-• Behind a "More" toggle: API Key, Content Host
+Six chips, one-click copy. The values an operator actually pastes into a ticket, Slack, or API call:
 
-Empty values render grayed out and uncopyable so you can tell at a glance what's actually set vs. missing.
+• Visitor ID
+• Account ID
+• Subscription ID
+• Session ID
+• Agent Version
+• Realm (US / EU / US1 / JP / Custom CNAME)
+
+Empty values render grayed out and uncopyable so you can tell at a glance what's actually set vs. missing. Diagnostic state (framework, ready/not-ready, active guides count) intentionally stays out of the chip grid because it isn't a copy-paste value; it's covered by the grade pill and the "Why this grade" drawer.
 
 INSTALLATION GRADE (A to F)
 

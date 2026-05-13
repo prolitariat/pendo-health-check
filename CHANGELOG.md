@@ -5,7 +5,7 @@ All notable changes to the Pendo Health Check Chrome extension are documented he
 ## [3.0.0] — 2026-05-13
 
 ### Added
-- **Quick Copy chip grid.** One-click copy for Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Data Host, Realm, Active Guides, Framework, Ready. "More" toggle reveals API Key and Content Host. Empty values render grayed out and uncopyable so missing data is visible, not hidden.
+- **Quick Copy chip grid.** Six chips, one-click copy: Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Realm. The values an operator actually pastes into a ticket, Slack, or API call. Diagnostic state (Framework, Ready, Active Guides count) intentionally stays out of the chip grid because it isn't a copy-paste value; it lives in the grade pill and the "Why this grade" drawer. Empty values render grayed out and uncopyable so missing data is visible, not hidden.
 - **Subscription ID and Session ID extraction.** Values most often pasted into Pendo support tickets and API calls, surfaced as their own chips. Best-effort across `pendo.getSubscriptionId()` / `pendo._config.subscriptionId` / direct property paths and `pendo.getSessionId()` / `pendo._session.id` / `pendo.sessionId`.
 - **Realm chip.** Derives US / EU / US1 / JP / "Custom CNAME" from the detected data host suffix.
 - **AI prompt mode for Copy Issues.** Format selector next to the copy button. "AI prompt" wraps the existing report with a triage preamble for Claude / ChatGPT. Preamble explicitly tells the model not to invent URLs. Plain text remains the default. Last-used format persists across popup opens.

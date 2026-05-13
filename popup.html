@@ -1023,29 +1023,6 @@
       transition: opacity 0.12s;
     }
     .chip.copied .chip-copied-overlay { opacity: 1; }
-    .more-chips-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 4px 2px;
-      margin-top: 4px;
-      cursor: pointer;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--muted-foreground);
-      user-select: none;
-    }
-    .more-chips-toggle:hover { color: var(--foreground); }
-    .more-chips-toggle.open .more-chevron { transform: rotate(90deg); }
-    .more-chevron {
-      font-size: 9px;
-      transition: transform 0.15s;
-      width: 10px;
-      text-align: center;
-      display: inline-block;
-    }
-    #more-chip-grid { margin-top: 6px; }
-
     /* === v3: Diagnostics drawer wraps the existing checks list === */
     #diagnostics-drawer {
       border-top: 1px solid var(--border);
@@ -1169,15 +1146,12 @@
   <!-- Pendo Status Section -->
   <div id="pendo-status" style="display:none; flex-shrink: 0;"></div>
 
-  <!-- v3: Quick Copy chips — one-click values for fast handoff -->
+  <!-- v3: Quick Copy chips — six values an operator pastes into a ticket,
+       Slack, or API call. Diagnostic state lives in the grade pill and the
+       "Why this grade" drawer; it doesn't belong here. -->
   <div id="quick-copy">
     <div class="section-title">Quick Copy</div>
     <div id="chip-grid" class="chip-grid"></div>
-    <div id="more-chips-toggle" class="more-chips-toggle" role="button" tabindex="0" aria-expanded="false">
-      <span class="more-chevron">▶</span>
-      <span>More</span>
-    </div>
-    <div id="more-chip-grid" class="chip-grid" style="display:none"></div>
   </div>
 
   <!-- v3: Score history popover (toggled by score-diff badge) -->

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Pendo Health Check",
   "version": "3.0.0",
-  "description": "Side project, not an official Pendo product. Quick Copy chips for common values, A-F install grade, score diff, and CMP consent-gating check.",
+  "description": "Side project, not an official Pendo product. Six Quick Copy chips, A-F install grade, score diff, and CMP consent-gating check.",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
   "action": {
     "default_popup": "popup.html",
