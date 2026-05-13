@@ -7,7 +7,7 @@ Pendo Health Check
 Side project, not an official Pendo product. Grades any Pendo install A to F with prioritized diagnostics and inline tools.
 
 --- DETAILED DESCRIPTION ---
-Heads up: this is a side project from a Pendo employee, not an official Pendo product. No SLA, no support contract, no guarantees. If something breaks, file a GitHub issue; please don't open a Pendo support ticket, because Pendo support didn't ship this and can't help with it.
+Heads up: this is a side project built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract, no guarantees. If something breaks, file a GitHub issue; please don't open a Pendo support ticket, because Pendo didn't ship this and can't help with it.
 
 Open it on any page with Pendo and you get a letter grade (A to F) plus a single prioritized list of what's wrong. No DevTools required.
 
