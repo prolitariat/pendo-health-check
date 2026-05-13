@@ -71,34 +71,38 @@ try {
 // ---------------------------------------------------------------------------
 
 function showView(id) {
+  // v4: when an empty/error state is active, hide the hero/tabs/content too,
+  // so the popup doesn't double-render. When `id` is anything else (e.g.
+  // "__none__"), all three empty states hide and the main UI takes over.
   ["loading", "not-detected", "error-state"].forEach((v) => {
-    document.getElementById(v).style.display = v === id ? "block" : "none";
+    var el = document.getElementById(v);
+    if (!el) return;
+    var active = v === id;
+    el.style.display = active ? "block" : "none";
+    el.classList.toggle("is-active", active);
+  });
+  var anyEmpty = id === "loading" || id === "not-detected" || id === "error-state";
+  ["hero", "tabs", "content"].forEach(function (uid) {
+    var el = document.getElementById(uid);
+    if (el && anyEmpty) el.style.display = "none";
   });
 }
 
 function showTabs() {
-  // No tab bar — just show the pinned action bars (debugger + copy issues)
-  const debuggerBar = document.getElementById("debugger-bar");
-  if (debuggerBar) debuggerBar.style.display = "block";
-  const copyBar = document.getElementById("health-copy-bar");
-  if (copyBar) copyBar.style.display = "block";
+  // v4: reveal hero card, segmented tabs, and the main content area.
+  // Called once we've confirmed Pendo is present on the page.
+  var hero    = document.getElementById("hero");
+  var tabs    = document.getElementById("tabs");
+  var content = document.getElementById("content");
+  if (hero)    hero.style.display = "flex";
+  if (tabs)    tabs.style.display = "flex";
+  if (content) content.style.display = "block";
 }
 
-// ---------------------------------------------------------------------------
-// Scroll fade indicator — shows/hides bottom gradient on Report panel
-// ---------------------------------------------------------------------------
-function updateScrollFade() {
-  const panel = document.getElementById("panel-report");
-  const fade = document.getElementById("scroll-fade");
-  if (!panel || !fade) return;
-  const hasOverflow = panel.scrollHeight > panel.clientHeight + 2;
-  const nearBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 8;
-  fade.style.display = (hasOverflow && !nearBottom) ? "block" : "none";
-}
-(function() {
-  const panel = document.getElementById("panel-report");
-  if (panel) panel.addEventListener("scroll", updateScrollFade);
-})();
+// v4: updateScrollFade was a v3 visual cue. The new layout uses .content's
+// natural overflow without a gradient fade. Kept as a no-op so legacy
+// callers don't throw.
+function updateScrollFade() { /* v4 no-op */ }
 
 function escapeHtml(str) {
   const el = document.createElement("span");
@@ -303,18 +307,11 @@ function renderChecks(checks) {
     list.appendChild(allGood);
   }
 
-  // Passed checks omitted — grade card summary already shows the count.
-  // Summary line removed — grade card already displays the same breakdown.
-
-  // Reveal results: hide loading, fade in content
-  var loading = document.getElementById("report-loading");
-  var content = document.getElementById("report-content");
-  if (loading) loading.style.display = "none";
-  if (content) content.style.opacity = "1";
+  // Passed checks omitted — the hero card and Why-this-grade accordion already
+  // expose enough state. v4: this list lives inside the accordion now.
 
   showView("__none__");
   showTabs();
-  setTimeout(updateScrollFade, 50); // after DOM settles
 
   // Track popup open with check results
   trackEvent("popup_open", {
@@ -417,273 +414,312 @@ function computeGrade(hcChecks, setupIssues) {
 // Grade Card Rendering
 // ---------------------------------------------------------------------------
 
+// v4: renderGradeCard is the analysis flow's hook for "we have a final
+// grade, render it." Drives the new hero card. Issue rows are rendered
+// separately via v4RenderIssuesList from the analysis flow.
 function renderGradeCard(grade) {
-  var card = document.getElementById("grade-card");
-  if (!card) return;
-  // v3: legacy card kept for compatibility but hidden via CSS — still populate
-  // its fields in case anything else references them.
-  card.style.display = "flex";
-  var letterEl = document.getElementById("grade-letter");
-  letterEl.textContent = grade.letter;
-  letterEl.className = grade.cssClass;
-  document.getElementById("grade-score").textContent = grade.score + " / 100";
-  document.getElementById("grade-summary").textContent = grade.summary;
-
-  // v3: surface the grade in the header pill (the visible representation)
-  var pill = document.getElementById("grade-pill");
-  if (pill) {
-    pill.textContent = grade.letter;
-    pill.className = "grade-pill " + grade.cssClass;
-    pill.style.display = "inline-flex";
-    pill.title = grade.score + " / 100 · " + grade.summary;
-  }
-
-  // Reveal results: hide loading indicator, fade in report content
-  var loading = document.getElementById("report-loading");
-  var content = document.getElementById("report-content");
-  if (loading) loading.style.display = "none";
-  if (content) content.style.opacity = "1";
+  var state = v4DeriveState(grade, true);
+  var issueCount = (grade && (grade.criticals + grade.warnings)) || 0;
+  v4RenderHero(grade, state, issueCount);
 }
 
 // ===========================================================================
-// v3: Quick Copy chips + score history + AI prompt mode
-// All v3-specific UI lives below so the legacy code above is untouched.
+// v4: Direction C UI layer
+// Hero card · segmented tabs · severity-colored issue rows · compact quick-copy
+// All v4-specific UI lives below so the data-extraction code above is untouched.
 // ===========================================================================
 
-// v3: chip set is intentionally tight — only values an operator actually
-// pastes into a ticket, Slack, or API call. Diagnostic state (Framework,
-// Ready, Active Guides) is covered by the grade pill and "Why this grade"
-// drawer and does not belong here. Six entries → three clean rows in the
-// 2-column grid.
-var V3_CHIPS_MAIN = [
-  { key: "visitorId",      label: "Visitor ID" },
-  { key: "accountId",      label: "Account ID" },
-  { key: "subscriptionId", label: "Subscription ID" },
-  { key: "sessionId",      label: "Session ID" },
-  { key: "version",        label: "Agent Version" },
+// Inline SVG strings for the icons we use in dynamic content. Static icons
+// (header brand mark, refresh button, etc.) live in popup.html.
+var V4_SVG = {
+  copy:         '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  check:        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
+  alertTri:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  alertOctagon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  info:         '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+};
+
+// Chips on the Status panel (compact, five rows). The IDs tab gets the same
+// list plus Subscription appended. Diagnostic state (Framework, Ready,
+// Active Guides) intentionally does NOT appear here — that's the hero's job.
+var V4_CHIPS_STATUS = [
+  { key: "visitorId",      label: "Visitor" },
+  { key: "accountId",      label: "Account" },
+  { key: "sessionId",      label: "Session" },
+  { key: "version",        label: "Agent" },
+  { key: "realm",          label: "Realm" }
+];
+var V4_CHIPS_IDS = [
+  { key: "visitorId",      label: "Visitor" },
+  { key: "accountId",      label: "Account" },
+  { key: "subscriptionId", label: "Subscription" },
+  { key: "sessionId",      label: "Session" },
+  { key: "version",        label: "Agent" },
   { key: "realm",          label: "Realm" }
 ];
 
-function v3FormatChipValue(value, format) {
-  if (value === null || value === undefined || value === "") return null;
-  if (format === "number") {
-    if (typeof value === "number") return String(value);
-    var n = parseInt(value, 10);
-    return isNaN(n) ? String(value) : String(n);
+// --- State derivation ----------------------------------------------------
+
+// Map (grade, issue counts) to one of three hero states.
+//   healthy  → green grade square, "Pendo is healthy"
+//   degraded → orange grade square, "Pendo is degraded"
+//   outage   → red grade square, "Pendo is not running"
+function v4DeriveState(grade, pendoDetected) {
+  if (pendoDetected === false) return "outage";
+  if (!grade) return "degraded";
+  if (grade.criticals > 0 || grade.letter === "F") return "outage";
+  if (grade.warnings > 0 || grade.letter === "C" || grade.letter === "D") return "degraded";
+  return "healthy";
+}
+
+// --- Hero card -----------------------------------------------------------
+
+function v4RenderHero(grade, state, issueCount) {
+  var hero       = document.getElementById("hero");
+  var square     = document.getElementById("grade-square");
+  var titleEl    = document.getElementById("hero-title");
+  var subEl      = document.getElementById("hero-sub");
+  if (!hero || !square || !titleEl || !subEl) return;
+
+  square.textContent = grade && grade.letter ? grade.letter : "—";
+  square.className = "grade-square state-" + state;
+  square.title = grade ? (grade.score + " / 100 · " + grade.summary) : "";
+
+  var titles = {
+    healthy:  "Pendo is healthy",
+    degraded: "Pendo is degraded",
+    outage:   "Pendo is not running"
+  };
+  var subs = {
+    healthy:  "Tracking events, guides loading correctly.",
+    degraded: issueCount + " issue" + (issueCount === 1 ? "" : "s") + " found · agent live",
+    outage:   "Agent failed to initialize on this page"
+  };
+
+  titleEl.textContent = titles[state] || titles.degraded;
+  titleEl.className = "hero-title state-" + state;
+  subEl.textContent = subs[state] || subs.degraded;
+  hero.style.display = "flex";
+}
+
+// --- Severity-colored issue rows (top of Status panel) -------------------
+
+function v4SeverityClass(status) {
+  if (status === "fail") return "sev-err";
+  if (status === "warn") return "sev-warn";
+  if (status === "info") return "sev-info";
+  return "sev-info";
+}
+function v4SeverityIcon(status) {
+  if (status === "fail") return V4_SVG.alertOctagon;
+  if (status === "warn") return V4_SVG.alertTri;
+  return V4_SVG.info;
+}
+
+function v4RenderIssuesList(checks) {
+  var section = document.getElementById("issues-section");
+  var ok      = document.getElementById("ok-block");
+  var list    = document.getElementById("issues-list");
+  var countEl = document.getElementById("active-issues-count");
+  var tabCount = document.getElementById("tab-status-count");
+  if (!section || !ok || !list || !countEl) return 0;
+
+  // Filter to actionable items: fail + warn + info. Passes do not appear here.
+  var actionable = (checks || []).filter(function (c) {
+    return c.status === "fail" || c.status === "warn" || c.status === "info";
+  });
+
+  list.innerHTML = "";
+  countEl.textContent = actionable.length;
+
+  if (actionable.length === 0) {
+    section.style.display = "none";
+    ok.style.display = "block";
+    if (tabCount) {
+      tabCount.textContent = "";
+      tabCount.classList.remove("has-count");
+    }
+    return 0;
   }
-  if (format === "boolean") return value ? "yes" : "no";
+
+  ok.style.display = "none";
+  section.style.display = "block";
+  actionable.forEach(function (c) {
+    var row = document.createElement("div");
+    row.className = "issue-row " + v4SeverityClass(c.status);
+    var text = (c.detail && c.detail.trim()) ? c.detail : c.label;
+    row.innerHTML = v4SeverityIcon(c.status) + "<span></span>";
+    row.querySelector("span").textContent = text;
+    list.appendChild(row);
+  });
+
+  if (tabCount) {
+    tabCount.textContent = actionable.length;
+    tabCount.classList.add("has-count");
+  }
+  return actionable.length;
+}
+
+// --- Compact quick-copy table -------------------------------------------
+
+function v4FormatChipValue(value) {
+  if (value === null || value === undefined || value === "") return null;
   return String(value);
 }
 
-function v3RenderChip(spec, values) {
+function v4RenderQuickCopyRow(spec, values, isLast) {
   var raw = values[spec.key];
-  var display = v3FormatChipValue(raw, spec.format);
-  var btn = document.createElement("button");
-  btn.className = "chip" + (display === null ? " empty" : "");
-  btn.type = "button";
-  btn.setAttribute("data-key", spec.key);
+  var display = v4FormatChipValue(raw);
+  var empty = display === null;
 
-  var labelEl = document.createElement("span");
-  labelEl.className = "chip-label";
-  labelEl.textContent = spec.label;
+  var row = document.createElement(empty ? "div" : "button");
+  row.className = "qc-row" + (empty ? " qc-empty" : "");
+  if (!empty) {
+    row.type = "button";
+    row.setAttribute("data-key", spec.key);
+  }
+  if (isLast) row.style.borderBottom = "none";
 
-  var valueEl = document.createElement("span");
-  valueEl.className = "chip-value";
-  valueEl.textContent = display !== null ? display : "—";
-  valueEl.title = display !== null ? display : "Not available on this page";
+  var label = document.createElement("span");
+  label.className = "qc-label";
+  label.textContent = spec.label;
 
-  var overlay = document.createElement("span");
-  overlay.className = "chip-copied-overlay";
-  overlay.textContent = "Copied";
+  var value = document.createElement("span");
+  value.className = "qc-value";
+  value.textContent = display !== null ? display : "Not set";
+  value.title = display !== null ? display : "Not available on this page";
 
-  btn.appendChild(labelEl);
-  btn.appendChild(valueEl);
-  btn.appendChild(overlay);
+  var copyIcon = document.createElement("span");
+  copyIcon.className = "qc-copy-icon";
+  copyIcon.innerHTML = V4_SVG.copy;
 
-  if (display !== null) {
-    btn.addEventListener("click", function () {
+  row.appendChild(label);
+  row.appendChild(value);
+  row.appendChild(copyIcon);
+
+  if (!empty) {
+    row.addEventListener("click", function () {
       navigator.clipboard.writeText(display).then(function () {
-        btn.classList.add("copied");
+        row.classList.add("is-copied");
+        copyIcon.innerHTML = V4_SVG.check;
         try { trackEvent("copy_chip", { key: spec.key }); } catch (_) {}
-        setTimeout(function () { btn.classList.remove("copied"); }, 900);
+        setTimeout(function () {
+          row.classList.remove("is-copied");
+          copyIcon.innerHTML = V4_SVG.copy;
+        }, 1000);
       });
     });
-  } else {
-    btn.setAttribute("aria-disabled", "true");
   }
-
-  return btn;
+  return row;
 }
 
-function v3RenderQuickCopy(values) {
-  var section = document.getElementById("quick-copy");
-  var mainGrid = document.getElementById("chip-grid");
-  if (!section || !mainGrid) return;
-
-  mainGrid.innerHTML = "";
-  V3_CHIPS_MAIN.forEach(function (spec) { mainGrid.appendChild(v3RenderChip(spec, values || {})); });
-
-  section.style.display = "block";
-}
-
-// --- v3: score history (chrome.storage.local, last 5 per hostname+path) ---
-
-function v3HistoryKey(urlString) {
-  try {
-    var u = new URL(urlString);
-    return "score_history::" + u.hostname + u.pathname;
-  } catch (_) {
-    return "score_history::" + String(urlString || "unknown");
-  }
-}
-
-function v3LoadHistory(urlString, cb) {
-  var key = v3HistoryKey(urlString);
-  try {
-    chrome.storage.local.get(key, function (result) {
-      var arr = (result && result[key]) || [];
-      cb(arr, key);
-    });
-  } catch (_) {
-    cb([], key);
-  }
-}
-
-function v3SaveHistory(urlString, entry, cb) {
-  v3LoadHistory(urlString, function (existing, key) {
-    var next = [entry].concat(existing).slice(0, 5);
-    var update = {};
-    update[key] = next;
-    try {
-      chrome.storage.local.set(update, function () { if (cb) cb(next); });
-    } catch (_) {
-      if (cb) cb(next);
-    }
+function v4RenderQuickCopy(values, specs, mountId) {
+  var mount = document.getElementById(mountId);
+  if (!mount) return;
+  mount.innerHTML = "";
+  specs.forEach(function (spec, idx) {
+    mount.appendChild(v4RenderQuickCopyRow(spec, values || {}, idx === specs.length - 1));
   });
 }
 
-function v3FormatRelative(ts) {
-  if (!ts) return "";
-  var diffMs = Date.now() - ts;
-  var minutes = Math.round(diffMs / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return minutes + "m ago";
-  var hours = Math.round(minutes / 60);
-  if (hours < 24) return hours + "h ago";
-  var days = Math.round(hours / 24);
-  if (days < 14) return days + "d ago";
-  return new Date(ts).toLocaleDateString();
+// Convenience: render both Status (compact) and IDs (full) tables from
+// the same values object.
+function v4RenderAllQuickCopy(values) {
+  v4RenderQuickCopy(values, V4_CHIPS_STATUS, "quick-copy-status");
+  v4RenderQuickCopy(values, V4_CHIPS_IDS,    "quick-copy-ids");
 }
 
-function v3RenderScoreDiff(currentScore, history) {
-  var btn = document.getElementById("score-diff");
-  if (!btn) return;
-  // history[0] is the just-saved current entry; history[1] is the previous visit
-  var prev = history && history.length > 1 ? history[1] : null;
-  if (!prev || typeof prev.score !== "number") { btn.style.display = "none"; return; }
-  var delta = currentScore - prev.score;
-  var arrow, cls;
-  if (delta > 0) { arrow = "↑"; cls = "up"; }
-  else if (delta < 0) { arrow = "↓"; cls = "down"; }
-  else { arrow = "·"; cls = "flat"; }
-  btn.className = "score-diff-badge " + cls;
-  btn.textContent = arrow + " " + (delta > 0 ? "+" : "") + delta;
-  btn.title = "Previous: " + prev.letter + " (" + prev.score + ") · " + v3FormatRelative(prev.timestamp);
-  btn.style.display = "inline-flex";
-  // Cache history for popover render
-  window.__v3LastHistory = history;
-}
+// --- Tab switching --------------------------------------------------------
 
-function v3RenderHistoryPopover(history) {
-  var pop = document.getElementById("score-history-popover");
-  if (!pop) return;
-  pop.innerHTML = "";
-  var title = document.createElement("div");
-  title.className = "popover-title";
-  title.textContent = "Score history (this page)";
-  pop.appendChild(title);
-  if (!history || history.length === 0) {
-    var empty = document.createElement("div");
-    empty.textContent = "No prior visits recorded.";
-    empty.style.color = "var(--muted-foreground)";
-    pop.appendChild(empty);
-    return;
-  }
-  history.forEach(function (entry, idx) {
-    var row = document.createElement("div");
-    row.className = "history-row";
-    var g = document.createElement("span");
-    g.className = "history-grade " + (entry.cssClass || "");
-    g.textContent = entry.letter || "?";
-    var when = document.createElement("span");
-    when.className = "history-when";
-    when.textContent = (idx === 0 ? "now" : v3FormatRelative(entry.timestamp));
-    var score = document.createElement("span");
-    score.className = "history-score";
-    score.textContent = entry.score + "/100";
-    row.appendChild(g);
-    row.appendChild(when);
-    row.appendChild(score);
-    pop.appendChild(row);
+function v4ActivateTab(name) {
+  var tabs = document.querySelectorAll(".tab[data-tab]");
+  tabs.forEach(function (t) {
+    var active = t.getAttribute("data-tab") === name;
+    t.classList.toggle("is-active", active);
+    t.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  var panels = document.querySelectorAll(".tab-panel[data-panel]");
+  panels.forEach(function (p) {
+    var active = p.getAttribute("data-panel") === name;
+    p.classList.toggle("is-active", active);
+    if (active) p.removeAttribute("hidden"); else p.setAttribute("hidden", "");
   });
 }
 
-function v3PersistAndRenderScore(finalGrade) {
-  var pageUrl = (document.getElementById("page-url") || {}).textContent || "";
-  if (!pageUrl) return;
-  var entry = {
-    score: finalGrade.score,
-    letter: finalGrade.letter,
-    cssClass: finalGrade.cssClass,
-    timestamp: Date.now(),
-    url: pageUrl
-  };
-  v3SaveHistory(pageUrl, entry, function (history) {
-    v3RenderScoreDiff(finalGrade.score, history);
-  });
+// --- Badge state text in footer ------------------------------------------
+
+function v4SyncBadgeStateText() {
+  var input = document.getElementById("badge-enabled");
+  var text  = document.getElementById("badge-state-text");
+  if (!input || !text) return;
+  text.textContent = input.checked ? "Badge on" : "Badge off";
 }
 
-// --- v3: AI prompt builder (wraps the plain-text report) ---
+// --- Wireup: tabs, why-grade accordion, refresh, JSON copy, footer ------
 
-// --- v3: wireup for drawers, toggles, and popover ---
+(function v4Wireup() {
+  // Segmented tab clicks
+  document.querySelectorAll(".tab[data-tab]").forEach(function (t) {
+    t.addEventListener("click", function () {
+      v4ActivateTab(t.getAttribute("data-tab"));
+      try { trackEvent("tab_switch", { tab: t.getAttribute("data-tab") }); } catch (_) {}
+    });
+  });
 
-(function v3Wireup() {
-  // Diagnostics drawer ("Why this grade")
-  var diagToggle = document.getElementById("diagnostics-toggle");
-  var diagDrawer = document.getElementById("diagnostics-drawer");
-  if (diagToggle && diagDrawer) {
-    function toggleDiag() {
-      var open = diagDrawer.classList.toggle("open");
-      diagToggle.classList.toggle("open", open);
-      diagToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    }
-    diagToggle.addEventListener("click", toggleDiag);
-    diagToggle.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDiag(); }
+  // "Why this grade?" accordion — toggles the checks-list body
+  var whyToggle = document.getElementById("why-grade-toggle");
+  var whyBody   = document.getElementById("why-grade-body");
+  if (whyToggle && whyBody) {
+    whyToggle.addEventListener("click", function () {
+      var open = whyBody.style.display === "block";
+      whyBody.style.display = open ? "none" : "block";
+      whyToggle.setAttribute("aria-expanded", open ? "false" : "true");
     });
   }
 
-  // Score-diff badge → toggle history popover
-  var diffBtn = document.getElementById("score-diff");
-  var pop = document.getElementById("score-history-popover");
-  if (diffBtn && pop) {
-    diffBtn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      if (pop.style.display === "block") {
-        pop.style.display = "none";
-        return;
-      }
-      v3RenderHistoryPopover(window.__v3LastHistory || []);
-      pop.style.display = "block";
-    });
-    // Click anywhere else closes the popover
-    document.addEventListener("click", function (e) {
-      if (pop.style.display === "block" && !pop.contains(e.target) && e.target !== diffBtn) {
-        pop.style.display = "none";
-      }
+  // Refresh button — re-run the diagnostic without reopening the popup.
+  var refreshBtn = document.getElementById("header-refresh");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", function () {
+      refreshBtn.classList.add("spinning");
+      setTimeout(function () { refreshBtn.classList.remove("spinning"); }, 600);
+      try { trackEvent("refresh_click"); } catch (_) {}
+      // Re-run the same DOMContentLoaded flow by reloading the popup window.
+      // Cheapest correct behavior; the popup is ephemeral state anyway.
+      window.location.reload();
     });
   }
 
+  // Copy all IDs as JSON (IDs tab)
+  var copyJson = document.getElementById("copy-all-json");
+  if (copyJson) {
+    var jsonLabel = copyJson.querySelector(".btn-label");
+    copyJson.addEventListener("click", function () {
+      var values = window.__lastValues || {};
+      var payload = {};
+      V4_CHIPS_IDS.forEach(function (spec) {
+        payload[spec.key] = values[spec.key] === undefined ? null : values[spec.key];
+      });
+      navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(function () {
+        if (jsonLabel) {
+          var orig = jsonLabel.textContent;
+          jsonLabel.textContent = "Copied!";
+          setTimeout(function () { jsonLabel.textContent = orig; }, 1500);
+        }
+        try { trackEvent("copy_ids_json"); } catch (_) {}
+      });
+    });
+  }
+
+  // Footer "Send feedback" link — same handler as the legacy feedback-btn
+  // (the click listener is attached lower in the file, no extra wiring needed).
+
+  // Badge checkbox controls the footer text label too.
+  var badgeInput = document.getElementById("badge-enabled");
+  if (badgeInput) {
+    badgeInput.addEventListener("change", v4SyncBadgeStateText);
+    v4SyncBadgeStateText();
+  }
 })();
 
 // ---------------------------------------------------------------------------
@@ -950,6 +986,9 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   if (!tab) return;
   currentTabId = tab.id;
   document.getElementById("page-url").textContent = tab.url || "";
+  // v4: also reflect the URL in the visible chip on the Status panel
+  var urlDisplay = document.getElementById("page-url-display");
+  if (urlDisplay) urlDisplay.textContent = tab.url || "—";
 
   if (
     !tab.url ||
@@ -986,9 +1025,11 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       activeTabId = "report";
       renderChecks(data.checks);
 
-      // v3: render chips immediately from the first analysis pass.
-      // Framework is unknown until setup completes; populated again below.
-      v3RenderQuickCopy(window.__lastValues);
+      // v4: populate the Quick Copy compact table (Status) and the full IDs
+      // table (IDs tab) immediately from the first analysis pass. Issue rows
+      // and hero card update again below once setup analysis completes.
+      v4RenderAllQuickCopy(window.__lastValues);
+      v4RenderIssuesList(data.checks);
 
       // Re-render status filtered to detected environment
       const env = detectEnvFromChecks(data.checks);
@@ -1020,13 +1061,17 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
                            : "info";
                 return { status: status, label: si.label, detail: si.detail };
               });
-              renderChecks(data.checks.concat(setupAsChecks));
+              var allChecks = data.checks.concat(setupAsChecks);
+              renderChecks(allChecks);
+              v4RenderIssuesList(allChecks);
 
               // Compute final grade from both HC and setup data
               const finalGrade = computeGrade(data.checks, setupIssues);
               renderGradeCard(finalGrade);
 
-              // v3: enrich chips with framework from setup data, then persist + diff
+              // v4: re-render quick copy with framework merged from setup data.
+              // (Chip set doesn't include framework, but __lastValues is
+              // kept up to date for any future consumers / IDs JSON copy.)
               try {
                 var mergedValues = Object.assign({}, window.__lastValues || {});
                 if (setupData.framework && setupData.framework.name) {
@@ -1035,12 +1080,8 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
                     : setupData.framework.name;
                 }
                 window.__lastValues = mergedValues;
-                v3RenderQuickCopy(mergedValues);
+                v4RenderAllQuickCopy(mergedValues);
               } catch (_) {}
-              try { v3PersistAndRenderScore(finalGrade); } catch (_) {}
-
-              setTimeout(updateScrollFade, 50);
-              // Auto-expand dev tools if there's room after full render
 
               // Set badge on icon — send full analysis to background
               window.__lastTotalIssues = finalGrade.criticals + finalGrade.warnings;
@@ -1050,12 +1091,13 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
             }
           })
           .catch(() => {
-            // Setup failed — show grade from HC data only
-            if (!document.getElementById("grade-card").style.display ||
-                document.getElementById("grade-card").style.display === "none") {
+            // Setup failed — show grade from HC data only.
+            // v4: the hero card is the visible representation; check
+            // its dataset/state rather than the legacy grade-card.
+            var hero = document.getElementById("hero");
+            if (!hero || hero.style.display === "none") {
               var fallbackGrade = window.__prelimGrade || computeGrade(data.checks, []);
               renderGradeCard(fallbackGrade);
-              try { v3PersistAndRenderScore(fallbackGrade); } catch (_) {}
               window.__lastTotalIssues = (fallbackGrade.criticals || 0) + (fallbackGrade.warnings || 0);
               window.__lastCriticals = fallbackGrade.criticals || 0;
               window.__lastWarnings = fallbackGrade.warnings || 0;

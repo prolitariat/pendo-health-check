@@ -2,7 +2,7 @@
 
 > **Side project, not an official Pendo product.** Built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract. If something breaks, file a GitHub issue here; please don't file a Pendo support ticket about it.
 
-A Manifest V3 Chrome extension that helps Pendo operators make decisions faster on any page with [Pendo](https://www.pendo.io/) installed. Click the toolbar icon and get two things at once: a **Quick Copy chip grid** of six values an operator actually pastes into a ticket, Slack, or API call (Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Realm) and an **A–F installation grade** with a score-diff badge showing the delta from your last visit. The full prioritized findings list lives behind a "Why this grade" drawer that stays collapsed by default.
+A Manifest V3 Chrome extension that helps Pendo operators make decisions faster on any page with [Pendo](https://www.pendo.io/) installed. v4 ships the **Compact Dashboard** redesign: a hero grade card up top, segmented **Status / IDs / Tools** tabs, severity-colored issue rows, and a Quick Copy table of the IDs operators actually paste into tickets. The full prioritized check list lives behind a "Why this grade?" accordion that stays collapsed by default.
 
 Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-setup-assistant). The ai-setup-assistant helps developers **install** Pendo into a codebase; this extension **validates and triages** the running installation from the browser.
 

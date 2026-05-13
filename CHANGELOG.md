@@ -2,6 +2,36 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [4.0.0] — 2026-05-13
+
+Visual redesign implementing **Direction C — Compact Dashboard** from the design handoff. Same data, same checks, same CMP consent-gating logic. Different shell.
+
+### Changed
+
+- **New brand mark.** Red-cross "Health Check" icon (inline SVG) replaces the Pendo-pink mark in the popup header. The Pendo chevron and other trademarked Pendo assets are not used; this is a third-party extension, not an official Pendo product.
+- **New typography.** Sora (display), Inter (UI), JetBrains Mono (IDs / URLs / versions) loaded from Google Fonts with `display=swap` so the popup paints immediately on fallback fonts.
+- **New color palette.** Pank (`#EB4778`) as the primary action color; ok/warn/err status ramps (50/200/500/700) drive grade square, hero title color, and issue row backgrounds.
+- **Hero grade card** replaces the previous header grade pill. 56×56 grade square (color = status-500), uppercase caption "Pendo Service Status," human-readable hero title ("Pendo is healthy" / "is degraded" / "is not running"), and a short sub-line.
+- **Segmented tabs.** Status / IDs / Tools as a pill-track control. Status panel hosts the URL chip, issues list, CTAs, and a compact Quick Copy table. IDs panel hosts a full table including Subscription plus a "Copy all as JSON" button. Tools panel hosts Toggle Pendo Debugger and the badge-on/off switch.
+- **Severity-colored issue rows.** Active issues render as ok/warn/err-tinted cards with severity icons (`alert-triangle` for warn, `alert-octagon` for fail) instead of a flat list.
+- **All-systems-operational block.** Healthy state replaces the issues list with a soft green dashed card, removing the empty-list feel.
+- **"Why this grade?" accordion** replaces the always-visible diagnostics drawer. Ghost button under the CTAs; expands inline to show the full check list when the user wants the technical breakdown.
+- **Footer.** Pank dot + version + badge state text + "Send feedback" link (no more checkbox; the badge toggle moves to the Tools tab as a real switch).
+- **Refresh button** added to the header. Reloads the popup, re-running the diagnostic without closing and reopening.
+- **Popup width** bumped to 384px (was 380px) to match the design's spacing rhythm.
+
+### Removed
+
+- **Score diff badge and per-page score history.** Not in the new design. The `chrome.storage.local` history under `score_history::*` is no longer written; existing entries from v3 remain on disk but are unread.
+- **Header grade pill.** Replaced by the hero grade square.
+- **Pinned debugger bar.** Toggle Pendo Debugger now lives in the Tools tab.
+- **Scroll-fade gradient** at the bottom of the report panel. The new content area uses native overflow.
+
+### Notes
+
+- The `_PENDO_T_` placeholder example in the original handoff README was a sample value, not a real visitor ID — visitor IDs that start with `_PENDO_T_` or `VISITOR-` continue to be flagged as anonymous by the existing visitor check (no change to detection logic).
+- This release does not migrate the extension to React. The handoff README assumed React + Tailwind as the default, but the existing codebase is vanilla JS with inline CSS in `popup.html`; the design tokens, layout, and structural composition map cleanly to plain CSS variables without a build step. Decided in conversation with the maintainer before implementation.
+
 ## [3.0.0] — 2026-05-13
 
 ### Added

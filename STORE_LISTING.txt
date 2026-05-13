@@ -1,4 +1,4 @@
-=== CHROME WEB STORE LISTING CONTENT (v3.0.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v4.0.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
