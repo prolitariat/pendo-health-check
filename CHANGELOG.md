@@ -6,6 +6,10 @@ All notable changes to the Pendo Health Check Chrome extension are documented he
 
 Visual redesign implementing **Direction C — Compact Dashboard** from the design handoff. Same data, same checks, same CMP consent-gating logic. Different shell.
 
+### Fixed
+
+- **Anonymous visitor IDs no longer flagged as a warning.** Pendo's own Help Center documents anonymous visitor tracking (the `_PENDO_T_*` and `VISITOR-*` prefixes) as the intentional pattern for pre-authentication and public-facing pages: see "Anonymous visitors" (article `360032202751`) and "Install Pendo on a login page" (article `360031861672`). The previous `warn` severity wrongly treated a documented Pendo pattern as a problem. Anonymous visitors now resolve to `pass` with a descriptive detail ("Anonymous visitor (pre-auth pattern): …"). Missing visitor ID entirely is still `fail`. The CMP consent-gating check is unaffected — it still inspects the anonymous prefix independently to avoid false-flagging legitimate pre-consent tracking.
+
 ### Changed
 
 - **New brand mark.** Red-cross "Health Check" icon (inline SVG) replaces the Pendo-pink mark in the popup header. The Pendo chevron and other trademarked Pendo assets are not used; this is a third-party extension, not an official Pendo product.

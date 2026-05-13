@@ -1531,6 +1531,16 @@ function runPendoHealthCheck() {
   }
 
   // 3. Visitor ID
+  // Anonymous visitor IDs (prefixes VISITOR- and _PENDO_T_) are a documented
+  // Pendo pattern for pre-authentication tracking. Pendo's "Anonymous
+  // visitors" article (360032202751) and "Install Pendo on a login page"
+  // article (360031861672) both describe this as the correct behavior for
+  // public-facing pages where there is no signed-in user to identify. We
+  // therefore treat anonymous as PASS with a descriptive detail, not as a
+  // warning. Missing visitor ID (no ID at all) is still a fail.
+  // The CMP consent-gating check in runPendoSetupAssistant still inspects
+  // the anonymous prefix directly to avoid false-flagging legitimate
+  // anonymous pre-consent tracking.
   try {
     var visitor =
       (pendo.getVisitorId && pendo.getVisitorId()) ||
@@ -1542,7 +1552,7 @@ function runPendoHealthCheck() {
       add("fail", "Visitor ID", "No visitor ID found");
     } else if (visitor.startsWith("VISITOR-") || visitor.startsWith("_PENDO_T_")) {
       values.visitorAnonymous = true;
-      add("warn", "Visitor ID", "Anonymous visitor: " + visitor);
+      add("pass", "Visitor ID", "Anonymous visitor (pre-auth pattern): " + visitor);
     } else {
       values.visitorAnonymous = false;
       add("pass", "Visitor ID", visitor);
