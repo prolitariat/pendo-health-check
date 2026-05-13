@@ -2,6 +2,12 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [4.1.1] — 2026-05-13
+
+### Fixed
+
+- **Auto-check toggle not persisting after permission grant.** The "Auto-check pages on load" toggle would visually flip on, prompt for `<all_urls>` permission, accept the grant, then revert to off on the next popup open. Root cause: Chrome's native permission prompt closes the popup on some platforms (macOS in particular), destroying the JavaScript context before the `chrome.storage.local.set` call inside the `chrome.permissions.request` callback could run. The intent was lost; the permission was granted but the preference saying "use it" was never written. Fix: write the user's intent to storage *immediately* on toggle change, *before* calling `chrome.permissions.request`. If the user denies the prompt, revert in the callback (the deny path keeps the popup open). On the next popup open, the existing reconciliation logic normalizes any saved/granted mismatch.
+
 ## [4.1.0] — 2026-05-13
 
 ### Added

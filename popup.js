@@ -68,32 +68,42 @@ chrome.storage.local.get("badgeEnabled", function(result) {
   });
   checkbox.addEventListener("change", function () {
     if (checkbox.checked) {
-      // Turning ON — request the host permission. Chrome shows the prompt.
+      // Turning ON. Write the intent to storage IMMEDIATELY, before requesting
+      // permission. Chrome's permission prompt on some platforms (notably
+      // macOS) steals focus and closes the popup — once the popup's JS
+      // context is destroyed, any callback that hadn't fired yet is lost.
+      // Writing storage first means the user's intent is persisted regardless
+      // of popup lifecycle. If the user denies the prompt, we revert below;
+      // and on the next popup open the init reconciliation in this same IIFE
+      // normalizes any "saved=true but not granted" mismatch.
+      chrome.storage.local.set({ autoCheckEnabled: true });
+      chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
       try {
         chrome.permissions.request({ origins: ["<all_urls>"] }, function (granted) {
-          if (granted) {
-            chrome.storage.local.set({ autoCheckEnabled: true });
+          if (!granted) {
+            // User denied — revert.
+            chrome.storage.local.set({ autoCheckEnabled: false });
             chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
-            try { trackEvent("auto_check_enabled"); } catch (_) {}
-          } else {
             checkbox.checked = false;
+          } else {
+            try { trackEvent("auto_check_enabled"); } catch (_) {}
           }
         });
       } catch (_) {
+        // Synchronous error — revert to be safe.
+        chrome.storage.local.set({ autoCheckEnabled: false });
+        chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
         checkbox.checked = false;
       }
     } else {
-      // Turning OFF — revoke the host permission so we're not silently sitting
-      // on broad access the user is no longer using.
+      // Turning OFF — flip storage immediately, then revoke the permission.
       chrome.storage.local.set({ autoCheckEnabled: false });
+      chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
       try {
         chrome.permissions.remove({ origins: ["<all_urls>"] }, function () {
-          chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
           try { trackEvent("auto_check_disabled"); } catch (_) {}
         });
-      } catch (_) {
-        chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
-      }
+      } catch (_) {}
     }
   });
 })();
