@@ -239,16 +239,6 @@
     .tool-btn.active-tool .tool-label {
       color: var(--pendo-pink);
     }
-    #tool-status {
-      padding: 0 16px 10px;
-      font-size: 12px;
-      color: var(--muted-foreground);
-      text-align: center;
-      min-height: 18px;
-    }
-    #tool-status.success { color: var(--pendo-pink); }
-    #tool-status.error { color: var(--destructive); }
-
     /* === Feedback Bar === */
     #feedback-bar {
       padding: 8px 16px;
@@ -480,6 +470,14 @@
     #health-copy-bar {
       display: none;
       padding: 8px 12px 2px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* === v3: Debugger bar — top-level pinned Toggle Debugger button === */
+    #debugger-bar {
+      display: none;
+      padding: 8px 12px 0;
       border-top: 1px solid var(--border);
       flex-shrink: 0;
     }
@@ -849,51 +847,6 @@
     .grade-d { color: #ea580c; }
     .grade-f { color: var(--destructive); }
 
-    /* === Validate Results === */
-    #validate-results-wrap {
-      position: relative;
-      margin: 8px 4px;
-    }
-    #validate-results-wrap .copy-result-btn {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      padding: 3px 8px;
-      font-size: 11px;
-      font-weight: 500;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--background);
-      color: var(--muted-foreground);
-      cursor: pointer;
-      opacity: 0;
-      transition: opacity 0.15s, background 0.15s;
-      z-index: 2;
-    }
-    #validate-results-wrap:hover .copy-result-btn {
-      opacity: 1;
-    }
-    #validate-results-wrap .copy-result-btn:hover {
-      background: var(--pendo-pink-light);
-      border-color: var(--pendo-pink-mid);
-      color: var(--foreground);
-    }
-    #validate-results {
-      display: none;
-      padding: 10px 12px;
-      background: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 11px;
-      color: var(--foreground);
-      max-height: 200px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      line-height: 1.5;
-    }
-
     /* === v3: Header grade pill + score-diff badge === */
     .header-grade {
       display: flex;
@@ -1188,60 +1141,36 @@
         </div>
       </div>
 
-    <!-- Developer Tools — collapsible drawer -->
-    <div id="dev-tools-drawer" style="margin-top:4px;border-top:1px solid var(--border)">
-      <div id="dev-tools-toggle" style="display:flex;align-items:center;gap:6px;padding:8px 4px;cursor:pointer;user-select:none;font-size:12px;font-weight:600;color:var(--muted-foreground);letter-spacing:-0.01em;transition:background 0.1s" tabindex="0" role="button" aria-expanded="false">
-        <span class="setup-chevron" style="font-size:9px;width:12px;text-align:center;transition:transform 0.15s">▶</span>
-        <span>Developer Tools</span>
-      </div>
-      <div id="dev-tools-body" style="display:none;padding:0 4px 8px">
-        <!-- Launch Debugger -->
-        <div style="padding:0 0 8px">
-          <button class="tool-btn" id="tool-launch-debug" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
-            <span class="tool-icon" style="font-size:18px">🐛</span>
-            <div style="text-align:left;flex:1">
-              <span class="tool-label">Toggle Pendo Debugger</span>
-              <span class="tool-desc" style="display:block">Open/close on-page overlay</span>
-            </div>
-          </button>
-        </div>
-        <!-- Validate buttons -->
-        <div style="display:flex;gap:8px;margin-bottom:6px">
-          <button class="tool-btn" id="tool-validate-install" style="flex:1;flex-direction:row;padding:8px 10px;gap:8px">
-            <span class="tool-icon" style="font-size:15px">🔍</span>
-            <div style="text-align:left">
-              <span class="tool-label" style="font-size:11px">Validate Install</span>
-              <span class="tool-desc" style="display:block">Identity & metadata</span>
-            </div>
-          </button>
-          <button class="tool-btn" id="tool-validate-env" style="flex:1;flex-direction:row;padding:8px 10px;gap:8px">
-            <span class="tool-icon" style="font-size:15px">🧪</span>
-            <div style="text-align:left">
-              <span class="tool-label" style="font-size:11px">Validate Environment</span>
-              <span class="tool-desc" style="display:block">Config & error audit</span>
-            </div>
-          </button>
-        </div>
-        <div id="tool-status"></div>
-        <div id="validate-results-wrap">
-          <button class="copy-result-btn" id="copy-validate-result" title="Copy output">Copy</button>
-          <div id="validate-results"></div>
-        </div>
-      </div>
-    </div>
     </div><!-- /report-content -->
   </div>
 
   <!-- Scroll fade — visual cue that more content is below -->
   <div id="scroll-fade"></div>
 
-  <!-- Copy Issues — pinned outside scroll area so it's always visible -->
+  <!-- v3: Toggle Pendo Debugger — pinned top-level action.
+       The Pendo Debugger is the daily tool for tagging operators, in-app
+       content authors, and Pendo support staff. It does not belong behind
+       a "Developer Tools" drawer; it's promoted next to Copy Issues. -->
+  <div id="debugger-bar">
+    <button class="tool-btn" id="tool-launch-debug" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
+      <span class="tool-icon" style="font-size:18px">🐛</span>
+      <div style="text-align:left;flex:1">
+        <span class="tool-label">Toggle Pendo Debugger</span>
+        <span class="tool-desc" style="display:block">Open or close Pendo's on-page debug overlay</span>
+      </div>
+    </button>
+  </div>
+
+  <!-- Copy Issues — pinned outside scroll area so it's always visible.
+       v3: clicking also runs pendo.validateInstall() and appends its
+       console output to the report, so the artifact handed to engineering
+       contains both the extension's interpretation and Pendo's own verdict. -->
   <div id="health-copy-bar">
     <button class="tool-btn" id="tool-copy-issues" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
       <span class="tool-icon" style="font-size:18px">📋</span>
       <div style="text-align:left;flex:1">
         <span class="tool-label">Copy Issues to Clipboard</span>
-        <span class="tool-desc" style="display:block">Plain text with verified docs — paste into Slack, Jira, an AI chat, or anywhere</span>
+        <span class="tool-desc" style="display:block">Plain text with verified docs + Pendo's validateInstall output</span>
       </div>
     </button>
   </div>

@@ -77,7 +77,9 @@ function showView(id) {
 }
 
 function showTabs() {
-  // No tab bar — just show the copy bar
+  // No tab bar — just show the pinned action bars (debugger + copy issues)
+  const debuggerBar = document.getElementById("debugger-bar");
+  if (debuggerBar) debuggerBar.style.display = "block";
   const copyBar = document.getElementById("health-copy-bar");
   if (copyBar) copyBar.style.display = "block";
 }
@@ -250,49 +252,6 @@ let setupLoaded = false;
 let activeTabId = "report"; // Single view — always report
 let lastHealthData = null;
 let lastSetupData = null;
-
-// Developer Tools drawer toggle + auto-expand when space allows
-(function() {
-  const toggle = document.getElementById("dev-tools-toggle");
-  const body = document.getElementById("dev-tools-body");
-  const chevron = toggle ? toggle.querySelector(".setup-chevron") : null;
-  if (toggle && body) {
-    function openDrawer() {
-      body.style.display = "block";
-      if (chevron) chevron.style.transform = "rotate(90deg)";
-      toggle.setAttribute("aria-expanded", "true");
-    }
-    function closeDrawer() {
-      body.style.display = "none";
-      if (chevron) chevron.style.transform = "";
-      toggle.setAttribute("aria-expanded", "false");
-    }
-    function toggleDrawer() {
-      var isOpen = body.style.display !== "none";
-      if (isOpen) closeDrawer(); else openDrawer();
-      trackEvent("dev_tools_toggle", { open: !isOpen });
-    }
-    toggle.addEventListener("click", toggleDrawer);
-    toggle.addEventListener("keydown", function(e) {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDrawer(); }
-    });
-
-    // Auto-expand if there's room — called after checks render.
-    // Strategy: open the drawer, wait for layout to settle, then check
-    // if the container overflows. If it does, close it back.
-    // Using setTimeout(50) because rAF is unreliable in Chrome popup context.
-    window.__autoExpandDevTools = function() {
-      var scrollContainer = document.getElementById("panel-report");
-      if (!scrollContainer) return;
-      openDrawer();
-      setTimeout(function() {
-        if (scrollContainer.scrollHeight > scrollContainer.clientHeight + 2) {
-          closeDrawer();
-        }
-      }, 50);
-    };
-  }
-})();
 
 // ---------------------------------------------------------------------------
 // Health Check — rendering
@@ -1082,7 +1041,6 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
 
               setTimeout(updateScrollFade, 50);
               // Auto-expand dev tools if there's room after full render
-              setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
 
               // Set badge on icon — send full analysis to background
               window.__lastTotalIssues = finalGrade.criticals + finalGrade.warnings;
@@ -1098,7 +1056,6 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               var fallbackGrade = window.__prelimGrade || computeGrade(data.checks, []);
               renderGradeCard(fallbackGrade);
               try { v3PersistAndRenderScore(fallbackGrade); } catch (_) {}
-              setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
               window.__lastTotalIssues = (fallbackGrade.criticals || 0) + (fallbackGrade.warnings || 0);
               window.__lastCriticals = fallbackGrade.criticals || 0;
               window.__lastWarnings = fallbackGrade.warnings || 0;
@@ -1188,82 +1145,43 @@ function runPendoCommand(funcToInject, successMsg) {
     });
 }
 
-document.getElementById("tool-validate-install")?.addEventListener("click", () => {
-  if (!currentTabId) { setToolStatus("No active tab", "error"); return; }
-  setToolStatus("Running…", "");
-  chrome.scripting.executeScript({
+// v3: Run pendo.validateInstall() in the page's MAIN world and capture its
+// console output. Used by the Copy Issues handler to fold Pendo's own verdict
+// into the report. Returns "" if Pendo isn't on the page or the API isn't
+// available, so the caller can simply append-or-skip.
+function v3CaptureValidateInstall() {
+  if (!currentTabId) return Promise.resolve("");
+  return chrome.scripting.executeScript({
     target: { tabId: currentTabId },
-    func: function() {
+    func: function () {
       try {
-        if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-        if (typeof pendo.validateInstall !== "function") return { error: "pendo.validateInstall() not available" };
+        if (typeof pendo === "undefined") return { skipped: "Pendo agent not present on this page." };
+        if (typeof pendo.validateInstall !== "function") return { skipped: "pendo.validateInstall() not available on this agent version." };
         var captured = [];
         var origLog = console.log;
         var origWarn = console.warn;
-        console.log = function() { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
-        console.warn = function() { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
-        pendo.validateInstall();
-        console.log = origLog;
-        console.warn = origWarn;
-        return { output: captured.length > 0 ? captured.join("\n") : "validateInstall() completed — no console output captured." };
-      } catch(e) { return { error: e.message }; }
+        console.log = function () { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
+        console.warn = function () { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
+        try { pendo.validateInstall(); } finally {
+          console.log = origLog;
+          console.warn = origWarn;
+        }
+        return { output: captured.length > 0 ? captured.join("\n") : "validateInstall() completed with no console output." };
+      } catch (e) {
+        return { error: e.message };
+      }
     },
     world: "MAIN"
-  }).then(function(results) {
+  }).then(function (results) {
     var r = results && results[0] && results[0].result;
-    if (r && r.error) {
-      setToolStatus(r.error, "error");
-    } else if (r && r.output) {
-      setToolStatus("✅ validateInstall() executed", "success");
-      var resultsDiv = document.getElementById("validate-results");
-      if (resultsDiv) { resultsDiv.style.display = "block"; resultsDiv.textContent = r.output; }
-    }
-  }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
-});
-
-document.getElementById("tool-validate-env")?.addEventListener("click", () => {
-  if (!currentTabId) { setToolStatus("No active tab", "error"); return; }
-  setToolStatus("Running…", "");
-  chrome.scripting.executeScript({
-    target: { tabId: currentTabId },
-    func: function() {
-      try {
-        if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-        if (typeof pendo.validateEnvironment !== "function") return { error: "pendo.validateEnvironment() not available" };
-        var captured = [];
-        var origLog = console.log;
-        var origWarn = console.warn;
-        console.log = function() { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
-        console.warn = function() { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
-        pendo.validateEnvironment();
-        console.log = origLog;
-        console.warn = origWarn;
-        return { output: captured.length > 0 ? captured.join("\n") : "validateEnvironment() completed — no console output captured." };
-      } catch(e) { return { error: e.message }; }
-    },
-    world: "MAIN"
-  }).then(function(results) {
-    var r = results && results[0] && results[0].result;
-    if (r && r.error) {
-      setToolStatus(r.error, "error");
-    } else if (r && r.output) {
-      setToolStatus("✅ validateEnvironment() executed", "success");
-      var resultsDiv = document.getElementById("validate-results");
-      if (resultsDiv) { resultsDiv.style.display = "block"; resultsDiv.textContent = r.output; }
-    }
-  }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
-});
-
-// Copy validate output to clipboard
-document.getElementById("copy-validate-result")?.addEventListener("click", function() {
-  var resultsDiv = document.getElementById("validate-results");
-  if (!resultsDiv || !resultsDiv.textContent) return;
-  navigator.clipboard.writeText(resultsDiv.textContent).then(function() {
-    var btn = document.getElementById("copy-validate-result");
-    btn.textContent = "Copied!";
-    setTimeout(function() { btn.textContent = "Copy"; }, 1500);
+    if (!r) return "";
+    if (r.skipped) return r.skipped;
+    if (r.error) return "Error running pendo.validateInstall(): " + r.error;
+    return r.output || "";
+  }).catch(function (err) {
+    return "Error running pendo.validateInstall(): " + (err.message || "unknown");
   });
-});
+}
 
 document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
   runPendoCommand(function () {
@@ -1499,15 +1417,25 @@ function buildIssuesReport() {
 document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
   const btn = document.getElementById("tool-copy-issues");
   const label = btn.querySelector(".tool-label");
-  // v3: single plain-text output. The report's preamble is self-describing
-  // enough that pasting it into an LLM works without a separate "AI mode."
-  const text = buildIssuesReport();
-  navigator.clipboard.writeText(text).then(() => {
+  const origLabel = label ? label.textContent : null;
+  // v3: also run pendo.validateInstall() so the artifact contains both the
+  // extension's interpretation AND Pendo's own verdict. The whole thing is
+  // one plain-text blob; the preamble orients both humans and LLMs.
+  if (label) label.textContent = "Running validateInstall()…";
+  v3CaptureValidateInstall().then(function (validateOutput) {
+    let combined = buildIssuesReport();
+    if (validateOutput) {
+      combined += "\n\n── Pendo's official validateInstall() output ──\n" + validateOutput;
+    }
+    return navigator.clipboard.writeText(combined);
+  }).then(() => {
     trackEvent("copy_report");
     if (label) {
       label.textContent = "Copied!";
-      setTimeout(() => { label.textContent = "Copy Issues to Clipboard"; }, 1500);
+      setTimeout(() => { label.textContent = origLabel || "Copy Issues to Clipboard"; }, 1500);
     }
+  }).catch(() => {
+    if (label) label.textContent = origLabel || "Copy Issues to Clipboard";
   });
 });
 

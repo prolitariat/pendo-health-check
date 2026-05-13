@@ -62,7 +62,9 @@ To update later, just `git pull` and click the ↻ reload button on the extensio
 
 **Score diff** — The grade pill in the header is paired with a score-diff badge (↑ +12 / ↓ −8 / · 0) showing the delta from your last visit to the same hostname + path. Click the badge for a popover with the last five scores. History is stored locally in `chrome.storage.local`; nothing leaves your browser.
 
-**Copy Issues** — One plain-text output. The preamble identifies the tool, version, and source repo, lists the severity ordering, and notes that Pendo doc URLs in the report are verified Help Center articles. That orientation is enough for both a human reader and an LLM you paste the report into. When issues are detected, the copy button pulses to draw attention.
+**Toggle Pendo Debugger** — A pinned top-level button alongside Copy Issues. One click opens or closes Pendo's on-page debug overlay. The debugger is the daily tool for tagging operators, in-app content authors, and Pendo support, so it lives outside any "developer tools" framing.
+
+**Copy Issues** — One plain-text output. Clicking runs `pendo.validateInstall()` in the page, captures its console output, and appends it to the report under a labeled "Pendo's official validateInstall() output" section. The artifact you hand to engineering now contains both the extension's interpretation and Pendo's own verdict in one paste. The preamble identifies the tool, version, and source repo and notes that Pendo doc URLs in the report are verified Help Center articles. When issues are detected, the copy button pulses to draw attention.
 
 **CMP consent-gating warning** — If a consent manager is on the page and Pendo is initialized with a non-anonymous visitor while the CMP reports analytics consent denied, the extension flags it with a warning. Actionable detection on Cookiebot, Didomi, Osano, and a narrow OneTrust read. Inform-only on TrustArc and TCF v2.0. The check is conservative: any unknown signal suppresses the flag.
 

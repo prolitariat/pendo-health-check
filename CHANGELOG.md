@@ -18,6 +18,11 @@ All notable changes to the Pendo Health Check Chrome extension are documented he
 - **Honest framing.** Store listing and manifest description now open with "Side project, not an official Pendo product." Disclaims Pendo affiliation/endorsement up front, redirects bug reports to GitHub, and asks users not to file Pendo support tickets for extension issues.
 - **Doc-label accuracy.** Six Pendo Help Center IDs in the sources map were audited against Google's index. Five labels updated to match canonical titles. The CMP doc ID `360031867272` ("Configure Pendo with a Cookie Consent Manager") was removed because no public record of it exists. Replaced with the verified `21326554691227` ("Data collection and compliance") for the CMP-related links.
 
+### Changed
+- **Toggle Pendo Debugger is now a top-level pinned button.** The Pendo Debugger is used daily by tagging operators, in-app content authors, and Pendo support — not just developers. It does not belong behind a "Developer Tools" drawer. Now sits directly above Copy Issues, same visual treatment, one click.
+- **Validate Install and Validate Environment buttons removed.** Their output overlapped heavily with the extension's own Why-this-grade drawer (CSP and Data Transmission checks already cover the validateEnvironment surface). What was valuable about validateInstall (Pendo's own verdict on the install) is now folded into Copy Issues — see below. The "Developer Tools" drawer goes away entirely.
+- **Copy Issues now appends Pendo's `validateInstall()` console output.** When you click Copy Issues, the extension runs `pendo.validateInstall()` in the page, captures its console output, and appends it to the report under a clearly-labeled "Pendo's official validateInstall() output" section. The artifact you hand to engineering now contains both the extension's interpretation and Pendo's own verdict in a single paste.
+
 ### Fixed
 - **Wrong npm package name in remediation text.** The "agent version outdated" recommendation pointed users to `npm update @pendo-io/agent`. The real npm package is `@pendo/agent` (the org is `pendo-io`, but the npm scope is `pendo`). The wrong command would have failed silently; corrected.
 
