@@ -1,45 +1,52 @@
-=== CHROME WEB STORE LISTING CONTENT (v4.1.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v4.2.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
 
 --- SHORT DESCRIPTION (132 chars max) ---
-Side project, not an official Pendo product. Six Quick Copy chips, A to F install grade, score diff, CMP consent-gating check.
+Side project, not an official Pendo product. A-F install grade, Quick Copy IDs, CMP consent-gating, optional auto-check badge.
 
 --- DETAILED DESCRIPTION ---
 Heads up: this is a side project built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract, no guarantees. If something breaks, file a GitHub issue; please don't open a Pendo support ticket, because Pendo didn't ship this and can't help with it.
 
-Open it on any page with Pendo and get two things at once: a Quick Copy chip grid for the values you reach for most, and a letter grade (A to F) for the install. Built so Pendo admins, implementation engineers, and support folks can make decisions faster with less effort.
+Open it on any page with Pendo and you get a compact dashboard: an A-to-F install grade with a plain-English status line, a Status panel for triage, an IDs panel for values you paste into tickets, and a Tools panel for the actions you run all day. Built so Pendo admins, implementation engineers, and support folks can make decisions faster with less effort.
 
-QUICK COPY CHIPS
+HERO STATUS
 
-Six chips, one-click copy. The values an operator actually pastes into a ticket, Slack, or API call:
+A single source of status truth at the top of the popup: a colored grade square (green / orange / red), the word "Pendo Service Status," and a short title — "Pendo is healthy," "Pendo is degraded," or "Pendo is not running" — plus a one-line summary. No second status row anywhere. The color follows the state, so the letter and the color cannot drift.
 
-• Visitor ID
-• Account ID
-• Subscription ID
-• Session ID
-• Agent Version
-• Realm (US / EU / US1 / JP / Custom CNAME)
+STATUS PANEL
 
-Empty values render grayed out and uncopyable so you can tell at a glance what's actually set vs. missing. Diagnostic state (framework, ready/not-ready, active guides count) intentionally stays out of the chip grid because it isn't a copy-paste value; it's covered by the grade pill and the "Why this grade" drawer.
+Default view on open. The current page URL appears in a chip at the top so you can confirm the extension is looking at what you think it's looking at. Below that, either:
 
-INSTALLATION GRADE (A to F)
+• An "All systems operational" block when the page is healthy, or
+• A list of active issues, each color-coded by severity (orange for warnings, red for failures, gray for tips)
 
-A compact pill in the header shows the current grade. A score-diff badge next to it shows the delta from your previous visit to the same page (history keyed by hostname + path, last five entries persisted locally). Click the badge to see recent grades for that page.
+Beneath the issues sits the Copy Issues to Clipboard primary button (more on that below) and a collapsed "Why this grade?" disclosure. Expanding it shows the full prioritized check list with pass / warn / fail dots so you can see exactly what the grade is computed from.
 
-WHY THIS GRADE (drawer)
+A compact Quick Copy table is always pinned at the bottom of the Status panel: Visitor, Account, Session, Agent, Realm. Click any value to copy it; empty rows render grayed out and uncopyable so you can tell at a glance what's set vs. missing.
 
-Open the "Why this grade" drawer to see the full prioritized findings list, sorted by severity. The drawer stays collapsed by default so the default view stays focused on the chips.
+IDS PANEL
 
-Health checks:
-• Agent loaded, initialized, version
-• Visitor and Account ID validation (flags anonymous, missing, malformed)
+A fuller table of identifiers including Subscription, plus a "Copy all as JSON" primary button for handoff to engineering or AI triage. Same row style as the Status panel's compact Quick Copy; same click-to-copy interaction.
+
+TOOLS PANEL
+
+• Toggle Pendo Debugger as the primary action. The debugger is the daily tool for tagging operators, in-app content authors, and Pendo support staff, so it sits as a primary CTA in Tools rather than buried.
+• Show badge on extension icon — a real on/off switch (replaces the old footer checkbox).
+• Auto-check pages on load — opt-in proactive checking. Flipping it on triggers Chrome's permission prompt for "<all_urls>". Once granted, the extension probes every page on load and updates the toolbar badge automatically. Tab-hopping between several Pendo-instrumented apps becomes a glanceable activity. Off by default. Turning it off revokes the permission immediately.
+
+COPY ISSUES TO CLIPBOARD
+
+One click, one plain-text output. Behind the scenes the extension runs Pendo's own pendo.validateInstall(), captures its console output, and appends it to the report under a labeled section. The artifact you hand to engineering contains both the extension's interpretation and Pendo's own verdict in one paste. The preamble identifies the tool, version, and source repo and notes that doc URLs at the bottom are verified Pendo Help Center articles. That orientation is enough for both a human reader (Slack, Jira, a support ticket) and an LLM (Claude or ChatGPT triage). No format selector to fiddle with.
+
+HEALTH CHECKS UNDER THE HOOD
+
+• Agent loaded, initialized, version detection
+• Visitor and Account ID validation — anonymous IDs (the documented Pendo pre-auth pattern) are explicitly NOT flagged
 • Duplicate detection (multiple instances or agent scripts)
-• Data Transmission (catches ad blocker, CSP, firewall blocks)
-• Feature Flags (surfaces disabled features like guides off, analytics off)
-
-Setup analysis:
+• Data Transmission validation (catches ad blocker, CSP, firewall blocks; CORS-aware)
+• Feature flags (surfaces disabled features like guides off, analytics off)
 • Framework detection (React, Angular, Vue, Ember, Svelte, Next.js, Nuxt, jQuery)
 • Snippet analysis (install method, placement, async loading)
 • CSP compatibility directive by directive, with strict-dynamic and nonce awareness; Report-Only CSP detected and not flagged as blocking
@@ -50,29 +57,17 @@ CMP CONSENT-GATING CHECK
 
 If a consent manager is on the page and Pendo is initialized with a non-anonymous visitor while the CMP reports analytics consent denied, the extension flags it with a warning and links to that CMP's remediation docs. Actionable detection on Cookiebot, Didomi, Osano, and a narrow OneTrust read. Inform-only on TrustArc and TCF v2.0. The check is intentionally conservative: any unknown signal suppresses the flag, so anonymous-pre-consent and strictly-necessary classifications never get falsely flagged.
 
-COPY ISSUES TO CLIPBOARD
-
-One click, one plain-text output. Behind the scenes the extension runs Pendo's own pendo.validateInstall(), captures its console output, and appends it to the report under a labeled section. The artifact you hand to engineering contains both the extension's interpretation AND Pendo's own verdict in one paste. The preamble identifies the tool, version, and source repo and notes that doc URLs at the bottom are verified Pendo Help Center articles. That orientation is enough for both a human reader (Slack, Jira, a support ticket) and an LLM (Claude or ChatGPT triage). No format selector to fiddle with.
-
-TOGGLE PENDO DEBUGGER
-
-Pinned top-level button next to Copy Issues. One click opens or closes Pendo's on-page debug overlay. The debugger is the daily tool for tagging operators, in-app content authors, and Pendo support staff, so it sits outside any "developer tools" framing.
-
-OPTIONAL AUTO-CHECK ON PAGE LOAD
-
-In the Tools tab, flip "Auto-check pages on load" to enable proactive checking. Chrome prompts for permission to read all pages; if granted, the extension runs a lightweight Pendo detection on every page-load completion and updates the toolbar badge automatically. Tab-hopping operators can see at a glance which tabs have Pendo issues without opening the popup. Off by default. Turning it off revokes the permission immediately.
-
 ICON BADGE
 
-Yellow shows issue count after analysis; red shows critical problems. Clears when you change pages so it never shows stale data. Toggle from the footer.
+Yellow shows issue count after analysis; red shows critical problems. Clears when you change pages so it never shows stale data. Toggle on or off from the Tools panel.
 
 PENDO SERVICE STATUS
 
-Live from status.pendo.io, surfaced only during incidents. Included in the copied report.
+status.pendo.io incidents are pulled into the Copy Issues report when active. There is no separate banner element in the popup — the hero card is the single status display.
 
 PRIVACY
 
-All checks run locally in your browser. Score history is stored in chrome.storage.local on your device only. Nothing leaves the extension. No account, no login.
+All checks run locally in your browser. Nothing leaves the extension. No account, no login. The default install footprint is minimal (activeTab + scripting + storage + tabs). The optional auto-check toggle requests "<all_urls>" at the moment you turn it on and revokes it the moment you turn it off.
 
 SOURCE
 
@@ -85,4 +80,4 @@ Developer Tools
 English
 
 --- SINGLE PURPOSE DESCRIPTION ---
-Surface common Pendo agent values as one-click copy chips and diagnose health, configuration, and consent-gating problems on any webpage with Pendo installed. Side project, not an official Pendo product.
+Diagnose and grade the health and configuration of the Pendo analytics agent on any webpage. Surface common Pendo IDs as one-click copy values, run Pendo's own validateInstall as part of the report, and flag consent-management misconfigurations. Side project, not an official Pendo product.
