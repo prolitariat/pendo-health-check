@@ -144,15 +144,12 @@ try {
 // ---------------------------------------------------------------------------
 
 function showView(id) {
-  // v4: when an empty/error state is active, hide the hero/tabs/content too,
-  // so the popup doesn't double-render. When `id` is anything else (e.g.
-  // "__none__"), all three empty states hide and the main UI takes over.
+  // v4.2: empty states are CSS-driven via .ph-empty.is-active. Hero/tabs/body
+  // are hidden via inline style while an empty state is active.
   ["loading", "not-detected", "error-state"].forEach((v) => {
     var el = document.getElementById(v);
     if (!el) return;
-    var active = v === id;
-    el.style.display = active ? "block" : "none";
-    el.classList.toggle("is-active", active);
+    el.classList.toggle("is-active", v === id);
   });
   var anyEmpty = id === "loading" || id === "not-detected" || id === "error-state";
   ["hero", "tabs", "content"].forEach(function (uid) {
@@ -170,6 +167,11 @@ function showTabs() {
   if (hero)    hero.style.display = "flex";
   if (tabs)    tabs.style.display = "flex";
   if (content) content.style.display = "block";
+  // v4.2: ensure no empty state is left dangling visually.
+  ["loading", "not-detected", "error-state"].forEach(function (v) {
+    var el = document.getElementById(v);
+    if (el) el.classList.remove("is-active");
+  });
 }
 
 // v4: updateScrollFade was a v3 visual cue. The new layout uses .content's
@@ -236,6 +238,13 @@ function detectEnvFromChecks(checks) {
 }
 
 function renderPendoStatus(data, detectedEnv) {
+  // v4.2: the Pendo Service Status banner is gone — the hero card is now
+  // the single status display. Incidents still fold into the issues list
+  // and Copy Issues report via window.__pendoServiceStatus, which this
+  // function continues to set elsewhere. This early-return keeps callers
+  // unchanged but renders nothing.
+  return;
+  // legacy branch below kept for grep-friendliness; never reached.
   const statusDiv = document.getElementById("pendo-status");
   if (!statusDiv) return;
 
@@ -363,12 +372,12 @@ function renderChecks(checks) {
   if (problemChecks.length > 0) {
     problemChecks.forEach((c) => {
       const row = document.createElement("div");
-      row.className = "check-row";
+      row.className = "ph-check " + c.status;
       row.innerHTML = `
-        <span class="check-status">${STATUS_ICONS[c.status]}</span>
-        <div class="check-info">
-          <div class="check-label">${escapeHtml(c.label)}</div>
-          <div class="check-detail">${escapeHtml(c.detail)}</div>
+        <span class="ph-check-status">${STATUS_ICONS[c.status]}</span>
+        <div class="ph-check-info">
+          <div class="ph-check-label">${escapeHtml(c.label)}</div>
+          <div class="ph-check-detail">${escapeHtml(c.detail)}</div>
         </div>
       `;
       list.appendChild(row);
@@ -398,8 +407,8 @@ function renderChecks(checks) {
   if (warn > 0 || fail > 0) {
     const copyBtn = document.getElementById("tool-copy-issues");
     if (copyBtn) {
-      setTimeout(() => copyBtn.classList.add("copy-pulse"), 800);
-      setTimeout(() => copyBtn.classList.remove("copy-pulse"), 5300);
+      setTimeout(() => copyBtn.classList.add("is-pulsing"), 800);
+      setTimeout(() => copyBtn.classList.remove("is-pulsing"), 5300);
     }
   }
 
@@ -554,8 +563,11 @@ function v4RenderHero(grade, state, issueCount) {
   var subEl      = document.getElementById("hero-sub");
   if (!hero || !square || !titleEl || !subEl) return;
 
+  // v4.2: status is driven by a single data-status attribute on .ph-hero.
+  // The CSS handles grade-square background and hero-title color from that.
+  hero.setAttribute("data-status", state);
+
   square.textContent = grade && grade.letter ? grade.letter : "—";
-  square.className = "grade-square state-" + state;
   square.title = grade ? (grade.score + " / 100 · " + grade.summary) : "";
 
   var titles = {
@@ -570,18 +582,18 @@ function v4RenderHero(grade, state, issueCount) {
   };
 
   titleEl.textContent = titles[state] || titles.degraded;
-  titleEl.className = "hero-title state-" + state;
   subEl.textContent = subs[state] || subs.degraded;
   hero.style.display = "flex";
 }
 
 // --- Severity-colored issue rows (top of Status panel) -------------------
 
-function v4SeverityClass(status) {
-  if (status === "fail") return "sev-err";
-  if (status === "warn") return "sev-warn";
-  if (status === "info") return "sev-info";
-  return "sev-info";
+// v4.2: severity maps to a data-sev attribute (warn|err|info|tip) on .ph-issue.
+function v4SeverityAttr(status) {
+  if (status === "fail") return "err";
+  if (status === "warn") return "warn";
+  if (status === "info") return "info";
+  return "info";
 }
 function v4SeverityIcon(status) {
   if (status === "fail") return V4_SVG.alertOctagon;
@@ -610,7 +622,7 @@ function v4RenderIssuesList(checks) {
     ok.style.display = "block";
     if (tabCount) {
       tabCount.textContent = "";
-      tabCount.classList.remove("has-count");
+      tabCount.style.display = "none";
     }
     return 0;
   }
@@ -619,16 +631,17 @@ function v4RenderIssuesList(checks) {
   section.style.display = "block";
   actionable.forEach(function (c) {
     var row = document.createElement("div");
-    row.className = "issue-row " + v4SeverityClass(c.status);
+    row.className = "ph-issue";
+    row.setAttribute("data-sev", v4SeverityAttr(c.status));
     var text = (c.detail && c.detail.trim()) ? c.detail : c.label;
-    row.innerHTML = v4SeverityIcon(c.status) + "<span></span>";
-    row.querySelector("span").textContent = text;
+    row.innerHTML = v4SeverityIcon(c.status) + '<span class="ph-issue-text"></span>';
+    row.querySelector(".ph-issue-text").textContent = text;
     list.appendChild(row);
   });
 
   if (tabCount) {
     tabCount.textContent = actionable.length;
-    tabCount.classList.add("has-count");
+    tabCount.style.display = "inline-flex";
   }
   return actionable.length;
 }
@@ -640,30 +653,31 @@ function v4FormatChipValue(value) {
   return String(value);
 }
 
-function v4RenderQuickCopyRow(spec, values, isLast) {
+function v4RenderQuickCopyRow(spec, values) {
   var raw = values[spec.key];
   var display = v4FormatChipValue(raw);
   var empty = display === null;
 
+  // .ph-id rows. <button> when copyable, <div> when empty.
   var row = document.createElement(empty ? "div" : "button");
-  row.className = "qc-row" + (empty ? " qc-empty" : "");
+  row.className = "ph-id";
+  if (empty) row.setAttribute("data-empty", "true");
   if (!empty) {
     row.type = "button";
     row.setAttribute("data-key", spec.key);
   }
-  if (isLast) row.style.borderBottom = "none";
 
   var label = document.createElement("span");
-  label.className = "qc-label";
+  label.className = "ph-id-label";
   label.textContent = spec.label;
 
   var value = document.createElement("span");
-  value.className = "qc-value";
+  value.className = "ph-id-value";
   value.textContent = display !== null ? display : "Not set";
   value.title = display !== null ? display : "Not available on this page";
 
   var copyIcon = document.createElement("span");
-  copyIcon.className = "qc-copy-icon";
+  copyIcon.className = "ph-id-copy";
   copyIcon.innerHTML = V4_SVG.copy;
 
   row.appendChild(label);
@@ -690,8 +704,8 @@ function v4RenderQuickCopy(values, specs, mountId) {
   var mount = document.getElementById(mountId);
   if (!mount) return;
   mount.innerHTML = "";
-  specs.forEach(function (spec, idx) {
-    mount.appendChild(v4RenderQuickCopyRow(spec, values || {}, idx === specs.length - 1));
+  specs.forEach(function (spec) {
+    mount.appendChild(v4RenderQuickCopyRow(spec, values || {}));
   });
 }
 
@@ -705,17 +719,15 @@ function v4RenderAllQuickCopy(values) {
 // --- Tab switching --------------------------------------------------------
 
 function v4ActivateTab(name) {
-  var tabs = document.querySelectorAll(".tab[data-tab]");
+  // v4.2: state is on aria-selected (tabs) and aria-hidden (panels), per
+  // popup_reference.html. No "is-active" class is used for tabs.
+  var tabs = document.querySelectorAll(".ph-tab[data-tab]");
   tabs.forEach(function (t) {
-    var active = t.getAttribute("data-tab") === name;
-    t.classList.toggle("is-active", active);
-    t.setAttribute("aria-selected", active ? "true" : "false");
+    t.setAttribute("aria-selected", t.getAttribute("data-tab") === name ? "true" : "false");
   });
-  var panels = document.querySelectorAll(".tab-panel[data-panel]");
+  var panels = document.querySelectorAll(".ph-panel[data-panel]");
   panels.forEach(function (p) {
-    var active = p.getAttribute("data-panel") === name;
-    p.classList.toggle("is-active", active);
-    if (active) p.removeAttribute("hidden"); else p.setAttribute("hidden", "");
+    p.setAttribute("aria-hidden", p.getAttribute("data-panel") === name ? "false" : "true");
   });
 }
 
@@ -731,24 +743,15 @@ function v4SyncBadgeStateText() {
 // --- Wireup: tabs, why-grade accordion, refresh, JSON copy, footer ------
 
 (function v4Wireup() {
-  // Segmented tab clicks
-  document.querySelectorAll(".tab[data-tab]").forEach(function (t) {
+  // Segmented tab clicks (popup_reference.html uses .ph-tab[data-tab]).
+  document.querySelectorAll(".ph-tab[data-tab]").forEach(function (t) {
     t.addEventListener("click", function () {
       v4ActivateTab(t.getAttribute("data-tab"));
       try { trackEvent("tab_switch", { tab: t.getAttribute("data-tab") }); } catch (_) {}
     });
   });
 
-  // "Why this grade?" accordion — toggles the checks-list body
-  var whyToggle = document.getElementById("why-grade-toggle");
-  var whyBody   = document.getElementById("why-grade-body");
-  if (whyToggle && whyBody) {
-    whyToggle.addEventListener("click", function () {
-      var open = whyBody.style.display === "block";
-      whyBody.style.display = open ? "none" : "block";
-      whyToggle.setAttribute("aria-expanded", open ? "false" : "true");
-    });
-  }
+  // "Why this grade?" is a native <details> element now — no custom toggle JS.
 
   // Refresh button — re-run the diagnostic without reopening the popup.
   var refreshBtn = document.getElementById("header-refresh");

@@ -2,6 +2,33 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [4.2.0] — 2026-05-13
+
+Literal implementation of `design_handoff_pendo_health_check/popup_reference.html` (v2 of the handoff). Markup and CSS copied verbatim from the reference; no creative interpretation.
+
+### Changed
+
+- **Split CSS into `popup.css`.** Previously `popup.html` carried a 900-line inline `<style>` block. The reference handoff is structured with markup and styles as separate concerns, and that's what's shipped. `popup.html` now has a single `<link rel="stylesheet" href="popup.css">`.
+- **All classes prefixed `.ph-*`.** Matches popup_reference.html byte-for-byte: `.ph-header`, `.ph-hero`, `.ph-tabs`, `.ph-tab`, `.ph-tab-count`, `.ph-body`, `.ph-panel`, `.ph-url`, `.ph-subhead`, `.ph-section`, `.ph-issues`, `.ph-issue`, `.ph-ok`, `.ph-btn`, `.ph-btn-primary`, `.ph-btn-ghost`, `.ph-actions`, `.ph-why`, `.ph-ids`, `.ph-id`, `.ph-footer`, etc. Old `.chip`, `.tab`, `.tab-panel`, `.hero`, `.issue-row`, etc. are gone.
+- **Hero status driven by `data-status` attribute** on `.ph-hero`. A single attribute change cascades through the CSS to color the grade square and tint the hero title; the letter and color can no longer desync the way they could when each was tracked independently.
+- **Issues use `data-sev="warn|err|info|tip"` attribute** instead of severity classes. Same pattern — single source of truth per element.
+- **ID rows use `data-empty="true"`** instead of an `qc-empty` class. The `Not set` italic + hidden copy icon is driven entirely from the attribute.
+- **Tabs use `aria-selected="true"`** for the active state; panels use `aria-hidden="false"`. No more `.is-active` class on tab elements.
+- **"Why this grade?" is now a native `<details>` element.** The custom toggle JS, custom chevron rotation, custom `aria-expanded` management — all replaced by the browser's built-in disclosure widget. Accessible by default, zero JS, the chevron animation is pure CSS off the `:open` state.
+- **System fonts only.** Removed the Google Fonts `<link>` (Sora / Inter / JetBrains Mono) introduced in v4.0.0. The handoff README v2 calls this out explicitly: Chrome MV3's popup CSP blocks external font loading without explicit `font-src`/`connect-src` overrides, and the system stack looks excellent at popup scale. `--sans` and `--mono` variables now resolve to the platform default.
+- **Body scrolls; hero/tabs/footer don't.** `.ph-body` has `max-height: 360px; overflow-y: auto`, so long issue lists scroll inside the panel while the hero and footer stay visible.
+
+### Removed
+
+- **`#pendo-status` Pendo Service Status banner element.** The hero card is the single source of status truth per the handoff README v2: "Single status display — the hero card replaces the old Pendo Service Status / Degraded row. Do not render both." Pendo statuspage.io incidents still flow into the Copy Issues report via `window.__pendoServiceStatus`, but there is no separate visual banner anymore.
+- **Custom "Why this grade" toggle JS, chevron-rotation CSS, and aria-expanded plumbing.** Native `<details>` replaces all of it.
+- **`copy-pulse` / `sev-*` / `qc-*` / `is-active` (on tabs)** class names — superseded by the `.ph-*` / attribute-driven equivalents.
+
+### Notes
+
+- This release is purely a UI-layer rewrite. Underlying data extraction (`runPendoHealthCheck`, `runPendoSetupAssistant`), the CMP consent-gating check, the Copy Issues report builder with `validateInstall()` output, the optional proactive badge (4.1) and the anonymous-visitor-is-pass fix (4.1.1 → 4.0.0 lineage) are all unchanged.
+- `popup_reference.html` from the design handoff was the authoritative source. The README v2 explicitly says: "The markup inside `.popup` and the CSS rules prefixed `.ph-*` are intended to be copied directly into `popup.html` / `popup.css`." That's what was done.
+
 ## [4.1.1] — 2026-05-13
 
 ### Fixed

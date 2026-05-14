@@ -4,925 +4,197 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pendo Health Check</title>
-  <!-- v4: Design Direction C — Compact Dashboard.
-       Sora for display, Inter for UI, JetBrains Mono for IDs / URLs / versions.
-       display=swap so fallback fonts paint immediately while Google Fonts loads. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    /* ============================================================
-       v4 design tokens — Pendo Health Check (Direction C)
-       Pank + charcoal inspired by Pendo's palette; this is NOT an
-       official Pendo product (see header comment in README).
-       ============================================================ */
-    :root {
-      --pank:        #EB4778;
-      --pank-700:    #C9335F;
-      --pank-50:     #FFF1F5;
-      --pank-100:    #FFE0EA;
-      --charcoal:    #1A1A24;
-
-      --bg:          #ffffff;
-      --fg:          #0a0a0b;
-      --muted:       #f4f4f5;
-      --muted-fg:    #71717a;
-      --border:      #e4e4e7;
-      --border-strong: #d4d4d8;
-
-      --ok-50:  #ECFDF5; --ok-200: #A7F3D0; --ok-500: #10B981; --ok-700: #047857;
-      --warn-50:#FFF7ED; --warn-200:#FED7AA; --warn-500:#F59E0B; --warn-700:#B45309;
-      --err-50: #FEF2F2; --err-200: #FECACA; --err-500: #EF4444; --err-700: #B91C1C;
-
-      --display: 'Sora', ui-sans-serif, system-ui, -apple-system, sans-serif;
-      --sans:    'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
-      --mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-
-      --radius-sm: 6px;
-      --radius:    8px;
-      --radius-lg: 12px;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg:          #0f0f12;
-        --fg:          #f4f4f5;
-        --muted:       #1c1c1f;
-        --muted-fg:    #a1a1aa;
-        --border:      #27272a;
-        --border-strong: #3f3f46;
-        --pank-50:     #2a1019;
-        --pank-100:    #3d1525;
-        --ok-50:       #052e16;
-        --ok-700:      #4ade80;
-        --warn-50:     #2a1d04;
-        --warn-700:    #fcd34d;
-        --err-50:      #450a0a;
-        --err-700:     #fca5a5;
-      }
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :focus { outline: none; }
-    :focus-visible {
-      outline: 2px solid var(--pank);
-      outline-offset: 2px;
-      border-radius: var(--radius-sm);
-    }
-
-    body {
-      width: 384px;
-      font-family: var(--sans);
-      font-size: 13px;
-      color: var(--fg);
-      background: var(--bg);
-      line-height: 1.5;
-      overflow: hidden;
-      min-height: 480px;
-      display: flex;
-      flex-direction: column;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ============================================================
-       Header — brand mark + wordmark + refresh button
-       ============================================================ */
-    .header {
-      padding: 12px 14px 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 1;
-      min-width: 0;
-    }
-    .brand-icon {
-      width: 20px;
-      height: 20px;
-      flex-shrink: 0;
-    }
-    .brand-text {
-      font-family: var(--display);
-      font-weight: 700;
-      font-size: 14px;
-      letter-spacing: -0.1px;
-      color: var(--fg);
-    }
-    .header-btn {
-      width: 26px;
-      height: 26px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--bg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted-fg);
-      cursor: pointer;
-      transition: color 0.12s, border-color 0.12s, transform 0.6s ease;
-    }
-    .header-btn:hover {
-      color: var(--fg);
-      border-color: var(--border-strong);
-    }
-    .header-btn.spinning {
-      transform: rotate(360deg);
-    }
-
-    /* ============================================================
-       Hero card — grade square + status copy
-       ============================================================ */
-    .hero {
-      margin: 12px 14px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 12px;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      background: linear-gradient(135deg, var(--bg) 0%, var(--muted) 100%);
-      flex-shrink: 0;
-    }
-    .grade-square {
-      width: 56px;
-      height: 56px;
-      border-radius: var(--radius-lg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-family: var(--display);
-      font-weight: 800;
-      font-size: 28px;
-      letter-spacing: -1px;
-      flex: 0 0 auto;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      background: var(--muted-fg);
-    }
-    .grade-square.state-healthy  { background: var(--ok-500); }
-    .grade-square.state-degraded { background: var(--warn-500); }
-    .grade-square.state-outage   { background: var(--err-500); }
-
-    .hero-text { flex: 1; min-width: 0; }
-    .hero-caption {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted-fg);
-      margin-bottom: 3px;
-    }
-    .hero-title {
-      font-family: var(--display);
-      font-weight: 700;
-      font-size: 15px;
-      line-height: 1.1;
-      margin-bottom: 2px;
-    }
-    .hero-title.state-healthy  { color: var(--ok-700); }
-    .hero-title.state-degraded { color: var(--warn-700); }
-    .hero-title.state-outage   { color: var(--err-700); }
-    .hero-sub {
-      font-size: 11.5px;
-      color: var(--muted-fg);
-      line-height: 1.35;
-    }
-
-    /* ============================================================
-       Segmented tabs — Status / IDs / Tools
-       ============================================================ */
-    .tabs {
-      margin: 0 14px;
-      display: flex;
-      gap: 2px;
-      padding: 3px;
-      background: var(--muted);
-      border-radius: var(--radius);
-      flex-shrink: 0;
-    }
-    .tab {
-      flex: 1;
-      height: 26px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      font-family: inherit;
-      font-size: 11.5px;
-      font-weight: 500;
-      color: var(--muted-fg);
-      background: transparent;
-      border: none;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: all 0.12s;
-    }
-    .tab:hover:not(.is-active) {
-      color: var(--fg);
-    }
-    .tab.is-active {
-      color: var(--fg);
-      background: var(--bg);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
-    }
-    .tab-count {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      min-width: 16px;
-      height: 16px;
-      padding: 0 5px;
-      border-radius: 999px;
-      background: var(--border-strong);
-      color: #fff;
-      font-size: 9.5px;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-    }
-    .tab.is-active .tab-count { background: var(--pank); }
-    .tab-count.has-count { display: inline-flex; }
-
-    /* ============================================================
-       Pendo Service Status incident banner
-       Only renders during a real Pendo incident.
-       ============================================================ */
-    #pendo-status {
-      margin: 10px 14px 0;
-      flex-shrink: 0;
-    }
-    .incident-banner {
-      padding: 8px 10px;
-      background: var(--warn-50);
-      border: 1px solid var(--warn-200);
-      border-radius: var(--radius);
-      font-size: 11px;
-      color: var(--warn-700);
-      line-height: 1.4;
-    }
-    .incident-banner strong {
-      display: block;
-      margin-bottom: 2px;
-      font-weight: 600;
-    }
-    .incident-banner a {
-      color: var(--warn-700);
-      text-decoration: underline;
-    }
-
-    /* ============================================================
-       Content area — tab panels
-       ============================================================ */
-    .content {
-      padding: 12px 14px;
-      flex: 1;
-      overflow-y: auto;
-      min-height: 0;
-    }
-    .tab-panel { display: none; }
-    .tab-panel.is-active { display: block; }
-
-    /* URL chip — "you are here" line on Status panel */
-    .url-chip {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      background: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      font-size: 11px;
-      color: var(--muted-fg);
-      margin-bottom: 10px;
-      min-width: 0;
-    }
-    .url-chip-icon { flex-shrink: 0; color: var(--muted-fg); }
-    .url-chip-text {
-      flex: 1;
-      min-width: 0;
-      font-family: var(--mono);
-      font-size: 10.5px;
-      color: var(--fg);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* Subhead — uppercase section caption */
-    .subhead {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted-fg);
-      margin-bottom: 7px;
-    }
-    .subhead-spacer { margin-top: 14px; }
-
-    /* ============================================================
-       Issues list
-       ============================================================ */
-    .issues-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .issue-row {
-      display: flex;
-      gap: 9px;
-      align-items: flex-start;
-      padding: 9px 11px;
-      border-radius: var(--radius);
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 1.4;
-    }
-    .issue-row.sev-warn {
-      background: var(--warn-50);
-      border: 1px solid var(--warn-200);
-      color: var(--warn-700);
-    }
-    .issue-row.sev-err,
-    .issue-row.sev-fail {
-      background: var(--err-50);
-      border: 1px solid var(--err-200);
-      color: var(--err-700);
-    }
-    .issue-row.sev-info,
-    .issue-row.sev-tip {
-      background: var(--muted);
-      border: 1px solid var(--border);
-      color: var(--muted-fg);
-    }
-    .issue-row svg { flex-shrink: 0; }
-    .issue-row span { flex: 1; word-break: break-word; }
-
-    /* All-systems-OK block — healthy state */
-    .ok-block {
-      border: 1px dashed var(--ok-200);
-      background: var(--ok-50);
-      border-radius: var(--radius-lg);
-      padding: 14px 12px;
-      text-align: center;
-      color: var(--ok-700);
-    }
-    .ok-block svg {
-      color: var(--ok-500);
-      margin-bottom: 6px;
-    }
-    .ok-title {
-      font-family: var(--display);
-      font-weight: 700;
-      font-size: 13px;
-      margin-bottom: 2px;
-    }
-    .ok-sub {
-      font-size: 11px;
-      color: var(--ok-700);
-      opacity: 0.85;
-    }
-
-    /* ============================================================
-       Buttons — primary (Pank) + ghost
-       ============================================================ */
-    .btn {
-      width: 100%;
-      height: 36px;
-      border-radius: var(--radius);
-      cursor: pointer;
-      font-family: var(--sans);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      transition: background 0.12s, border-color 0.12s, color 0.12s;
-    }
-    .btn-primary {
-      margin-top: 10px;
-      border: none;
-      background: var(--pank);
-      color: #fff;
-      font-weight: 600;
-      font-size: 12.5px;
-    }
-    .btn-primary:hover { background: var(--pank-700); }
-    .btn-primary:active { background: var(--pank-700); box-shadow: inset 0 1px 0 rgba(0,0,0,0.1); }
-    .btn-ghost {
-      height: 32px;
-      margin-top: 6px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      color: var(--fg);
-      font-weight: 500;
-      font-size: 12px;
-    }
-    .btn-ghost:hover {
-      background: var(--muted);
-      border-color: var(--border-strong);
-    }
-    .btn-ghost svg { color: var(--muted-fg); }
-
-    /* Pulse highlight used when issues are detected — same idea as v3 */
-    @keyframes copy-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(235, 71, 120, 0.4); }
-      50% { box-shadow: 0 0 0 6px rgba(235, 71, 120, 0); }
-    }
-    .btn-primary.pulse { animation: copy-pulse 1.5s ease-in-out 3; }
-
-    /* "Why this grade?" accordion body — holds the existing checks list */
-    .why-grade-body {
-      margin-top: 8px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 8px 10px;
-      background: var(--muted);
-    }
-    .check-row {
-      display: flex;
-      gap: 8px;
-      padding: 5px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 11px;
-    }
-    .check-row:last-child { border-bottom: none; }
-    .check-status { flex-shrink: 0; font-size: 12px; line-height: 1; padding-top: 1px; width: 16px; }
-    .check-info { flex: 1; min-width: 0; }
-    .check-label {
-      font-weight: 500;
-      color: var(--fg);
-      letter-spacing: -0.01em;
-      line-height: 1.3;
-    }
-    .check-detail {
-      font-size: 11px;
-      color: var(--muted-fg);
-      word-break: break-word;
-      line-height: 1.4;
-      margin-top: 1px;
-    }
-    .check-row.pass .check-status { color: var(--ok-500); }
-    .check-row.warn .check-status { color: var(--warn-500); }
-    .check-row.fail .check-status { color: var(--err-500); }
-    .check-row.info .check-status { color: var(--muted-fg); }
-
-    /* ============================================================
-       Quick Copy compact table (Status panel) + full IDs table (IDs panel)
-       ============================================================ */
-    .quick-copy {
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      background: var(--bg);
-    }
-    .qc-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 11px;
-      border-bottom: 1px solid var(--border);
-      cursor: pointer;
-      transition: background 0.1s;
-      position: relative;
-      background: var(--bg);
-      border-left: none;
-      border-right: none;
-      border-top: none;
-      width: 100%;
-      text-align: left;
-      font-family: inherit;
-      color: var(--fg);
-    }
-    .qc-row:last-child { border-bottom: none; }
-    .qc-row:hover:not(.qc-empty) {
-      background: rgba(0,0,0,0.03);
-    }
-    .qc-row.qc-empty {
-      cursor: default;
-    }
-    .qc-label {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--muted-fg);
-      width: 90px;
-      flex: 0 0 auto;
-    }
-    .qc-value {
-      flex: 1;
-      min-width: 0;
-      font-family: var(--mono);
-      font-size: 11.5px;
-      font-weight: 500;
-      color: var(--fg);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .qc-empty .qc-value {
-      color: var(--muted-fg);
-      font-style: italic;
-    }
-    .qc-copy-icon {
-      flex-shrink: 0;
-      color: var(--muted-fg);
-      transition: color 0.12s;
-    }
-    .qc-empty .qc-copy-icon { visibility: hidden; }
-    .qc-row.is-copied {
-      background: var(--pank-50);
-    }
-    .qc-row.is-copied .qc-copy-icon { color: var(--ok-500); }
-
-    /* ============================================================
-       Tools panel
-       ============================================================ */
-    .setting-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 4px 4px;
-      font-size: 12px;
-      color: var(--fg);
-      gap: 12px;
-    }
-    .setting-row-stacked {
-      align-items: flex-start;
-    }
-    .setting-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-    .setting-sub {
-      font-size: 11px;
-      color: var(--muted-fg);
-      line-height: 1.4;
-    }
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 32px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .switch-track {
-      position: absolute;
-      inset: 0;
-      background: var(--border-strong);
-      border-radius: 999px;
-      transition: background 0.15s;
-      cursor: pointer;
-    }
-    .switch-track::before {
-      content: "";
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 14px;
-      height: 14px;
-      background: #fff;
-      border-radius: 50%;
-      transition: transform 0.15s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-    }
-    .switch input:checked + .switch-track { background: var(--pank); }
-    .switch input:checked + .switch-track::before { transform: translateX(14px); }
-
-    /* ============================================================
-       Empty states (loading, not detected, restricted page)
-       ============================================================ */
-    .empty-state {
-      padding: 40px 16px;
-      text-align: center;
-      flex: 1;
-      display: none;
-    }
-    .empty-state.is-active { display: block; }
-    .empty-icon { font-size: 28px; margin-bottom: 12px; }
-    .empty-state strong {
-      display: block;
-      font-family: var(--display);
-      font-weight: 700;
-      font-size: 14px;
-      color: var(--fg);
-      margin-bottom: 6px;
-    }
-    .empty-state p {
-      color: var(--muted-fg);
-      font-size: 13px;
-      line-height: 1.6;
-    }
-    .spinner {
-      display: inline-block;
-      width: 28px;
-      height: 28px;
-      border: 2.5px solid var(--pank-100);
-      border-top-color: var(--pank);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 12px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ============================================================
-       Footer
-       ============================================================ */
-    .footer {
-      border-top: 1px solid var(--border);
-      padding: 8px 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: var(--muted);
-      font-size: 11px;
-      color: var(--muted-fg);
-      flex-shrink: 0;
-    }
-    .footer-version {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-variant-numeric: tabular-nums;
-    }
-    .version-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 999px;
-      background: var(--pank);
-      display: inline-block;
-    }
-    .footer-sep { color: var(--border-strong); }
-    .footer-feedback {
-      margin-left: auto;
-      color: var(--pank);
-      font-weight: 600;
-      font-size: 11px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .footer-feedback:hover { color: var(--pank-700); }
-
-    /* ============================================================
-       Feedback modal — kept from v3, restyled to match v4 palette
-       ============================================================ */
-    #feedback-modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
-    .feedback-modal-content {
-      background: var(--bg);
-      border-radius: var(--radius-lg);
-      padding: 22px;
-      width: 90%;
-      max-width: 340px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.18);
-    }
-    .feedback-modal-content h3 {
-      font-family: var(--display);
-      font-weight: 700;
-      font-size: 15px;
-      margin-bottom: 6px;
-    }
-    .feedback-modal-content p {
-      font-size: 12px;
-      color: var(--muted-fg);
-      margin-bottom: 14px;
-    }
-    #feedback-text {
-      width: 100%;
-      height: 90px;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-family: inherit;
-      font-size: 12px;
-      resize: none;
-      margin-bottom: 14px;
-      line-height: 1.5;
-      color: var(--fg);
-      background: var(--bg);
-    }
-    #feedback-text:focus {
-      outline: none;
-      border-color: var(--pank);
-      box-shadow: 0 0 0 3px rgba(235,71,120,0.16);
-    }
-    .feedback-modal-buttons {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-    .feedback-modal-buttons button {
-      padding: 7px 12px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 12px;
-      font-weight: 500;
-      border: 1px solid transparent;
-    }
-    #feedback-cancel {
-      border-color: var(--border);
-      background: var(--bg);
-      color: var(--fg);
-    }
-    #feedback-submit { background: var(--pank); color: #fff; }
-    #feedback-email  { background: var(--charcoal); color: #fff; }
-    #feedback-status {
-      margin-top: 10px;
-      font-size: 12px;
-      text-align: center;
-    }
-    #feedback-status.feedback-error   { color: var(--err-700); }
-    #feedback-status.feedback-success { color: var(--ok-700); }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
 
-  <!-- Header: red-cross brand mark + "Health Check" wordmark + refresh button -->
-  <header class="header">
-    <div class="brand">
-      <!-- v4: red-cross "Health Check" mark. NOT the Pendo chevron.
-           This extension is not an official Pendo product; the design
-           handoff explicitly excludes Pendo trademarked assets. -->
-      <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <rect width="24" height="24" rx="5" fill="#EB4778"/>
-        <path d="M10 5h4v5h5v4h-5v5h-4v-5H5v-4h5z" fill="#fff"/>
-      </svg>
-      <span class="brand-text">Health Check</span>
-    </div>
-    <button class="header-btn" id="header-refresh" aria-label="Refresh diagnostics" title="Re-run health check">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <polyline points="23 4 23 10 17 10"/>
-        <polyline points="1 20 1 14 7 14"/>
-        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-      </svg>
-    </button>
-  </header>
+  <!-- The popup root. Matches design_handoff_pendo_health_check/popup_reference.html
+       verbatim. Hero card is the single source of status truth — no separate
+       Pendo Service Status banner element exists anywhere in this DOM. -->
+  <div class="popup" id="popup-root">
 
-  <!-- Hero card: grade letter + status copy. Hidden until first analysis completes. -->
-  <section class="hero" id="hero" style="display:none">
-    <div class="grade-square" id="grade-square">—</div>
-    <div class="hero-text">
-      <div class="hero-caption">Pendo Service Status</div>
-      <div class="hero-title" id="hero-title">Loading…</div>
-      <div class="hero-sub" id="hero-sub"></div>
-    </div>
-  </section>
-
-  <!-- Segmented tabs: Status / IDs / Tools -->
-  <nav class="tabs" id="tabs" style="display:none" role="tablist">
-    <button class="tab is-active" data-tab="status" role="tab" aria-selected="true">
-      Status
-      <span class="tab-count" id="tab-status-count" aria-hidden="true">0</span>
-    </button>
-    <button class="tab" data-tab="ids" role="tab" aria-selected="false">IDs</button>
-    <button class="tab" data-tab="tools" role="tab" aria-selected="false">Tools</button>
-  </nav>
-
-  <!-- Pendo Service Status incident banner — only when status.pendo.io reports an active incident -->
-  <div id="pendo-status" style="display:none"></div>
-
-  <!-- Empty / restricted / not-detected states -->
-  <div class="empty-state is-active" id="loading">
-    <div class="spinner"></div>
-    <p>Running diagnostics…</p>
-  </div>
-  <div class="empty-state" id="not-detected">
-    <div class="empty-icon">🔍</div>
-    <strong>Pendo Not Detected</strong>
-    <p>The Pendo agent is not loaded on this page. Install the Pendo snippet and try again.</p>
-  </div>
-  <div class="empty-state" id="error-state">
-    <div class="empty-icon">⛔</div>
-    <strong>Page Cannot Be Inspected</strong>
-    <p id="error-message">This extension cannot run on restricted pages.</p>
-  </div>
-
-  <!-- Tab content -->
-  <main class="content" id="content" style="display:none">
-
-    <!-- Status panel -->
-    <section class="tab-panel is-active" data-panel="status" role="tabpanel">
-      <div class="url-chip">
-        <svg class="url-chip-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    <!-- Header: red-cross Health Check mark + wordmark + refresh button.
+         No Pendo chevron, no Pendo wordmark — this is a third-party tool. -->
+    <div class="ph-header">
+      <span class="ph-mark" aria-hidden="true">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M10 5h4v5h5v4h-5v5h-4v-5H5v-4h5z"/>
         </svg>
-        <span class="url-chip-text" id="page-url-display">—</span>
-      </div>
-
-      <!-- All-systems-OK block: healthy state -->
-      <div class="ok-block" id="ok-block" style="display:none">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
+      </span>
+      <span class="ph-brand">Health Check</span>
+      <button class="ph-iconbtn" id="header-refresh" title="Refresh" aria-label="Refresh">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
         </svg>
-        <div class="ok-title">All systems operational</div>
-        <div class="ok-sub">No issues detected on this page</div>
+      </button>
+    </div>
+
+    <!-- Hero: grade letter + status copy. data-status drives color. -->
+    <div class="ph-hero" id="hero" data-status="degraded" style="display:none">
+      <div class="ph-grade" id="grade-square">—</div>
+      <div class="ph-hero-text">
+        <div class="ph-hero-caption">Pendo Service Status</div>
+        <div class="ph-hero-title" id="hero-title">Loading…</div>
+        <div class="ph-hero-sub" id="hero-sub"></div>
       </div>
+    </div>
 
-      <!-- Issues section: degraded + outage states -->
-      <div id="issues-section" style="display:none">
-        <div class="subhead">ACTIVE ISSUES · <span id="active-issues-count">0</span></div>
-        <div class="issues-list" id="issues-list"></div>
+    <!-- Tabs -->
+    <div class="ph-tabs" id="tabs" role="tablist" style="display:none">
+      <button class="ph-tab" data-tab="status" role="tab" aria-selected="true">
+        Status <span class="ph-tab-count" id="tab-status-count" style="display:none">0</span>
+      </button>
+      <button class="ph-tab" data-tab="ids" role="tab" aria-selected="false">IDs</button>
+      <button class="ph-tab" data-tab="tools" role="tab" aria-selected="false">Tools</button>
+    </div>
 
-        <button class="btn btn-primary" id="tool-copy-issues">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+    <!-- Empty / loading / error states. Hero + tabs + body are hidden while one is active. -->
+    <div class="ph-empty is-active" id="loading">
+      <div class="ph-spinner"></div>
+      <p>Running diagnostics…</p>
+    </div>
+    <div class="ph-empty" id="not-detected">
+      <div class="ph-empty-icon">🔍</div>
+      <strong>Pendo Not Detected</strong>
+      <p>The Pendo agent is not loaded on this page. Install the Pendo snippet and try again.</p>
+    </div>
+    <div class="ph-empty" id="error-state">
+      <div class="ph-empty-icon">⛔</div>
+      <strong>Page Cannot Be Inspected</strong>
+      <p id="error-message">This extension cannot run on restricted pages.</p>
+    </div>
+
+    <!-- Body -->
+    <div class="ph-body" id="content" style="display:none">
+
+      <!-- Status panel -->
+      <div class="ph-panel" data-panel="status" aria-hidden="false" role="tabpanel">
+
+        <!-- URL chip -->
+        <div class="ph-url">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <span class="btn-label">Copy Issues to Clipboard</span>
-        </button>
+          <span class="ph-url-text" id="page-url-display">—</span>
+        </div>
 
-        <button class="btn btn-ghost" id="why-grade-toggle" aria-expanded="false">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="16" x2="12" y2="12"/>
-            <line x1="12" y1="8" x2="12.01" y2="8"/>
+        <!-- All-systems-operational (healthy state) -->
+        <div class="ph-ok" id="ok-block" style="display:none">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
-          Why this grade?
-        </button>
+          <div class="ph-ok-title">All systems operational</div>
+          <div class="ph-ok-sub">No issues detected on this page</div>
+        </div>
 
-        <div class="why-grade-body" id="why-grade-body" style="display:none">
-          <div id="checks-list"></div>
+        <!-- Issues section (degraded / outage) -->
+        <div id="issues-section" style="display:none">
+          <div class="ph-subhead">ACTIVE ISSUES · <span id="active-issues-count">0</span></div>
+          <div class="ph-issues" id="issues-list"></div>
+
+          <div class="ph-actions">
+            <button class="ph-btn ph-btn-primary" id="tool-copy-issues">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+              </svg>
+              <span class="btn-label">Copy Issues to Clipboard</span>
+            </button>
+          </div>
+
+          <!-- Native <details> disclosure. No custom toggle JS. -->
+          <details class="ph-why">
+            <summary>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              Why this grade?
+              <svg class="ph-why-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </summary>
+            <div class="ph-why-body">
+              <div id="checks-list"></div>
+            </div>
+          </details>
+        </div>
+
+        <!-- Quick Copy compact table — always visible -->
+        <div class="ph-section">
+          <div class="ph-subhead">Quick Copy</div>
+          <div class="ph-ids" id="quick-copy-status"></div>
         </div>
       </div>
 
-      <!-- Quick Copy compact table — always visible on Status panel -->
-      <div class="subhead subhead-spacer">QUICK COPY</div>
-      <div class="quick-copy" id="quick-copy-status"></div>
-    </section>
-
-    <!-- IDs panel: fuller table including Subscription + Copy all as JSON -->
-    <section class="tab-panel" data-panel="ids" role="tabpanel" hidden>
-      <div class="subhead">IDENTIFIERS</div>
-      <div class="quick-copy" id="quick-copy-ids"></div>
-      <button class="btn btn-primary" id="copy-all-json">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-        </svg>
-        <span class="btn-label">Copy all as JSON</span>
-      </button>
-    </section>
-
-    <!-- Tools panel: Toggle Debugger + badge toggle -->
-    <section class="tab-panel" data-panel="tools" role="tabpanel" hidden>
-      <div class="subhead">TOOLS</div>
-      <button class="btn btn-primary" id="tool-launch-debug">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-        </svg>
-        <span class="btn-label">Toggle Pendo Debugger</span>
-      </button>
-
-      <div class="setting-row">
-        <span>Show badge on extension icon</span>
-        <label class="switch" aria-label="Show issue count badge on the extension icon">
-          <input type="checkbox" id="badge-enabled" checked>
-          <span class="switch-track"></span>
-        </label>
-      </div>
-
-      <!-- v4.1: optional proactive checking. Toggling this on prompts Chrome
-           for the <all_urls> host permission at runtime. Default off. -->
-      <div class="setting-row setting-row-stacked">
-        <div class="setting-text">
-          <span>Auto-check pages on load</span>
-          <span class="setting-sub">Requires permission to read all pages. Badge updates without opening this popup.</span>
+      <!-- IDs panel: fuller table with Subscription + Copy all as JSON -->
+      <div class="ph-panel" data-panel="ids" aria-hidden="true" role="tabpanel">
+        <div class="ph-subhead">Identifiers</div>
+        <div class="ph-ids" id="quick-copy-ids"></div>
+        <div class="ph-actions">
+          <button class="ph-btn ph-btn-primary" id="copy-all-json">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            </svg>
+            <span class="btn-label">Copy all as JSON</span>
+          </button>
         </div>
-        <label class="switch" aria-label="Auto-check pages on load">
-          <input type="checkbox" id="auto-check-enabled">
-          <span class="switch-track"></span>
-        </label>
       </div>
-    </section>
 
-  </main>
+      <!-- Tools panel: Toggle Debugger + settings -->
+      <div class="ph-panel" data-panel="tools" aria-hidden="true" role="tabpanel">
+        <div class="ph-subhead">Tools</div>
+        <div class="ph-actions">
+          <button class="ph-btn ph-btn-primary" id="tool-launch-debug">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+            <span class="btn-label">Toggle Pendo Debugger</span>
+          </button>
+        </div>
 
-  <!-- Footer: version dot + badge state + Send feedback link -->
-  <footer class="footer">
-    <span class="footer-version">
-      <span class="version-dot"></span>
-      <span id="version-text">v4.0.0</span>
-    </span>
-    <span class="footer-sep">·</span>
-    <span id="badge-state-text">Badge on</span>
-    <a class="footer-feedback" id="feedback-btn" href="#" role="button">Send feedback</a>
-  </footer>
+        <div class="ph-section">
+          <div class="ph-setting">
+            <span>Show badge on extension icon</span>
+            <label class="ph-switch" aria-label="Show issue count badge on the extension icon">
+              <input type="checkbox" id="badge-enabled" checked>
+              <span class="ph-switch-track"></span>
+            </label>
+          </div>
+          <div class="ph-setting ph-setting-stacked">
+            <div class="ph-setting-text">
+              <span>Auto-check pages on load</span>
+              <span class="ph-setting-sub">Requires permission to read all pages. Badge updates without opening this popup.</span>
+            </div>
+            <label class="ph-switch" aria-label="Auto-check pages on load">
+              <input type="checkbox" id="auto-check-enabled">
+              <span class="ph-switch-track"></span>
+            </label>
+          </div>
+        </div>
+      </div>
 
-  <!-- Feedback modal — kept from v3 -->
+    </div>
+
+    <!-- Footer -->
+    <div class="ph-footer">
+      <span class="ph-footer-version" id="version-text">v4.2.0</span>
+      <span class="ph-footer-dot">·</span>
+      <span id="badge-state-text">Badge on</span>
+      <button class="ph-footer-feedback" id="feedback-btn">Send feedback</button>
+    </div>
+  </div>
+
+  <!-- Hidden URL holder for popup.js compatibility -->
+  <div id="page-url" style="display:none"></div>
+
+  <!-- Feedback modal -->
   <div id="feedback-modal">
     <div class="feedback-modal-content">
       <h3>Send Feedback</h3>
@@ -936,9 +208,6 @@
       <div id="feedback-status"></div>
     </div>
   </div>
-
-  <!-- Hidden URL holder so popup.js can keep reading it the same way -->
-  <div id="page-url" style="display:none"></div>
 
   <script src="popup.js"></script>
 </body>
