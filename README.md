@@ -1,10 +1,12 @@
 # Pendo Health Check — Chrome Extension
 
-A Manifest V3 Chrome extension that gives you an instant letter grade (A–F) for any [Pendo](https://www.pendo.io/) installation. Click the toolbar icon to get a single prioritized diagnostic report with one-click issue export, inline developer tools, and live service status.
+> **Side project, not an official Pendo product.** Built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract. If something breaks, file a GitHub issue here; please don't file a Pendo support ticket about it.
 
-Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-setup-assistant) — the ai-setup-assistant helps developers **install** Pendo into a codebase, while this extension **validates** the running installation from the browser.
+A Manifest V3 Chrome extension that helps Pendo operators make decisions faster on any page with [Pendo](https://www.pendo.io/) installed. v4 ships the **Compact Dashboard** redesign: a hero grade card up top, segmented **Status / IDs / Tools** tabs, severity-colored issue rows, and a Quick Copy table of the IDs operators actually paste into tickets. The full prioritized check list lives behind a "Why this grade?" accordion that stays collapsed by default.
 
-Built for Pendo admins who need to prove what's wrong and hand it to engineering.
+Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-setup-assistant). The ai-setup-assistant helps developers **install** Pendo into a codebase; this extension **validates and triages** the running installation from the browser.
+
+Built for Pendo admins, implementation engineers, and customer success folks. Scope includes Pendo-adjacent problems too (consent management, CSP, CNAME, framework integration), and remediation links point to whichever vendor owns the actual fix.
 
 ---
 
@@ -56,7 +58,15 @@ To update later, just `git pull` and click the ↻ reload button on the extensio
 
 **Restricted Pages** — On `chrome://` pages and the Chrome Web Store, the extension shows an error state explaining the restriction.
 
-**Copy Issues** — A "Copy Issues to Clipboard" button is pinned at the bottom. It generates a priority-sorted diagnostic report with remediation steps. Paste into Slack, Jira, or a support ticket. When issues are detected, the copy button pulses to draw attention.
+**Quick Copy chips** — The chip grid below the header surfaces six values an operator actually pastes into a ticket, Slack, or API call: Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Realm. Chips for values that aren't set on this page render grayed out and uncopyable so missing data is visible, not hidden. Diagnostic state (Framework, Ready, Active Guides count) stays out of the chip grid because it isn't a copy-paste value — it's already covered by the grade pill and the "Why this grade" drawer.
+
+**Score diff** — The grade pill in the header is paired with a score-diff badge (↑ +12 / ↓ −8 / · 0) showing the delta from your last visit to the same hostname + path. Click the badge for a popover with the last five scores. History is stored locally in `chrome.storage.local`; nothing leaves your browser.
+
+**Toggle Pendo Debugger** — A pinned top-level button alongside Copy Issues. One click opens or closes Pendo's on-page debug overlay. The debugger is the daily tool for tagging operators, in-app content authors, and Pendo support, so it lives outside any "developer tools" framing.
+
+**Copy Issues** — One plain-text output. Clicking runs `pendo.validateInstall()` in the page, captures its console output, and appends it to the report under a labeled "Pendo's official validateInstall() output" section. The artifact you hand to engineering now contains both the extension's interpretation and Pendo's own verdict in one paste. The preamble identifies the tool, version, and source repo and notes that Pendo doc URLs in the report are verified Help Center articles. When issues are detected, the copy button pulses to draw attention.
+
+**CMP consent-gating warning** — If a consent manager is on the page and Pendo is initialized with a non-anonymous visitor while the CMP reports analytics consent denied, the extension flags it with a warning. Actionable detection on Cookiebot, Didomi, Osano, and a narrow OneTrust read. Inform-only on TrustArc and TCF v2.0. The check is conservative: any unknown signal suppresses the flag.
 
 **Icon Badge** — After analysis, the extension icon shows a yellow badge (warnings) or red badge (critical failures). The badge clears automatically when you navigate to a new page and updates correctly when switching tabs. Toggle the badge on or off from the footer.
 

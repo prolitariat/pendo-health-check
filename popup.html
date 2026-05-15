@@ -4,1041 +4,203 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pendo Health Check</title>
-  <style>
-    /* === Design tokens: shadcn/ui structure + Pendo brand === */
-    :root {
-      /* Pendo brand */
-      --pendo-pink: #c8385d;
-      --pendo-pink-btn: #c8385d;
-      --pendo-pink-light: #fff1f4;
-      --pendo-pink-mid: #ffe0e8;
-      --pendo-highlight: #FEF484;
-      --pendo-highlight-light: #fffde6;
-      --pendo-dark: #000000;
-      /* Core tokens (light) */
-      --background: #ffffff;
-      --foreground: #09090b;
-      --card: #ffffff;
-      --card-foreground: #09090b;
-      --muted: #f4f4f5;
-      --muted-foreground: #6c6c75;
-      --border: #e4e4e7;
-      --input: #e4e4e7;
-      --ring: var(--pendo-pink);
-      --primary: var(--pendo-dark);
-      --primary-foreground: #fafafa;
-      --secondary: #f4f4f5;
-      --secondary-foreground: #18181b;
-      --accent: var(--pendo-pink);
-      --accent-foreground: #ffffff;
-      --accent-subtle: var(--pendo-pink-light);
-      --destructive: #c93939;
-      --success: #117f39;
-      --warning: #a55a05;
-      --radius: 8px;
-      --radius-sm: 6px;
-      --radius-lg: 12px;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --pendo-pink: #FF4876;
-        --pendo-pink-btn: #d13b61;
-        --pendo-pink-light: #2a1019;
-        --pendo-pink-mid: #3d1525;
-        --pendo-highlight-light: #2a2810;
-        --pendo-dark: #ffffff;
-        --background: #09090b;
-        --foreground: #fafafa;
-        --card: #111113;
-        --card-foreground: #fafafa;
-        --muted: #1c1c1f;
-        --muted-foreground: #a1a1aa;
-        --border: #27272a;
-        --input: #27272a;
-        --primary: #fafafa;
-        --primary-foreground: #09090b;
-        --secondary: #1c1c1f;
-        --secondary-foreground: #fafafa;
-        --accent-subtle: #2a1019;
-        --pendo-highlight: #FEF484;
-        --destructive: #f87171;
-        --success: #22c55e;
-        --warning: var(--pendo-highlight);
-      }
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    /* === Focus-visible ring (shadcn pattern) === */
-    :focus { outline: none; }
-    :focus-visible {
-      outline: 2px solid var(--ring);
-      outline-offset: 2px;
-      border-radius: var(--radius-sm);
-    }
-
-    .loading-dot {
-      display: inline-block;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--muted-foreground);
-      animation: pulse-dot 1s ease-in-out infinite;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 1; }
-    }
-
-    body {
-      width: 380px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 13px;
-      color: var(--foreground);
-      background: var(--background);
-      line-height: 1.5;
-      overflow: hidden;
-      height: 600px;
-      display: flex;
-      flex-direction: column;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* === Header === */
-    .header {
-      background: #000000;
-      color: #fafafa;
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 2px solid var(--pendo-pink);
-      flex-shrink: 0;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .header {
-        background: #18181b;
-      }
-    }
-
-    .header-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .header-icon {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-
-    .header-text {
-      font-weight: 600;
-      font-size: 13px;
-      letter-spacing: -0.01em;
-    }
-
-    /* === Tab Bar (shadcn line variant) === */
-    #tab-bar {
-      display: none;
-      background: var(--background);
-      border-bottom: 1px solid var(--border);
-      padding: 0;
-      gap: 0;
-      flex-shrink: 0;
-    }
-
-    .tab {
-      flex: 1;
-      text-align: center;
-      padding: 10px 12px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      border-bottom: 2px solid transparent;
-      color: var(--muted-foreground);
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
-      position: relative;
-    }
-
-    .tab:hover {
-      color: var(--foreground);
-      border-bottom-color: var(--pendo-pink-mid);
-      background: var(--pendo-pink-light);
-    }
-
-    .tab.active {
-      color: var(--foreground);
-      border-bottom-color: var(--pendo-pink);
-    }
-    .tab.active:hover {
-      background: transparent;
-    }
-    .tab:focus-visible {
-      outline-offset: -2px;
-      border-radius: 4px 4px 0 0;
-    }
-
-    /* === Tool Buttons (shadcn outline button style) === */
-    .tools-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      padding: 16px;
-    }
-    .tool-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      padding: 12px 10px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--background);
-      cursor: pointer;
-      font-size: 12px;
-      color: var(--foreground);
-      text-align: center;
-      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-    }
-    .tool-btn:focus-visible {
-      outline-offset: -1px;
-    }
-    .tool-btn:hover {
-      background: var(--pendo-pink-light);
-      border-color: var(--pendo-pink-mid);
-    }
-    .tool-btn:active {
-      background: var(--pendo-pink-mid);
-    }
-    .tool-btn .tool-icon {
-      font-size: 20px;
-    }
-    .tool-btn .tool-label {
-      font-weight: 600;
-      line-height: 1.2;
-      font-size: 12px;
-      letter-spacing: -0.01em;
-    }
-    .tool-btn .tool-desc {
-      font-size: 11px;
-      color: var(--muted-foreground);
-      line-height: 1.3;
-    }
-    .tool-btn.active-tool {
-      border-color: var(--pendo-pink);
-      background: var(--pendo-pink-light);
-    }
-    .tool-btn.active-tool .tool-label {
-      color: var(--pendo-pink);
-    }
-    #tool-status {
-      padding: 0 16px 10px;
-      font-size: 12px;
-      color: var(--muted-foreground);
-      text-align: center;
-      min-height: 18px;
-    }
-    #tool-status.success { color: var(--pendo-pink); }
-    #tool-status.error { color: var(--destructive); }
-
-    /* === Feedback Bar === */
-    #feedback-bar {
-      padding: 8px 16px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    #version-label {
-      font-size: 11px;
-      color: var(--muted-foreground);
-      user-select: text;
-    }
-
-    #feedback-bar-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    #feedback-btn {
-      padding: 5px 12px;
-      font-size: 12px;
-      font-weight: 500;
-      border: 1px solid var(--border);
-      background: var(--background);
-      color: var(--foreground);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-    }
-
-    #feedback-btn:hover {
-      background: var(--pendo-pink-light);
-      border-color: var(--pendo-pink-mid);
-    }
-
-    /* === Feedback Modal === */
-    #feedback-modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.45);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .feedback-modal-content {
-      background: var(--background);
-      border-radius: var(--radius-lg);
-      padding: 24px;
-      width: 90%;
-      max-width: 400px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.08);
-    }
-
-    .feedback-modal-content h3 {
-      margin-bottom: 6px;
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
-
-    .feedback-modal-content p {
-      font-size: 13px;
-      color: var(--muted-foreground);
-      margin-bottom: 16px;
-    }
-
-    #feedback-text {
-      width: 100%;
-      height: 100px;
-      padding: 10px 12px;
-      border: 1px solid var(--input);
-      border-radius: var(--radius-sm);
-      font-family: inherit;
-      font-size: 13px;
-      resize: none;
-      margin-bottom: 16px;
-      line-height: 1.5;
-      color: var(--foreground);
-      background: var(--card);
-    }
-
-    #feedback-text:focus {
-      outline: none;
-      border-color: var(--pendo-pink);
-      box-shadow: 0 0 0 3px rgba(255,72,118,0.12);
-    }
-
-    .feedback-modal-buttons {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-
-    #feedback-cancel {
-      padding: 7px 14px;
-      border: 1px solid var(--border);
-      background: var(--background);
-      color: var(--foreground);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      transition: background 0.15s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-    }
-
-    #feedback-submit, #feedback-email {
-      padding: 7px 14px;
-      border: 1px solid transparent;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      transition: opacity 0.15s;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-    }
-
-    #feedback-submit {
-      background: var(--pendo-pink-btn);
-      color: #ffffff;
-    }
-
-    #feedback-email {
-      background: var(--foreground);
-      color: var(--background);
-    }
-
-    #feedback-submit:hover, #feedback-email:hover {
-      opacity: 0.9;
-    }
-
-    #feedback-cancel:hover {
-      background: var(--pendo-pink-light);
-      border-color: var(--pendo-pink-mid);
-    }
-
-    #feedback-submit:disabled, #feedback-email:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .feedback-status {
-      margin-top: 12px;
-      font-size: 13px;
-      text-align: center;
-    }
-
-    .feedback-status.feedback-error {
-      color: var(--destructive);
-    }
-
-    .feedback-status.feedback-success {
-      color: var(--success);
-    }
-
-    /* === Loading / Empty States === */
-    #loading,
-    #not-detected,
-    #error-state {
-      display: none;
-      padding: 40px 16px;
-      text-align: center;
-      flex: 1;
-    }
-
-    .loading-spinner {
-      display: inline-block;
-      width: 28px;
-      height: 28px;
-      border: 2.5px solid var(--pendo-pink-mid);
-      border-top-color: var(--pendo-pink);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 12px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .empty-state {
-      color: var(--muted-foreground);
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    .empty-state-icon {
-      font-size: 28px;
-      margin-bottom: 12px;
-    }
-
-    /* === Main Panel === */
-    .tab-panel {
-      display: none;
-      padding: 10px 12px;
-      overflow-y: auto;
-      overflow-x: hidden;
-      flex: 1;
-      min-height: 0;
-    }
-
-    .tab-panel.active {
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* === Scroll fade — bottom gradient hinting at more content === */
-    #scroll-fade {
-      display: none;
-      height: 28px;
-      margin-top: -28px;
-      background: linear-gradient(to bottom, transparent, var(--background));
-      pointer-events: none;
-      position: relative;
-      z-index: 1;
-      flex-shrink: 0;
-    }
-
-    /* === Health Check copy bar — pinned below scroll area === */
-    #health-copy-bar {
-      display: none;
-      padding: 8px 12px 2px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    /* === Pendo Status Section === */
-    #pendo-status {
-      display: none;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 0;
-    }
-
-    .incident-banner {
-      padding: 8px 16px;
-      background: var(--pendo-highlight-light);
-      border-bottom: 1px solid var(--border);
-      font-size: 12px;
-      color: #854d0e;
-    }
-
-    .incident-banner strong {
-      display: block;
-      margin-bottom: 2px;
-    }
-
-    /* === Health Check List === */
-    #checks-list {
-      margin: 4px 0 2px;
-    }
-
-    .check-row {
-      display: flex;
-      gap: 8px;
-      padding: 5px 8px;
-      border-bottom: 1px solid var(--muted);
-      transition: background 0.1s;
-    }
-
-    .check-row:hover {
-      background: var(--muted);
-    }
-
-    .check-row:last-child {
-      border-bottom: none;
-    }
-
-    .check-status {
-      flex-shrink: 0;
-      font-size: 12px;
-      width: 16px;
-      line-height: 1;
-      padding-top: 1px;
-    }
-
-    .check-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .check-label {
-      font-weight: 500;
-      color: var(--foreground);
-      font-size: 11px;
-      line-height: 1.3;
-      letter-spacing: -0.01em;
-    }
-
-    .check-detail {
-      font-size: 11px;
-      color: var(--muted-foreground);
-      word-break: break-word;
-      line-height: 1.4;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      margin-top: 1px;
-    }
-
-    /* === Summary / Copy === */
-    #health-summary,
-    #setup-summary {
-      display: none;
-      flex-direction: column;
-      gap: 6px;
-      padding: 6px 0 2px;
-      border-top: 1px solid var(--border);
-      margin-top: 2px;
-    }
-
-    #summary-counts,
-    #setup-summary-counts {
-      font-size: 12px;
-      text-align: center;
-      color: var(--muted-foreground);
-    }
-
-    .pass {
-      color: var(--success);
-      font-weight: 600;
-    }
-
-    .warn {
-      color: var(--warning);
-      font-weight: 600;
-    }
-
-    .fail {
-      color: var(--destructive);
-      font-weight: 600;
-    }
-
-    /* copy buttons removed — now unified in Tools panel */
-
-    /* === Setup Assistant === */
-    #setup-loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 40px 16px;
-      text-align: center;
-    }
-
-    #setup-content {
-      display: none;
-    }
-
-    .detail-row {
-      display: flex;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--muted);
-      gap: 12px;
-    }
-
-    .detail-row:last-child {
-      border-bottom: none;
-    }
-
-    .detail-key {
-      font-weight: 500;
-      color: var(--foreground);
-      min-width: 110px;
-      flex-shrink: 0;
-      font-size: 12px;
-    }
-
-    .detail-val {
-      flex: 1;
-      color: var(--muted-foreground);
-      word-break: break-word;
-      font-size: 12px;
-    }
-
-    /* === Badges (shadcn pill style) === */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 1px 8px;
-      border-radius: 9999px;
-      font-size: 11px;
-      font-weight: 500;
-      white-space: nowrap;
-      line-height: 1.6;
-    }
-
-    .badge-green {
-      background: #dcfce7;
-      color: #15803d;
-    }
-
-    .badge-yellow {
-      background: var(--pendo-highlight-light);
-      color: #92600a;
-    }
-
-    .badge-red {
-      background: #fee2e2;
-      color: #b91c1c;
-    }
-
-    .badge-blue {
-      background: #dbeafe;
-      color: #1d4ed8;
-    }
-
-    .badge-pink {
-      background: var(--pendo-pink-light);
-      color: #c0274e;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .badge-green { background: #052e16; color: #4ade80; }
-      .badge-yellow { color: var(--pendo-highlight); }
-      .badge-red { background: #450a0a; color: #fca5a5; }
-      .badge-blue { background: #172554; color: #93c5fd; }
-      .badge-pink { color: #d05d7a; }
-      .incident-banner { color: var(--pendo-highlight); }
-    }
-
-    /* === Metadata Table === */
-    .metadata-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 8px 0;
-      font-size: 12px;
-    }
-
-    .metadata-table th,
-    .metadata-table td {
-      padding: 6px 8px;
-      text-align: left;
-      border-bottom: 1px solid var(--muted);
-    }
-
-    .metadata-table th {
-      background: var(--muted);
-      font-weight: 600;
-      color: var(--foreground);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-
-    .metadata-table td {
-      color: var(--muted-foreground);
-    }
-
-    .field-ok {
-      color: var(--success);
-      font-weight: 500;
-    }
-
-    .field-warn {
-      color: var(--warning);
-      font-weight: 500;
-    }
-
-    /* === Collapsible Setup Sections === */
-    .setup-section {
-      border-bottom: 1px solid var(--border);
-    }
-    .setup-section:last-of-type {
-      border-bottom: none;
-    }
-    .setup-section-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 4px;
-      cursor: pointer;
-      user-select: none;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--foreground);
-      letter-spacing: -0.01em;
-      transition: background 0.1s;
-    }
-    .setup-section-header:hover {
-      background: var(--muted);
-    }
-    .setup-section-header:focus-visible {
-      outline-offset: -1px;
-    }
-    .setup-chevron {
-      font-size: 9px;
-      color: var(--muted-foreground);
-      transition: transform 0.15s;
-      flex-shrink: 0;
-      width: 12px;
-      text-align: center;
-    }
-    .setup-section.open .setup-chevron {
-      transform: rotate(90deg);
-    }
-    .setup-section-title {
-      flex: 1;
-    }
-    .setup-section-badge {
-      flex-shrink: 0;
-    }
-    .setup-section-body {
-      display: none;
-      padding: 0 4px 6px 18px;
-    }
-    .setup-section.open .setup-section-body {
-      display: block;
-    }
-
-    /* === Recommendations (shadcn alert-like) === */
-    .recommendation {
-      display: flex;
-      gap: 10px;
-      padding: 10px 12px;
-      background: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      margin-bottom: 8px;
-    }
-
-    .rec-icon {
-      flex-shrink: 0;
-      font-size: 14px;
-    }
-
-    .rec-text {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .rec-text strong {
-      display: block;
-      color: var(--foreground);
-      margin-bottom: 2px;
-      font-size: 12px;
-      letter-spacing: -0.01em;
-    }
-
-    .rec-detail {
-      font-size: 12px;
-      color: var(--muted-foreground);
-      word-break: break-word;
-      line-height: 1.5;
-    }
-
-    /* Copy button pulse */
-    @keyframes copy-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(200,56,93,0.4); }
-      50% { box-shadow: 0 0 0 6px rgba(200,56,93,0); }
-    }
-    .copy-pulse {
-      animation: copy-pulse 1.5s ease-in-out 3;
-      border-color: var(--pendo-pink) !important;
-    }
-
-    /* === Grade Card === */
-    #grade-card {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 12px;
-      margin: 4px 0 6px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--card);
-    }
-    #grade-letter {
-      font-size: 32px;
-      font-weight: 700;
-      line-height: 1;
-      min-width: 44px;
-      text-align: center;
-    }
-    #grade-details { flex: 1; }
-    #grade-score {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--foreground);
-    }
-    #grade-summary {
-      font-size: 11px;
-      color: var(--muted-foreground);
-      margin-top: 2px;
-    }
-    .grade-a { color: var(--success); }
-    .grade-b { color: #2563eb; }
-    .grade-c { color: var(--warning); }
-    .grade-d { color: #ea580c; }
-    .grade-f { color: var(--destructive); }
-
-    /* === Validate Results === */
-    #validate-results-wrap {
-      position: relative;
-      margin: 8px 4px;
-    }
-    #validate-results-wrap .copy-result-btn {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      padding: 3px 8px;
-      font-size: 11px;
-      font-weight: 500;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--background);
-      color: var(--muted-foreground);
-      cursor: pointer;
-      opacity: 0;
-      transition: opacity 0.15s, background 0.15s;
-      z-index: 2;
-    }
-    #validate-results-wrap:hover .copy-result-btn {
-      opacity: 1;
-    }
-    #validate-results-wrap .copy-result-btn:hover {
-      background: var(--pendo-pink-light);
-      border-color: var(--pendo-pink-mid);
-      color: var(--foreground);
-    }
-    #validate-results {
-      display: none;
-      padding: 10px 12px;
-      background: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 11px;
-      color: var(--foreground);
-      max-height: 200px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      line-height: 1.5;
-    }
-
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <!-- Header -->
-  <div class="header">
-    <div class="header-title">
-      <img class="header-icon" src="icons/icon48.png" alt="">
-      <span class="header-text">Pendo Health Check</span>
+
+  <!-- The popup root. Matches design_handoff_pendo_health_check/popup_reference.html
+       verbatim. Hero card is the single source of status truth — no separate
+       Pendo Service Status banner element exists anywhere in this DOM. -->
+  <div class="popup" id="popup-root">
+
+    <!-- Header: red-cross Health Check mark + wordmark + refresh button.
+         No Pendo chevron, no Pendo wordmark — this is a third-party tool. -->
+    <div class="ph-header">
+      <span class="ph-mark" aria-hidden="true">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M10 5h4v5h5v4h-5v5h-4v-5H5v-4h5z"/>
+        </svg>
+      </span>
+      <span class="ph-brand">Health Check</span>
+      <button class="ph-iconbtn" id="header-refresh" title="Refresh" aria-label="Refresh">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Hero: grade letter + status copy. data-status drives color. -->
+    <div class="ph-hero" id="hero" data-status="degraded" style="display:none">
+      <div class="ph-grade" id="grade-square">—</div>
+      <div class="ph-hero-text">
+        <div class="ph-hero-caption">Pendo Service Status</div>
+        <div class="ph-hero-title" id="hero-title">Loading…</div>
+        <div class="ph-hero-sub" id="hero-sub"></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="ph-tabs" id="tabs" role="tablist" style="display:none">
+      <button class="ph-tab" data-tab="status" role="tab" aria-selected="true">
+        Status <span class="ph-tab-count" id="tab-status-count" style="display:none">0</span>
+      </button>
+      <button class="ph-tab" data-tab="ids" role="tab" aria-selected="false">IDs</button>
+      <button class="ph-tab" data-tab="tools" role="tab" aria-selected="false">Tools</button>
+    </div>
+
+    <!-- Empty / loading / error states. Hero + tabs + body are hidden while one is active. -->
+    <div class="ph-empty is-active" id="loading">
+      <div class="ph-spinner"></div>
+      <p>Running diagnostics…</p>
+    </div>
+    <div class="ph-empty" id="not-detected">
+      <div class="ph-empty-icon">🔍</div>
+      <strong>Pendo Not Detected</strong>
+      <p>The Pendo agent is not loaded on this page. Install the Pendo snippet and try again.</p>
+    </div>
+    <div class="ph-empty" id="error-state">
+      <div class="ph-empty-icon">⛔</div>
+      <strong>Page Cannot Be Inspected</strong>
+      <p id="error-message">This extension cannot run on restricted pages.</p>
+    </div>
+
+    <!-- Body -->
+    <div class="ph-body" id="content" style="display:none">
+
+      <!-- Status panel -->
+      <div class="ph-panel" data-panel="status" aria-hidden="false" role="tabpanel">
+
+        <!-- URL chip -->
+        <div class="ph-url">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <span class="ph-url-text" id="page-url-display">—</span>
+        </div>
+
+        <!-- All-systems-operational (healthy state) -->
+        <div class="ph-ok" id="ok-block" style="display:none">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <div class="ph-ok-title">All systems operational</div>
+          <div class="ph-ok-sub">No issues detected on this page</div>
+        </div>
+
+        <!-- Issues section (degraded / outage / info-only).
+             Subhead label and the visibility of the Copy Issues action are
+             both driven by v4RenderIssuesList: NOTES · N when issues are
+             info-only; ACTIVE ISSUES · N when any warn/err is present. -->
+        <div id="issues-section" style="display:none">
+          <div class="ph-subhead"><span id="active-issues-label">ACTIVE ISSUES</span> · <span id="active-issues-count">0</span></div>
+          <div class="ph-issues" id="issues-list"></div>
+
+          <div class="ph-actions" id="copy-issues-actions">
+            <button class="ph-btn ph-btn-primary" id="tool-copy-issues">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+              </svg>
+              <span class="btn-label">Copy Issues to Clipboard</span>
+            </button>
+          </div>
+
+          <!-- Native <details> disclosure. No custom toggle JS. -->
+          <details class="ph-why">
+            <summary>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              Why this grade?
+              <svg class="ph-why-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </summary>
+            <!-- v4.3: per-issue .ph-why-item blocks, one per active issue.
+                 Populated by v4RenderWhyItems(issues). Empty when there are
+                 no issues, in which case the parent <details> still renders
+                 but expanding it shows nothing — there's nothing to say. -->
+            <div class="ph-why-body" id="why-items"></div>
+          </details>
+        </div>
+
+        <!-- v4.3: Quick Copy compact table removed from Status panel.
+             Identifiers are owned exclusively by the IDs tab per the README
+             v3 Status tab anatomy ("Status tab does not show identifiers"). -->
+      </div>
+
+      <!-- IDs panel: fuller table with Subscription + Copy all as JSON -->
+      <div class="ph-panel" data-panel="ids" aria-hidden="true" role="tabpanel">
+        <div class="ph-subhead">Identifiers</div>
+        <div class="ph-ids" id="quick-copy-ids"></div>
+        <div class="ph-actions">
+          <button class="ph-btn ph-btn-primary" id="copy-all-json">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            </svg>
+            <span class="btn-label">Copy all as JSON</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tools panel: Toggle Debugger + settings -->
+      <div class="ph-panel" data-panel="tools" aria-hidden="true" role="tabpanel">
+        <div class="ph-subhead">Tools</div>
+        <div class="ph-actions">
+          <button class="ph-btn ph-btn-primary" id="tool-launch-debug">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+            <span class="btn-label">Toggle Pendo Debugger</span>
+          </button>
+        </div>
+
+        <div class="ph-section">
+          <div class="ph-setting">
+            <span>Show badge on extension icon</span>
+            <label class="ph-switch" aria-label="Show issue count badge on the extension icon">
+              <input type="checkbox" id="badge-enabled" checked>
+              <span class="ph-switch-track"></span>
+            </label>
+          </div>
+          <div class="ph-setting ph-setting-stacked">
+            <div class="ph-setting-text">
+              <span>Auto-check pages on load</span>
+              <span class="ph-setting-sub">Requires permission to read all pages. Badge updates without opening this popup.</span>
+            </div>
+            <label class="ph-switch" aria-label="Auto-check pages on load">
+              <input type="checkbox" id="auto-check-enabled">
+              <span class="ph-switch-track"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer — v4.4: pink dot + "Badge on" label + separator removed
+         per UPDATE_1.md Part 2. Version on the left, Send feedback on
+         the right (margin-left: auto handles the spacing). -->
+    <div class="ph-footer">
+      <span class="ph-footer-version" id="version-text">v4.5.0</span>
+      <button class="ph-footer-feedback" id="feedback-btn">Send feedback</button>
     </div>
   </div>
 
-  <!-- Page URL — hidden; value used by clipboard report and feedback -->
+  <!-- Hidden URL holder for popup.js compatibility -->
   <div id="page-url" style="display:none"></div>
 
-  <!-- Pendo Status Section -->
-  <div id="pendo-status" style="display:none; flex-shrink: 0;"></div>
+  <!-- v4.5 / UPDATE_2.md: the in-popup FeedbackModal is deleted.
+       "Send feedback" in the footer now opens a pre-filled GitHub issue
+       compose URL in a new tab. The popup never owns a textarea. -->
 
-  <!-- Tab bar removed — single scrollable view -->
-
-  <!-- Loading View -->
-  <div id="loading">
-    <div class="loading-spinner"></div>
-    <p>Running diagnostics…</p>
-  </div>
-
-  <!-- Not Detected View -->
-  <div id="not-detected">
-    <div class="empty-state-icon">🔍</div>
-    <div class="empty-state">
-      <strong>Pendo Not Detected</strong>
-      <p style="margin-top: 8px;">The Pendo agent is not loaded on this page. Install the Pendo snippet and try again.</p>
-    </div>
-  </div>
-
-  <!-- Error State View -->
-  <div id="error-state">
-    <div class="empty-state-icon">⛔</div>
-    <div class="empty-state">
-      <strong>Page Cannot Be Inspected</strong>
-      <p style="margin-top: 8px;">This extension cannot run on restricted pages (Chrome internal pages, Web Store, etc.).</p>
-      <p id="error-message" style="margin-top: 8px; color: var(--destructive);"></p>
-    </div>
-  </div>
-
-  <!-- Single scrollable panel — report + tools in one view -->
-  <div id="panel-report" class="tab-panel active">
-    <div id="report-loading" style="display:flex;align-items:center;justify-content:center;padding:32px 0;color:var(--muted-foreground);font-size:12px;gap:8px">
-      <span class="loading-dot"></span> Analyzing Pendo installation…
-    </div>
-    <div id="report-content" style="opacity:0;transition:opacity 0.2s ease-in">
-      <div id="grade-card" style="display:none">
-        <div id="grade-letter">—</div>
-        <div id="grade-details">
-          <div id="grade-score"></div>
-          <div id="grade-summary"></div>
-        </div>
-      </div>
-      <div id="checks-list"></div>
-
-    <!-- Developer Tools — collapsible drawer -->
-    <div id="dev-tools-drawer" style="margin-top:4px;border-top:1px solid var(--border)">
-      <div id="dev-tools-toggle" style="display:flex;align-items:center;gap:6px;padding:8px 4px;cursor:pointer;user-select:none;font-size:12px;font-weight:600;color:var(--muted-foreground);letter-spacing:-0.01em;transition:background 0.1s" tabindex="0" role="button" aria-expanded="false">
-        <span class="setup-chevron" style="font-size:9px;width:12px;text-align:center;transition:transform 0.15s">▶</span>
-        <span>Developer Tools</span>
-      </div>
-      <div id="dev-tools-body" style="display:none;padding:0 4px 8px">
-        <!-- Launch Debugger -->
-        <div style="padding:0 0 8px">
-          <button class="tool-btn" id="tool-launch-debug" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
-            <span class="tool-icon" style="font-size:18px">🐛</span>
-            <div style="text-align:left;flex:1">
-              <span class="tool-label">Toggle Pendo Debugger</span>
-              <span class="tool-desc" style="display:block">Open/close on-page overlay</span>
-            </div>
-          </button>
-        </div>
-        <!-- Validate buttons -->
-        <div style="display:flex;gap:8px;margin-bottom:6px">
-          <button class="tool-btn" id="tool-validate-install" style="flex:1;flex-direction:row;padding:8px 10px;gap:8px">
-            <span class="tool-icon" style="font-size:15px">🔍</span>
-            <div style="text-align:left">
-              <span class="tool-label" style="font-size:11px">Validate Install</span>
-              <span class="tool-desc" style="display:block">Identity & metadata</span>
-            </div>
-          </button>
-          <button class="tool-btn" id="tool-validate-env" style="flex:1;flex-direction:row;padding:8px 10px;gap:8px">
-            <span class="tool-icon" style="font-size:15px">🧪</span>
-            <div style="text-align:left">
-              <span class="tool-label" style="font-size:11px">Validate Environment</span>
-              <span class="tool-desc" style="display:block">Config & error audit</span>
-            </div>
-          </button>
-        </div>
-        <div id="tool-status"></div>
-        <div id="validate-results-wrap">
-          <button class="copy-result-btn" id="copy-validate-result" title="Copy output">Copy</button>
-          <div id="validate-results"></div>
-        </div>
-      </div>
-    </div>
-    </div><!-- /report-content -->
-  </div>
-
-  <!-- Scroll fade — visual cue that more content is below -->
-  <div id="scroll-fade"></div>
-
-  <!-- Copy Issues — pinned outside scroll area so it's always visible -->
-  <div id="health-copy-bar">
-    <button class="tool-btn" id="tool-copy-issues" style="width:100%;flex-direction:row;padding:10px 14px;gap:10px">
-      <span class="tool-icon" style="font-size:18px">📋</span>
-      <div style="text-align:left;flex:1">
-        <span class="tool-label">Copy Issues to Clipboard</span>
-        <span class="tool-desc" style="display:block">Plain language problems &amp; fixes — paste into Slack, Jira, etc.</span>
-      </div>
-    </button>
-  </div>
-
-  <!-- Feedback Bar -->
-  <div id="feedback-bar">
-    <span id="version-label"></span>
-    <div id="feedback-bar-actions">
-      <label id="badge-toggle" style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--muted-foreground)" title="Show issue count on extension icon">
-        <input type="checkbox" id="badge-enabled" checked style="accent-color:var(--pendo-pink);width:12px;height:12px;cursor:pointer">
-        <span>Badge</span>
-      </label>
-      <button id="feedback-btn">Feedback</button>
-    </div>
-  </div>
-
-  <!-- Feedback Modal -->
-  <div id="feedback-modal">
-    <div class="feedback-modal-content">
-      <h3>Send Feedback</h3>
-      <p>Feedback is PII-scrubbed before it leaves the extension.</p>
-      <textarea id="feedback-text" placeholder="Describe the issue or suggestion..."></textarea>
-      <div class="feedback-modal-buttons">
-        <button id="feedback-cancel">Cancel</button>
-        <button id="feedback-email" title="Send via email (no account needed)">✉ Email</button>
-        <button id="feedback-submit" title="Open a GitHub issue (GitHub account required)">GitHub Issue</button>
-      </div>
-      <div id="feedback-status"></div>
-    </div>
-  </div>
-
-  <!-- Scripts -->
   <script src="popup.js"></script>
 </body>
 </html>

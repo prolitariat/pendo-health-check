@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Pendo Health Check",
-  "version": "2.2.0",
-  "description": "Instant Pendo installation grade with prioritized diagnostics, one-click issue export, inline debugger, and live service status.",
+  "version": "4.5.0",
+  "description": "Side project, not an official Pendo product. Compact dashboard, A-F install grade, Quick Copy IDs, optional auto-check badge.",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "optional_host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

@@ -35,6 +35,79 @@ chrome.storage.local.get("badgeEnabled", function(result) {
   }
 });
 
+// v4.1: "Auto-check pages on load" toggle (Tools tab).
+// Flipping it ON triggers chrome.permissions.request for <all_urls>. If the
+// user denies, we revert the toggle. Flipping OFF revokes the permission so
+// the install footprint shrinks back to default. background.js listens for
+// permission grants/revocations and starts/stops the proactive injection.
+(function v4WireAutoCheck() {
+  var checkbox = document.getElementById("auto-check-enabled");
+  if (!checkbox) return;
+  // Initial state must reflect both the stored preference AND whether the
+  // host permission is currently granted. If the user revoked the permission
+  // via Chrome settings, the toggle should snap back to off.
+  Promise.all([
+    new Promise(function (resolve) {
+      chrome.storage.local.get("autoCheckEnabled", function (r) {
+        resolve(r && r.autoCheckEnabled === true);
+      });
+    }),
+    new Promise(function (resolve) {
+      try {
+        chrome.permissions.contains({ origins: ["<all_urls>"] }, function (g) { resolve(!!g); });
+      } catch (_) { resolve(false); }
+    })
+  ]).then(function (results) {
+    var saved = results[0], granted = results[1];
+    var effective = saved && granted;
+    checkbox.checked = effective;
+    // If the saved pref disagrees with the actual permission state, normalize.
+    if (saved && !granted) {
+      try { chrome.storage.local.set({ autoCheckEnabled: false }); } catch (_) {}
+    }
+  });
+  checkbox.addEventListener("change", function () {
+    if (checkbox.checked) {
+      // Turning ON. Write the intent to storage IMMEDIATELY, before requesting
+      // permission. Chrome's permission prompt on some platforms (notably
+      // macOS) steals focus and closes the popup — once the popup's JS
+      // context is destroyed, any callback that hadn't fired yet is lost.
+      // Writing storage first means the user's intent is persisted regardless
+      // of popup lifecycle. If the user denies the prompt, we revert below;
+      // and on the next popup open the init reconciliation in this same IIFE
+      // normalizes any "saved=true but not granted" mismatch.
+      chrome.storage.local.set({ autoCheckEnabled: true });
+      chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
+      try {
+        chrome.permissions.request({ origins: ["<all_urls>"] }, function (granted) {
+          if (!granted) {
+            // User denied — revert.
+            chrome.storage.local.set({ autoCheckEnabled: false });
+            chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
+            checkbox.checked = false;
+          } else {
+            try { trackEvent("auto_check_enabled"); } catch (_) {}
+          }
+        });
+      } catch (_) {
+        // Synchronous error — revert to be safe.
+        chrome.storage.local.set({ autoCheckEnabled: false });
+        chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
+        checkbox.checked = false;
+      }
+    } else {
+      // Turning OFF — flip storage immediately, then revoke the permission.
+      chrome.storage.local.set({ autoCheckEnabled: false });
+      chrome.runtime.sendMessage({ type: "auto-check-pref-changed" }).catch(function () {});
+      try {
+        chrome.permissions.remove({ origins: ["<all_urls>"] }, function () {
+          try { trackEvent("auto_check_disabled"); } catch (_) {}
+        });
+      } catch (_) {}
+    }
+  });
+})();
+
 // ---------------------------------------------------------------------------
 // Analytics — lightweight, privacy-first, fire-and-forget
 // Set to "" to disable. Deploy Worker from /analytics directory.
@@ -61,7 +134,7 @@ function trackEvent(event, data) {
 try {
   const v = chrome.runtime.getManifest().version;
   document.addEventListener("DOMContentLoaded", () => {
-    const el = document.getElementById("version-label");
+    const el = document.getElementById("version-text");
     if (el) el.textContent = "v" + v;
   });
 } catch (_) {}
@@ -71,32 +144,40 @@ try {
 // ---------------------------------------------------------------------------
 
 function showView(id) {
+  // v4.2: empty states are CSS-driven via .ph-empty.is-active. Hero/tabs/body
+  // are hidden via inline style while an empty state is active.
   ["loading", "not-detected", "error-state"].forEach((v) => {
-    document.getElementById(v).style.display = v === id ? "block" : "none";
+    var el = document.getElementById(v);
+    if (!el) return;
+    el.classList.toggle("is-active", v === id);
+  });
+  var anyEmpty = id === "loading" || id === "not-detected" || id === "error-state";
+  ["hero", "tabs", "content"].forEach(function (uid) {
+    var el = document.getElementById(uid);
+    if (el && anyEmpty) el.style.display = "none";
   });
 }
 
 function showTabs() {
-  // No tab bar — just show the copy bar
-  const copyBar = document.getElementById("health-copy-bar");
-  if (copyBar) copyBar.style.display = "block";
+  // v4: reveal hero card, segmented tabs, and the main content area.
+  // Called once we've confirmed Pendo is present on the page.
+  var hero    = document.getElementById("hero");
+  var tabs    = document.getElementById("tabs");
+  var content = document.getElementById("content");
+  if (hero)    hero.style.display = "flex";
+  if (tabs)    tabs.style.display = "flex";
+  if (content) content.style.display = "block";
+  // v4.2: ensure no empty state is left dangling visually.
+  ["loading", "not-detected", "error-state"].forEach(function (v) {
+    var el = document.getElementById(v);
+    if (el) el.classList.remove("is-active");
+  });
 }
 
-// ---------------------------------------------------------------------------
-// Scroll fade indicator — shows/hides bottom gradient on Report panel
-// ---------------------------------------------------------------------------
-function updateScrollFade() {
-  const panel = document.getElementById("panel-report");
-  const fade = document.getElementById("scroll-fade");
-  if (!panel || !fade) return;
-  const hasOverflow = panel.scrollHeight > panel.clientHeight + 2;
-  const nearBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 8;
-  fade.style.display = (hasOverflow && !nearBottom) ? "block" : "none";
-}
-(function() {
-  const panel = document.getElementById("panel-report");
-  if (panel) panel.addEventListener("scroll", updateScrollFade);
-})();
+// v4: updateScrollFade was a v3 visual cue. The new layout uses .content's
+// natural overflow without a gradient fade. Kept as a no-op so legacy
+// callers don't throw.
+function updateScrollFade() { /* v4 no-op */ }
 
 function escapeHtml(str) {
   const el = document.createElement("span");
@@ -157,6 +238,13 @@ function detectEnvFromChecks(checks) {
 }
 
 function renderPendoStatus(data, detectedEnv) {
+  // v4.2: the Pendo Service Status banner is gone — the hero card is now
+  // the single status display. Incidents still fold into the issues list
+  // and Copy Issues report via window.__pendoServiceStatus, which this
+  // function continues to set elsewhere. This early-return keeps callers
+  // unchanged but renders nothing.
+  return;
+  // legacy branch below kept for grep-friendliness; never reached.
   const statusDiv = document.getElementById("pendo-status");
   if (!statusDiv) return;
 
@@ -251,111 +339,28 @@ let activeTabId = "report"; // Single view — always report
 let lastHealthData = null;
 let lastSetupData = null;
 
-// Developer Tools drawer toggle + auto-expand when space allows
-(function() {
-  const toggle = document.getElementById("dev-tools-toggle");
-  const body = document.getElementById("dev-tools-body");
-  const chevron = toggle ? toggle.querySelector(".setup-chevron") : null;
-  if (toggle && body) {
-    function openDrawer() {
-      body.style.display = "block";
-      if (chevron) chevron.style.transform = "rotate(90deg)";
-      toggle.setAttribute("aria-expanded", "true");
-    }
-    function closeDrawer() {
-      body.style.display = "none";
-      if (chevron) chevron.style.transform = "";
-      toggle.setAttribute("aria-expanded", "false");
-    }
-    function toggleDrawer() {
-      var isOpen = body.style.display !== "none";
-      if (isOpen) closeDrawer(); else openDrawer();
-      trackEvent("dev_tools_toggle", { open: !isOpen });
-    }
-    toggle.addEventListener("click", toggleDrawer);
-    toggle.addEventListener("keydown", function(e) {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDrawer(); }
-    });
-
-    // Auto-expand if there's room — called after checks render.
-    // Strategy: open the drawer, wait for layout to settle, then check
-    // if the container overflows. If it does, close it back.
-    // Using setTimeout(50) because rAF is unreliable in Chrome popup context.
-    window.__autoExpandDevTools = function() {
-      var scrollContainer = document.getElementById("panel-report");
-      if (!scrollContainer) return;
-      openDrawer();
-      setTimeout(function() {
-        if (scrollContainer.scrollHeight > scrollContainer.clientHeight + 2) {
-          closeDrawer();
-        }
-      }, 50);
-    };
-  }
-})();
-
 // ---------------------------------------------------------------------------
 // Health Check — rendering
 // ---------------------------------------------------------------------------
 
 function renderChecks(checks) {
-  // Store health data globally for grade computation
+  // v4.3: this function used to populate #checks-list with .ph-check rows.
+  // README v3 says the Why-this-grade disclosure body contains per-issue
+  // .ph-why-item blocks (rendered by v4RenderWhyItems), NOT the full check
+  // list. So no DOM rendering happens here anymore — kept only for the
+  // bookkeeping (counts, lastHealthData, prelim grade, copy-button pulse).
   lastHealthData = { checks: checks };
   window.__lastChecks = checks;
 
-  const list = document.getElementById("checks-list");
-  list.innerHTML = "";
-
   let pass = 0, warn = 0, fail = 0;
-
-  // Sort: problems first (fail → warn → info → pass)
-  const ORDER = { fail: 0, warn: 1, info: 2, pass: 3 };
-  const sorted = [...checks].sort((a, b) => (ORDER[a.status] ?? 2) - (ORDER[b.status] ?? 2));
-
-  // Separate into problem checks vs passing checks
-  const problemChecks = [];
-  const passingChecks = [];
-
-  sorted.forEach((c) => {
-    if (c.status === "pass") { pass++; passingChecks.push(c); }
-    else if (c.status === "warn") { warn++; problemChecks.push(c); }
-    else if (c.status === "fail") { fail++; problemChecks.push(c); }
-    else problemChecks.push(c); // info counts as noteworthy
+  (checks || []).forEach((c) => {
+    if (c.status === "pass") pass++;
+    else if (c.status === "warn") warn++;
+    else if (c.status === "fail") fail++;
   });
-
-  // Render problem checks at full opacity
-  if (problemChecks.length > 0) {
-    problemChecks.forEach((c) => {
-      const row = document.createElement("div");
-      row.className = "check-row";
-      row.innerHTML = `
-        <span class="check-status">${STATUS_ICONS[c.status]}</span>
-        <div class="check-info">
-          <div class="check-label">${escapeHtml(c.label)}</div>
-          <div class="check-detail">${escapeHtml(c.detail)}</div>
-        </div>
-      `;
-      list.appendChild(row);
-    });
-  } else {
-    const allGood = document.createElement("div");
-    allGood.style.cssText = "text-align:center;padding:12px 8px;color:var(--success);font-weight:600;font-size:13px";
-    allGood.textContent = "✅ All checks passed";
-    list.appendChild(allGood);
-  }
-
-  // Passed checks omitted — grade card summary already shows the count.
-  // Summary line removed — grade card already displays the same breakdown.
-
-  // Reveal results: hide loading, fade in content
-  var loading = document.getElementById("report-loading");
-  var content = document.getElementById("report-content");
-  if (loading) loading.style.display = "none";
-  if (content) content.style.opacity = "1";
 
   showView("__none__");
   showTabs();
-  setTimeout(updateScrollFade, 50); // after DOM settles
 
   // Track popup open with check results
   trackEvent("popup_open", {
@@ -369,8 +374,8 @@ function renderChecks(checks) {
   if (warn > 0 || fail > 0) {
     const copyBtn = document.getElementById("tool-copy-issues");
     if (copyBtn) {
-      setTimeout(() => copyBtn.classList.add("copy-pulse"), 800);
-      setTimeout(() => copyBtn.classList.remove("copy-pulse"), 5300);
+      setTimeout(() => copyBtn.classList.add("is-pulsing"), 800);
+      setTimeout(() => copyBtn.classList.remove("is-pulsing"), 5300);
     }
   }
 
@@ -421,19 +426,20 @@ function computeGrade(hcChecks, setupIssues) {
   var score = 100;
   var criticals = 0, warnings = 0, passed = 0, infos = 0;
 
-  // Health Check items — graded on a curve so F = badly broken, not "some warnings"
+  // v4.4: info severity does NOT lower the grade (per UPDATE_1.md). Only
+  // warn and fail deduct points. infos are still counted for the summary.
   (hcChecks || []).forEach(function(c) {
     if (c.status === "fail") { score -= 10; criticals++; }
     else if (c.status === "warn") { score -= 3; warnings++; }
-    else if (c.status === "info") { score -= 1; infos++; }
+    else if (c.status === "info") { infos++; }
     else { passed++; }
   });
 
-  // Setup issues (CSP errors, recommendations)
+  // Setup issues (CSP errors, recommendations). info/tip do not deduct.
   (setupIssues || []).forEach(function(si) {
     if (si.severity === "error" || si.severity === "fail") { score -= 10; criticals++; }
     else if (si.severity === "warning" || si.severity === "warn") { score -= 3; warnings++; }
-    else if (si.severity === "tip" || si.severity === "info") { score -= 1; infos++; }
+    else if (si.severity === "tip" || si.severity === "info") { infos++; }
   });
 
   score = Math.max(0, Math.min(100, score));
@@ -451,29 +457,660 @@ function computeGrade(hcChecks, setupIssues) {
   if (infos > 0) parts.push(infos + " info");
   parts.push(passed + " passed");
 
-  return { score: score, letter: letter, cssClass: cssClass, summary: parts.join(" · "), criticals: criticals, warnings: warnings };
+  return { score: score, letter: letter, cssClass: cssClass, summary: parts.join(" · "), criticals: criticals, warnings: warnings, infos: infos };
 }
 
 // ---------------------------------------------------------------------------
 // Grade Card Rendering
 // ---------------------------------------------------------------------------
 
+// v4: renderGradeCard is the analysis flow's hook for "we have a final
+// grade, render it." Drives the new hero card. Issue rows are rendered
+// separately via v4RenderIssuesList from the analysis flow.
 function renderGradeCard(grade) {
-  var card = document.getElementById("grade-card");
-  if (!card) return;
-  card.style.display = "flex";
-  var letterEl = document.getElementById("grade-letter");
-  letterEl.textContent = grade.letter;
-  letterEl.className = grade.cssClass;
-  document.getElementById("grade-score").textContent = grade.score + " / 100";
-  document.getElementById("grade-summary").textContent = grade.summary;
-
-  // Reveal results: hide loading indicator, fade in report content
-  var loading = document.getElementById("report-loading");
-  var content = document.getElementById("report-content");
-  if (loading) loading.style.display = "none";
-  if (content) content.style.opacity = "1";
+  var state = v4DeriveState(grade, true);
+  var issueCount = (grade && (grade.criticals + grade.warnings)) || 0;
+  // v4.4: infos counted separately so the hero sub-line can render
+  // "Healthy · N notes" instead of the default copy.
+  var infoCount = (grade && grade.infos) || 0;
+  // v4.5: cache the grade so the Send feedback handler can read it
+  // without having to recompute.
+  window.__lastGrade = grade;
+  v4RenderHero(grade, state, issueCount, infoCount);
 }
+
+// ===========================================================================
+// v4: Direction C UI layer
+// Hero card · segmented tabs · severity-colored issue rows · compact quick-copy
+// All v4-specific UI lives below so the data-extraction code above is untouched.
+// ===========================================================================
+
+// Inline SVG strings for the icons we use in dynamic content. Static icons
+// (header brand mark, refresh button, etc.) live in popup.html.
+var V4_SVG = {
+  copy:         '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  check:        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>',
+  alertTri:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  alertOctagon: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  info:         '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+};
+
+// IDs tab owns identifiers per README v3. The Status tab no longer mirrors
+// them — see the Status tab anatomy section ("Quick Copy is owned by the
+// IDs tab. The Status tab does not show identifiers.").
+var V4_CHIPS_IDS = [
+  { key: "visitorId",      label: "Visitor" },
+  { key: "accountId",      label: "Account" },
+  { key: "subscriptionId", label: "Subscription" },
+  { key: "sessionId",      label: "Session" },
+  { key: "version",        label: "Agent" },
+  { key: "realm",          label: "Realm" }
+];
+
+// --- State derivation ----------------------------------------------------
+
+// Map (grade, issue counts) to one of three hero states.
+//   healthy  → green grade square, "Pendo is healthy"
+//   degraded → orange grade square, "Pendo is degraded"
+//   outage   → red grade square, "Pendo is not running"
+function v4DeriveState(grade, pendoDetected) {
+  if (pendoDetected === false) return "outage";
+  if (!grade) return "degraded";
+  if (grade.criticals > 0 || grade.letter === "F") return "outage";
+  if (grade.warnings > 0 || grade.letter === "C" || grade.letter === "D") return "degraded";
+  return "healthy";
+}
+
+// --- Hero card -----------------------------------------------------------
+
+function v4RenderHero(grade, state, issueCount, infoCount) {
+  var hero       = document.getElementById("hero");
+  var square     = document.getElementById("grade-square");
+  var titleEl    = document.getElementById("hero-title");
+  var subEl      = document.getElementById("hero-sub");
+  if (!hero || !square || !titleEl || !subEl) return;
+
+  // v4.2: status is driven by a single data-status attribute on .ph-hero.
+  // The CSS handles grade-square background and hero-title color from that.
+  hero.setAttribute("data-status", state);
+
+  square.textContent = grade && grade.letter ? grade.letter : "—";
+  square.title = grade ? (grade.score + " / 100 · " + grade.summary) : "";
+
+  var titles = {
+    healthy:  "Pendo is healthy",
+    degraded: "Pendo is degraded",
+    outage:   "Pendo is not running"
+  };
+  // v4.4: when only info issues exist on a healthy page, the sub-line
+  // reads "Healthy · N notes" instead of the default copy.
+  var healthySub = (infoCount > 0)
+    ? "Healthy · " + infoCount + " note" + (infoCount !== 1 ? "s" : "")
+    : "Tracking events, guides loading correctly.";
+  var subs = {
+    healthy:  healthySub,
+    degraded: issueCount + " issue" + (issueCount === 1 ? "" : "s") + " found · agent live",
+    outage:   "Agent failed to initialize on this page"
+  };
+
+  titleEl.textContent = titles[state] || titles.degraded;
+  subEl.textContent = subs[state] || subs.degraded;
+  hero.style.display = "flex";
+}
+
+// --- Severity helpers ---------------------------------------------------
+
+function v4SeverityIcon(sev) {
+  // sev is 'err' | 'warn' (Issue.sev). Anything else falls through to info.
+  if (sev === "err") return V4_SVG.alertOctagon;
+  if (sev === "warn") return V4_SVG.alertTri;
+  return V4_SVG.info;
+}
+
+// ===========================================================================
+// v4.3: Unified Issue model (per README v3 "Status tab anatomy")
+// ===========================================================================
+//
+// One Issue array drives BOTH the chip list (title only) and the
+// "Why this grade?" per-issue blocks (title + why + fix + docsUrl).
+// Shape:
+//
+//   { id, sev: 'warn'|'err', title, why, fix, docsUrl }
+//
+// Sources:
+//   * runPendoHealthCheck check items (fail | warn) — mapped via
+//     V4_HC_ISSUE_TEMPLATES below to known titles / why / fix / docs.
+//   * runPendoSetupAssistant recommendations — parsed from the existing
+//     "detail\n  FIX: fix-text\n  Docs: url" string format that
+//     runPendoSetupAssistant already emits.
+//
+// Anonymous-visitor handling: anonymous visitors are PASS in the data
+// layer (see popup.js Visitor ID section, and project memory
+// project_pendo_anonymous_visitors_legitimate.md), so they never reach
+// this layer as warn or fail. No special-case needed here.
+// ===========================================================================
+
+var V4_HC_ISSUE_TEMPLATES = {
+  "Pendo Agent Loaded": {
+    fail: {
+      title: "Pendo snippet not detected on this page",
+      why: "The Pendo agent (`window.pendo`) isn't present. Until the install snippet runs, nothing will be tracked on this page.",
+      fix: "Add the Pendo install snippet to your `<head>` with the correct API key for this subscription.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Pendo Ready": {
+    warn: {
+      title: "Pendo not ready yet",
+      why: "`pendo.isReady()` returned false. The agent is loaded but `pendo.initialize()` either hasn't run or ran before the script finished loading.",
+      fix: "Call `pendo.initialize(...)` only after the Pendo script tag has loaded.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    },
+    fail: {
+      title: "Pendo ready check threw an error",
+      why: "Calling `pendo.isReady()` raised an exception. Usually means the script loaded partially or the snippet URL doesn't match the subscription.",
+      fix: "Clear browser cache, hard reload, and verify the API key in the snippet URL belongs to this subscription.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Visitor ID": {
+    fail: {
+      title: "No visitor ID found",
+      why: "`pendo.initialize()` was called without a visitor argument, so Pendo can't attribute events to anyone.",
+      fix: "Call `pendo.initialize({ visitor: { id: 'USER_ID' } })` after the user authenticates.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Account ID": {
+    warn: {
+      title: "No account ID found",
+      why: "Without an `account.id`, you can't roll up usage by customer. For B2B products this breaks segmentation by org or plan.",
+      fix: "Pass an `account` object to `pendo.initialize()` with your tenant or organization ID.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Pendo Instances": {
+    warn: {
+      title: "Multiple Pendo instances detected",
+      why: "More than one Pendo agent is running on this page. This causes double-counted analytics and conflicting guides.",
+      fix: "Check for duplicate `<script>` tags, duplicate bundler imports, or a GTM tag overlapping a hardcoded snippet.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Data Transmission": {
+    warn: {
+      title: "Pendo requests are blocked",
+      why: "No Pendo network activity was detected. Most likely an ad blocker, a restrictive CSP, or a corporate firewall.",
+      fix: "Disable ad blockers for this domain, ask IT to allowlist `*.pendo.io`, or configure a CNAME so Pendo traffic appears first-party.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
+    }
+  },
+  "Feature Flags": {
+    warn: {
+      title: "Pendo features are disabled in config",
+      why: "Your `pendo.initialize()` config has one or more disable flags set (e.g. `disableGuides`, `disableAnalytics`).",
+      fix: "Remove the disable flags from the initialize call if the disabling wasn't intentional.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Data Host": {
+    warn: {
+      title: "Could not determine Pendo data host",
+      why: "Pendo's `dataHost` and `contentHost` couldn't be read from the agent config. The agent may not be fully initialized.",
+      fix: "Check the `pendo.initialize()` call for `contentHost` and `dataHost` options.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Agent Version": {
+    warn: {
+      title: "Pendo agent is outdated",
+      why: "A pre-2.x Pendo agent is running. Newer versions ship performance fixes, Session Replay support, and security patches.",
+      fix: "Replace the snippet's script src with the current CDN URL, or run `npm update @pendo/agent`.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "API Key": {
+    warn: {
+      title: "Could not determine API key",
+      why: "The API key isn't reachable from `pendo.get('apiKey')` or `pendo.apiKey`. The agent may have failed to fully load.",
+      fix: "Verify the install snippet includes a valid API key in the script URL.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  }
+};
+
+function v4SlugifyId(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+// Split a setup recommendation's `detail` string into a (why, fix, docsUrl)
+// triple. The shape produced by runPendoSetupAssistant is:
+//   "<problem text>\n  FIX: <fix text>\n  Docs: <url>"
+// All three parts are optional except `why`.
+function v4ParseSetupDetail(detail) {
+  var why = String(detail || "");
+  var fix = "";
+  var docsUrl = "";
+  var fixIdx = why.indexOf("\n  FIX:");
+  if (fixIdx !== -1) {
+    var afterWhy = why.substring(fixIdx + 7).trim();
+    why = why.substring(0, fixIdx).trim();
+    // Pull out an inline Docs: URL if present.
+    var docsMatch = afterWhy.match(/\n\s*Docs:\s*(https?:\/\/\S+)/);
+    if (docsMatch) {
+      docsUrl = docsMatch[1];
+      afterWhy = afterWhy.replace(docsMatch[0], "").trim();
+    }
+    fix = afterWhy;
+  } else {
+    var topDocs = why.match(/\n\s*Docs:\s*(https?:\/\/\S+)/);
+    if (topDocs) {
+      docsUrl = topDocs[1];
+      why = why.replace(topDocs[0], "").trim();
+    }
+  }
+  return { why: why, fix: fix, docsUrl: docsUrl };
+}
+
+// v4.4: anonymous-context detection. Pulled from UPDATE_1.md Part 1.
+// A page is anonymous when EITHER the visitor ID has Pendo's anonymous
+// prefix (_PENDO_T_ or VISITOR-) OR both visitor and account are unset.
+// In anonymous context the missing-account-id warn is suppressed and a
+// single info-severity issue ("Anonymous context") is emitted instead.
+function v4IsAnonymousContext(values) {
+  if (!values) return false;
+  if (values.visitorAnonymous === true) return true;
+  if (!values.visitorId && !values.accountId) return true;
+  return false;
+}
+
+function v4BuildIssues(checks, setupData, values) {
+  var issues = [];
+  var anonymous = v4IsAnonymousContext(values);
+
+  // Pass 1: health-check items. Map via template; fall back to the raw
+  // check.label/detail when a template isn't defined.
+  (checks || []).forEach(function (c) {
+    if (c.status !== "fail" && c.status !== "warn") return; // info / pass don't surface as issues
+    // In anonymous context, the "Account ID warn" is rolled up into the
+    // single Anonymous context info chip below — don't double-report.
+    if (anonymous && c.label === "Account ID" && c.status === "warn") return;
+    var sev = c.status === "fail" ? "err" : "warn";
+    var template = V4_HC_ISSUE_TEMPLATES[c.label] && V4_HC_ISSUE_TEMPLATES[c.label][c.status];
+    if (template) {
+      issues.push({
+        id: "hc-" + v4SlugifyId(c.label) + "-" + c.status,
+        sev: sev,
+        title: template.title,
+        why: template.why,
+        fix: template.fix,
+        docsUrl: template.docsUrl
+      });
+    } else {
+      // Fallback for any check label not in the template map.
+      issues.push({
+        id: "hc-" + v4SlugifyId(c.label) + "-" + c.status,
+        sev: sev,
+        title: c.label,
+        why: c.detail || "",
+        fix: "",
+        docsUrl: ""
+      });
+    }
+  });
+
+  // Pass 2: setup recommendations. Use the parsed (why, fix, docsUrl) triple.
+  if (setupData && Array.isArray(setupData.recommendations)) {
+    setupData.recommendations.forEach(function (r) {
+      // Per README spec: issues are warn/err only. Tips don't surface as chips.
+      var sev;
+      if (r.severity === "error" || r.severity === "fail") sev = "err";
+      else if (r.severity === "warning" || r.severity === "warn") sev = "warn";
+      else return; // skip tip / info
+      // v4.4: in anonymous context, suppress visitor/account/metadata
+      // recommendations entirely — they're covered by the single Anonymous
+      // context info chip below.
+      if (anonymous && /visitor|account|metadata|identif/i.test(r.title)) return;
+      var parsed = v4ParseSetupDetail(r.detail);
+      issues.push({
+        id: "setup-" + v4SlugifyId(r.title),
+        sev: sev,
+        title: r.title,
+        why: parsed.why,
+        fix: parsed.fix,
+        docsUrl: parsed.docsUrl
+      });
+    });
+  }
+
+  // Pass 3: setup CSP issues are surfaced separately by extractSetupIssues
+  // but live under setupData.csp.issues. Render those too so the chip count
+  // matches what computeGrade sees.
+  if (setupData && setupData.csp && Array.isArray(setupData.csp.issues)) {
+    setupData.csp.issues.forEach(function (ci) {
+      var sev;
+      if (ci.severity === "error" || ci.severity === "fail") sev = "err";
+      else if (ci.severity === "warning" || ci.severity === "warn") sev = "warn";
+      else return;
+      var parsed = v4ParseSetupDetail((ci.detail || "") + (ci.fix ? "\n  FIX: " + ci.fix : ""));
+      issues.push({
+        id: "csp-" + v4SlugifyId(ci.directive),
+        sev: sev,
+        title: "CSP: " + ci.directive,
+        why: parsed.why,
+        fix: parsed.fix,
+        docsUrl: parsed.docsUrl
+      });
+    });
+  }
+
+  // v4.4: in anonymous context, append a single info chip summarising the
+  // state instead of per-field warnings. The docs link uses the verified
+  // "Anonymous visitors" article ID (360032202751); UPDATE_1.md cited 851
+  // which isn't a real Pendo article.
+  if (anonymous) {
+    issues.push({
+      id: "anonymous-context",
+      sev: "info",
+      title: "Anonymous context — no user identified",
+      why: "This page hasn't called pendo.identify() with a visitor object. That's expected for public pages (blog, marketing, pricing) but a problem for authenticated app routes.",
+      fix: "",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360032202751"
+    });
+  }
+
+  // Dedup by id — should be unique already, but defensive.
+  var seen = {};
+  return issues.filter(function (iss) {
+    if (seen[iss.id]) return false;
+    seen[iss.id] = true;
+    return true;
+  });
+}
+
+// --- Render: issue chips (title only) -----------------------------------
+
+function v4RenderIssuesList(issues) {
+  var section  = document.getElementById("issues-section");
+  var ok       = document.getElementById("ok-block");
+  var okTitle  = ok ? ok.querySelector(".ph-ok-title") : null;
+  var okSub    = ok ? ok.querySelector(".ph-ok-sub")   : null;
+  var list     = document.getElementById("issues-list");
+  var countEl  = document.getElementById("active-issues-count");
+  var labelEl  = document.getElementById("active-issues-label");
+  var tabCount = document.getElementById("tab-status-count");
+  var copyWrap = document.getElementById("copy-issues-actions");
+  if (!section || !ok || !list || !countEl) return 0;
+
+  issues = issues || [];
+
+  var actionableCount = 0;
+  var infoCount = 0;
+  issues.forEach(function (iss) {
+    if (iss.sev === "info") infoCount++;
+    else actionableCount++;
+  });
+
+  list.innerHTML = "";
+
+  // Zero issues → just the default OK block, no list.
+  if (issues.length === 0) {
+    section.style.display = "none";
+    ok.style.display = "block";
+    if (okTitle) okTitle.textContent = "All systems operational";
+    if (okSub)   okSub.textContent   = "No issues detected on this page";
+    if (tabCount) { tabCount.textContent = ""; tabCount.style.display = "none"; }
+    return 0;
+  }
+
+  // Render the chips (one line each, title only).
+  issues.forEach(function (iss) {
+    var row = document.createElement("div");
+    row.className = "ph-issue";
+    row.setAttribute("data-sev", iss.sev);
+    row.setAttribute("data-issue-id", iss.id);
+    row.innerHTML = v4SeverityIcon(iss.sev) + '<span class="ph-issue-text"></span>';
+    row.querySelector(".ph-issue-text").textContent = iss.title;
+    list.appendChild(row);
+  });
+
+  section.style.display = "block";
+  countEl.textContent = issues.length;
+
+  // v4.4: info-only state → keep OK block visible (with a healthy-note copy)
+  // alongside the info chips. Subhead reads NOTES. Copy Issues hidden.
+  if (actionableCount === 0) {
+    if (labelEl) labelEl.textContent = "NOTES";
+    if (okTitle) okTitle.textContent = "Healthy";
+    if (okSub)   okSub.textContent   = infoCount + " informational note" + (infoCount !== 1 ? "s" : "");
+    ok.style.display = "block";
+    if (copyWrap) copyWrap.style.display = "none";
+  } else {
+    if (labelEl) labelEl.textContent = "ACTIVE ISSUES";
+    ok.style.display = "none";
+    if (copyWrap) copyWrap.style.display = "flex";
+  }
+
+  // v4.4: tab count badge shows warn+err only (info doesn't count).
+  if (tabCount) {
+    if (actionableCount > 0) {
+      tabCount.textContent = actionableCount;
+      tabCount.style.display = "inline-flex";
+    } else {
+      tabCount.textContent = "";
+      tabCount.style.display = "none";
+    }
+  }
+  return actionableCount;
+}
+
+// --- Render: Why-this-grade per-issue blocks -----------------------------
+
+// Renders one .ph-why-item block per issue into the closed <details>
+// disclosure body. README v3 spec:
+//   <div class="ph-why-item">
+//     <div class="ph-why-item-title"><svg/>{title}</div>
+//     <p>{why}</p>
+//     <p><b>Fix:</b> {fix}. <a href="{docsUrl}">Docs →</a></p>
+//   </div>
+//
+// Inline `<code>` styling falls out of the CSS — see .ph-why-item code in
+// popup.css. We don't auto-format `code` ticks here; the template strings
+// already include backtick syntax which we render as HTML so the styling
+// applies.
+function v4RenderWhyItems(issues) {
+  var mount = document.getElementById("why-items");
+  if (!mount) return;
+  mount.innerHTML = "";
+  if (!issues || issues.length === 0) return;
+
+  issues.forEach(function (iss) {
+    var item = document.createElement("div");
+    item.className = "ph-why-item";
+
+    var titleEl = document.createElement("div");
+    titleEl.className = "ph-why-item-title";
+    titleEl.innerHTML = v4SeverityIcon(iss.sev) + '<span></span>';
+    titleEl.querySelector("span").textContent = iss.title;
+    item.appendChild(titleEl);
+
+    if (iss.why) {
+      var whyP = document.createElement("p");
+      whyP.innerHTML = v4RenderBackticks(iss.why);
+      item.appendChild(whyP);
+    }
+
+    if (iss.fix || iss.docsUrl) {
+      var fixP = document.createElement("p");
+      var html = "";
+      if (iss.fix) html += "<b>Fix:</b> " + v4RenderBackticks(iss.fix);
+      if (iss.docsUrl) {
+        if (iss.fix) html += " ";
+        // v4.4: info-severity issues use "Learn about anonymous visitors →"
+        // copy (and similar). warn/err use the default "Docs →" label.
+        var linkLabel = (iss.sev === "info") ? "Learn about anonymous visitors →" : "Docs →";
+        html += '<a href="' + v4EscapeAttr(iss.docsUrl) + '" target="_blank" rel="noopener noreferrer">' + linkLabel + '</a>';
+      }
+      fixP.innerHTML = html;
+      item.appendChild(fixP);
+    }
+
+    mount.appendChild(item);
+  });
+}
+
+// Minimal markdown-ish: backtick spans become <code>. No other formatting.
+function v4RenderBackticks(text) {
+  var s = String(text || "");
+  // Escape HTML first, then unescape backtick spans into <code>.
+  var safe = s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return safe.replace(/`([^`]+)`/g, function (_, body) { return "<code>" + body + "</code>"; });
+}
+
+function v4EscapeAttr(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// --- Compact quick-copy table -------------------------------------------
+
+function v4FormatChipValue(value) {
+  if (value === null || value === undefined || value === "") return null;
+  return String(value);
+}
+
+function v4RenderQuickCopyRow(spec, values) {
+  var raw = values[spec.key];
+  var display = v4FormatChipValue(raw);
+  var empty = display === null;
+
+  // .ph-id rows. <button> when copyable, <div> when empty.
+  var row = document.createElement(empty ? "div" : "button");
+  row.className = "ph-id";
+  if (empty) row.setAttribute("data-empty", "true");
+  if (!empty) {
+    row.type = "button";
+    row.setAttribute("data-key", spec.key);
+  }
+
+  var label = document.createElement("span");
+  label.className = "ph-id-label";
+  label.textContent = spec.label;
+
+  var value = document.createElement("span");
+  value.className = "ph-id-value";
+  value.textContent = display !== null ? display : "Not set";
+  value.title = display !== null ? display : "Not available on this page";
+
+  var copyIcon = document.createElement("span");
+  copyIcon.className = "ph-id-copy";
+  copyIcon.innerHTML = V4_SVG.copy;
+
+  row.appendChild(label);
+  row.appendChild(value);
+  row.appendChild(copyIcon);
+
+  if (!empty) {
+    row.addEventListener("click", function () {
+      navigator.clipboard.writeText(display).then(function () {
+        row.classList.add("is-copied");
+        copyIcon.innerHTML = V4_SVG.check;
+        try { trackEvent("copy_chip", { key: spec.key }); } catch (_) {}
+        setTimeout(function () {
+          row.classList.remove("is-copied");
+          copyIcon.innerHTML = V4_SVG.copy;
+        }, 1000);
+      });
+    });
+  }
+  return row;
+}
+
+function v4RenderQuickCopy(values, specs, mountId) {
+  var mount = document.getElementById(mountId);
+  if (!mount) return;
+  mount.innerHTML = "";
+  specs.forEach(function (spec) {
+    mount.appendChild(v4RenderQuickCopyRow(spec, values || {}));
+  });
+}
+
+// IDs tab table only. Status tab no longer renders identifiers (README v3:
+// "Quick Copy is owned by the IDs tab"). Name kept for call-site continuity.
+function v4RenderAllQuickCopy(values) {
+  v4RenderQuickCopy(values, V4_CHIPS_IDS, "quick-copy-ids");
+}
+
+// --- Tab switching --------------------------------------------------------
+
+function v4ActivateTab(name) {
+  // v4.2: state is on aria-selected (tabs) and aria-hidden (panels), per
+  // popup_reference.html. No "is-active" class is used for tabs.
+  var tabs = document.querySelectorAll(".ph-tab[data-tab]");
+  tabs.forEach(function (t) {
+    t.setAttribute("aria-selected", t.getAttribute("data-tab") === name ? "true" : "false");
+  });
+  var panels = document.querySelectorAll(".ph-panel[data-panel]");
+  panels.forEach(function (p) {
+    p.setAttribute("aria-hidden", p.getAttribute("data-panel") === name ? "false" : "true");
+  });
+}
+
+// v4.4: v4SyncBadgeStateText removed — UPDATE_1.md Part 2 deleted the
+// footer "Badge on/off" label. The toggle on the Tools tab is the only
+// surface for badge state now.
+
+// --- Wireup: tabs, why-grade accordion, refresh, JSON copy, footer ------
+
+(function v4Wireup() {
+  // Segmented tab clicks (popup_reference.html uses .ph-tab[data-tab]).
+  document.querySelectorAll(".ph-tab[data-tab]").forEach(function (t) {
+    t.addEventListener("click", function () {
+      v4ActivateTab(t.getAttribute("data-tab"));
+      try { trackEvent("tab_switch", { tab: t.getAttribute("data-tab") }); } catch (_) {}
+    });
+  });
+
+  // "Why this grade?" is a native <details> element now — no custom toggle JS.
+
+  // Refresh button — re-run the diagnostic without reopening the popup.
+  var refreshBtn = document.getElementById("header-refresh");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", function () {
+      refreshBtn.classList.add("spinning");
+      setTimeout(function () { refreshBtn.classList.remove("spinning"); }, 600);
+      try { trackEvent("refresh_click"); } catch (_) {}
+      // Re-run the same DOMContentLoaded flow by reloading the popup window.
+      // Cheapest correct behavior; the popup is ephemeral state anyway.
+      window.location.reload();
+    });
+  }
+
+  // Copy all IDs as JSON (IDs tab)
+  var copyJson = document.getElementById("copy-all-json");
+  if (copyJson) {
+    var jsonLabel = copyJson.querySelector(".btn-label");
+    copyJson.addEventListener("click", function () {
+      var values = window.__lastValues || {};
+      var payload = {};
+      V4_CHIPS_IDS.forEach(function (spec) {
+        payload[spec.key] = values[spec.key] === undefined ? null : values[spec.key];
+      });
+      navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(function () {
+        if (jsonLabel) {
+          var orig = jsonLabel.textContent;
+          jsonLabel.textContent = "Copied!";
+          setTimeout(function () { jsonLabel.textContent = orig; }, 1500);
+        }
+        try { trackEvent("copy_ids_json"); } catch (_) {}
+      });
+    });
+  }
+
+  // Footer "Send feedback" link — same handler as the legacy feedback-btn
+  // (the click listener is attached lower in the file, no extra wiring needed).
+
+  // v4.4: footer "Badge on/off" label removed; nothing extra to sync here.
+})();
 
 // ---------------------------------------------------------------------------
 // Extract Setup Issues into Unified Format
@@ -739,6 +1376,9 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   if (!tab) return;
   currentTabId = tab.id;
   document.getElementById("page-url").textContent = tab.url || "";
+  // v4: also reflect the URL in the visible chip on the Status panel
+  var urlDisplay = document.getElementById("page-url-display");
+  if (urlDisplay) urlDisplay.textContent = tab.url || "—";
 
   if (
     !tab.url ||
@@ -771,8 +1411,18 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         return;
       }
       window.__lastChecks = data.checks;
+      window.__lastValues = data.values || {};
       activeTabId = "report";
       renderChecks(data.checks);
+
+      // v4.3: build unified Issue[] from HC checks; setup data is folded in
+      // below once it completes. Both renderers (issue chips + Why-this-grade
+      // per-issue blocks) consume the same array.
+      v4RenderAllQuickCopy(window.__lastValues);
+      var prelimIssues = v4BuildIssues(data.checks, null, data.values);
+      window.__lastIssues = prelimIssues;
+      v4RenderIssuesList(prelimIssues);
+      v4RenderWhyItems(prelimIssues);
 
       // Re-render status filtered to detected environment
       const env = detectEnvFromChecks(data.checks);
@@ -804,14 +1454,31 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
                            : "info";
                 return { status: status, label: si.label, detail: si.detail };
               });
-              renderChecks(data.checks.concat(setupAsChecks));
+              var allChecks = data.checks.concat(setupAsChecks);
+              renderChecks(allChecks);
+              // v4.3: unify issues and re-render both chips and Why blocks
+              var finalIssues = v4BuildIssues(data.checks, setupData, data.values);
+              window.__lastIssues = finalIssues;
+              v4RenderIssuesList(finalIssues);
+              v4RenderWhyItems(finalIssues);
 
               // Compute final grade from both HC and setup data
               const finalGrade = computeGrade(data.checks, setupIssues);
               renderGradeCard(finalGrade);
-              setTimeout(updateScrollFade, 50);
-              // Auto-expand dev tools if there's room after full render
-              setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
+
+              // v4: re-render quick copy with framework merged from setup data.
+              // (Chip set doesn't include framework, but __lastValues is
+              // kept up to date for any future consumers / IDs JSON copy.)
+              try {
+                var mergedValues = Object.assign({}, window.__lastValues || {});
+                if (setupData.framework && setupData.framework.name) {
+                  mergedValues.framework = setupData.framework.version
+                    ? (setupData.framework.name + " " + setupData.framework.version)
+                    : setupData.framework.name;
+                }
+                window.__lastValues = mergedValues;
+                v4RenderAllQuickCopy(mergedValues);
+              } catch (_) {}
 
               // Set badge on icon — send full analysis to background
               window.__lastTotalIssues = finalGrade.criticals + finalGrade.warnings;
@@ -821,12 +1488,13 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
             }
           })
           .catch(() => {
-            // Setup failed — show grade from HC data only
-            if (!document.getElementById("grade-card").style.display ||
-                document.getElementById("grade-card").style.display === "none") {
+            // Setup failed — show grade from HC data only.
+            // v4: the hero card is the visible representation; check
+            // its dataset/state rather than the legacy grade-card.
+            var hero = document.getElementById("hero");
+            if (!hero || hero.style.display === "none") {
               var fallbackGrade = window.__prelimGrade || computeGrade(data.checks, []);
               renderGradeCard(fallbackGrade);
-              setTimeout(function() { if (window.__autoExpandDevTools) window.__autoExpandDevTools(); }, 100);
               window.__lastTotalIssues = (fallbackGrade.criticals || 0) + (fallbackGrade.warnings || 0);
               window.__lastCriticals = fallbackGrade.criticals || 0;
               window.__lastWarnings = fallbackGrade.warnings || 0;
@@ -916,82 +1584,43 @@ function runPendoCommand(funcToInject, successMsg) {
     });
 }
 
-document.getElementById("tool-validate-install")?.addEventListener("click", () => {
-  if (!currentTabId) { setToolStatus("No active tab", "error"); return; }
-  setToolStatus("Running…", "");
-  chrome.scripting.executeScript({
+// v3: Run pendo.validateInstall() in the page's MAIN world and capture its
+// console output. Used by the Copy Issues handler to fold Pendo's own verdict
+// into the report. Returns "" if Pendo isn't on the page or the API isn't
+// available, so the caller can simply append-or-skip.
+function v3CaptureValidateInstall() {
+  if (!currentTabId) return Promise.resolve("");
+  return chrome.scripting.executeScript({
     target: { tabId: currentTabId },
-    func: function() {
+    func: function () {
       try {
-        if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-        if (typeof pendo.validateInstall !== "function") return { error: "pendo.validateInstall() not available" };
+        if (typeof pendo === "undefined") return { skipped: "Pendo agent not present on this page." };
+        if (typeof pendo.validateInstall !== "function") return { skipped: "pendo.validateInstall() not available on this agent version." };
         var captured = [];
         var origLog = console.log;
         var origWarn = console.warn;
-        console.log = function() { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
-        console.warn = function() { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
-        pendo.validateInstall();
-        console.log = origLog;
-        console.warn = origWarn;
-        return { output: captured.length > 0 ? captured.join("\n") : "validateInstall() completed — no console output captured." };
-      } catch(e) { return { error: e.message }; }
+        console.log = function () { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
+        console.warn = function () { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
+        try { pendo.validateInstall(); } finally {
+          console.log = origLog;
+          console.warn = origWarn;
+        }
+        return { output: captured.length > 0 ? captured.join("\n") : "validateInstall() completed with no console output." };
+      } catch (e) {
+        return { error: e.message };
+      }
     },
     world: "MAIN"
-  }).then(function(results) {
+  }).then(function (results) {
     var r = results && results[0] && results[0].result;
-    if (r && r.error) {
-      setToolStatus(r.error, "error");
-    } else if (r && r.output) {
-      setToolStatus("✅ validateInstall() executed", "success");
-      var resultsDiv = document.getElementById("validate-results");
-      if (resultsDiv) { resultsDiv.style.display = "block"; resultsDiv.textContent = r.output; }
-    }
-  }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
-});
-
-document.getElementById("tool-validate-env")?.addEventListener("click", () => {
-  if (!currentTabId) { setToolStatus("No active tab", "error"); return; }
-  setToolStatus("Running…", "");
-  chrome.scripting.executeScript({
-    target: { tabId: currentTabId },
-    func: function() {
-      try {
-        if (typeof pendo === "undefined") return { error: "Pendo not found on this page" };
-        if (typeof pendo.validateEnvironment !== "function") return { error: "pendo.validateEnvironment() not available" };
-        var captured = [];
-        var origLog = console.log;
-        var origWarn = console.warn;
-        console.log = function() { captured.push(Array.from(arguments).join(" ")); origLog.apply(console, arguments); };
-        console.warn = function() { captured.push("⚠ " + Array.from(arguments).join(" ")); origWarn.apply(console, arguments); };
-        pendo.validateEnvironment();
-        console.log = origLog;
-        console.warn = origWarn;
-        return { output: captured.length > 0 ? captured.join("\n") : "validateEnvironment() completed — no console output captured." };
-      } catch(e) { return { error: e.message }; }
-    },
-    world: "MAIN"
-  }).then(function(results) {
-    var r = results && results[0] && results[0].result;
-    if (r && r.error) {
-      setToolStatus(r.error, "error");
-    } else if (r && r.output) {
-      setToolStatus("✅ validateEnvironment() executed", "success");
-      var resultsDiv = document.getElementById("validate-results");
-      if (resultsDiv) { resultsDiv.style.display = "block"; resultsDiv.textContent = r.output; }
-    }
-  }).catch(function(err) { setToolStatus("Error: " + (err.message || "Unknown"), "error"); });
-});
-
-// Copy validate output to clipboard
-document.getElementById("copy-validate-result")?.addEventListener("click", function() {
-  var resultsDiv = document.getElementById("validate-results");
-  if (!resultsDiv || !resultsDiv.textContent) return;
-  navigator.clipboard.writeText(resultsDiv.textContent).then(function() {
-    var btn = document.getElementById("copy-validate-result");
-    btn.textContent = "Copied!";
-    setTimeout(function() { btn.textContent = "Copy"; }, 1500);
+    if (!r) return "";
+    if (r.skipped) return r.skipped;
+    if (r.error) return "Error running pendo.validateInstall(): " + r.error;
+    return r.output || "";
+  }).catch(function (err) {
+    return "Error running pendo.validateInstall(): " + (err.message || "unknown");
   });
-});
+}
 
 document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
   runPendoCommand(function () {
@@ -1031,8 +1660,11 @@ document.getElementById("tool-launch-debug")?.addEventListener("click", () => {
 function buildIssuesReport() {
   const url = document.getElementById("page-url").textContent || "unknown page";
   const lines = [];
-  lines.push(`Pendo Issues Report — ${url}`);
-  lines.push(`Generated: ${new Date().toLocaleString()}`);
+  // Preamble doubles as orientation for a human reader AND any LLM the user
+  // pastes this into. Keep it factual and short. No marketing.
+  lines.push(`Pendo Health Check report — ${url}`);
+  lines.push(`Generated: ${new Date().toLocaleString()} by github.com/prolitariat/pendo-health-check v3.0.0 (Chrome extension; side project, not an official Pendo product).`);
+  lines.push(`Findings are ordered by severity (PROBLEM > INCIDENT > WARNING > INFO > TIP). Doc URLs at the bottom are verified Pendo Help Center articles; CMP vendor URLs appear inline in the relevant fix.`);
   lines.push("");
 
   const reported = new Set(); // Track reported topics to avoid duplicates
@@ -1203,12 +1835,12 @@ function buildIssuesReport() {
     lines.push("");
     lines.push("── Sources ──");
     const sourceLabels = {
-      "360032209131": "Content Security Policy for Pendo",
-      "360046272771": "Developer's Guide to Implementing Pendo",
-      "360031862272": "Install Pendo on a Single-Page Web Application",
-      "360031832072": "Configure Visitor and Account Metadata",
-      "360043539891": "CNAME for Pendo",
-      "360031867272": "Configure Pendo with a Cookie Consent Manager"
+      "360032209131": "Content-Security-Policy (CSP)",
+      "360046272771": "Developer's guide to implementing Pendo using the install script",
+      "360031862272": "Installation for Single-Page Frameworks",
+      "360031832072": "Visitor and Account Metadata",
+      "360043539891": "CNAME for Pendo Insights and Guidance",
+      "21326554691227": "Data collection and compliance"
     };
     sources.forEach(url => {
       // Extract article ID to generate a human-readable label
@@ -1224,13 +1856,25 @@ function buildIssuesReport() {
 document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
   const btn = document.getElementById("tool-copy-issues");
   const label = btn.querySelector(".tool-label");
-  const text = buildIssuesReport();
-  navigator.clipboard.writeText(text).then(() => {
+  const origLabel = label ? label.textContent : null;
+  // v3: also run pendo.validateInstall() so the artifact contains both the
+  // extension's interpretation AND Pendo's own verdict. The whole thing is
+  // one plain-text blob; the preamble orients both humans and LLMs.
+  if (label) label.textContent = "Running validateInstall()…";
+  v3CaptureValidateInstall().then(function (validateOutput) {
+    let combined = buildIssuesReport();
+    if (validateOutput) {
+      combined += "\n\n── Pendo's official validateInstall() output ──\n" + validateOutput;
+    }
+    return navigator.clipboard.writeText(combined);
+  }).then(() => {
     trackEvent("copy_report");
     if (label) {
       label.textContent = "Copied!";
-      setTimeout(() => { label.textContent = "Copy Issues to Clipboard"; }, 1500);
+      setTimeout(() => { label.textContent = origLabel || "Copy Issues to Clipboard"; }, 1500);
     }
+  }).catch(() => {
+    if (label) label.textContent = origLabel || "Copy Issues to Clipboard";
   });
 });
 
@@ -1240,6 +1884,23 @@ document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
 
 function runPendoHealthCheck() {
   var checks = [];
+  // v3: Aggregate raw scalar values for the Quick Copy chip grid in the popup.
+  // Each value is best-effort; missing ones surface as gray chips.
+  var values = {
+    pendoLoaded: false,
+    ready: null,
+    visitorId: null,
+    visitorAnonymous: null,
+    accountId: null,
+    version: null,
+    apiKey: null,
+    dataHost: null,
+    contentHost: null,
+    realm: null,
+    activeGuides: null,
+    subscriptionId: null,
+    sessionId: null
+  };
 
   function add(status, label, detail) {
     checks.push({ status: status, label: label, detail: String(detail) });
@@ -1248,13 +1909,15 @@ function runPendoHealthCheck() {
   // 1. Pendo agent loaded
   if (typeof window.pendo === "undefined" || !window.pendo) {
     add("fail", "Pendo Agent Loaded", "Pendo is not installed on this page");
-    return { pendoDetected: false, checks: checks };
+    return { pendoDetected: false, checks: checks, values: values };
   }
   add("pass", "Pendo Agent Loaded", "Pendo is installed on this page");
+  values.pendoLoaded = true;
 
   // 2. pendo.isReady()
   try {
     var ready = typeof pendo.isReady === "function" && pendo.isReady();
+    values.ready = !!ready;
     if (ready) {
       add("pass", "Pendo Ready", "Pendo is initialized and running");
     } else {
@@ -1265,17 +1928,30 @@ function runPendoHealthCheck() {
   }
 
   // 3. Visitor ID
+  // Anonymous visitor IDs (prefixes VISITOR- and _PENDO_T_) are a documented
+  // Pendo pattern for pre-authentication tracking. Pendo's "Anonymous
+  // visitors" article (360032202751) and "Install Pendo on a login page"
+  // article (360031861672) both describe this as the correct behavior for
+  // public-facing pages where there is no signed-in user to identify. We
+  // therefore treat anonymous as PASS with a descriptive detail, not as a
+  // warning. Missing visitor ID (no ID at all) is still a fail.
+  // The CMP consent-gating check in runPendoSetupAssistant still inspects
+  // the anonymous prefix directly to avoid false-flagging legitimate
+  // anonymous pre-consent tracking.
   try {
     var visitor =
       (pendo.getVisitorId && pendo.getVisitorId()) ||
       (pendo.get && pendo.get("visitor") && pendo.get("visitor").id) ||
       (pendo.visitorId) ||
       null;
+    values.visitorId = visitor;
     if (!visitor) {
       add("fail", "Visitor ID", "No visitor ID found");
     } else if (visitor.startsWith("VISITOR-") || visitor.startsWith("_PENDO_T_")) {
-      add("warn", "Visitor ID", "Anonymous visitor: " + visitor);
+      values.visitorAnonymous = true;
+      add("pass", "Visitor ID", "Anonymous visitor (pre-auth pattern): " + visitor);
     } else {
+      values.visitorAnonymous = false;
       add("pass", "Visitor ID", visitor);
     }
   } catch (e) {
@@ -1289,6 +1965,7 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("account") && pendo.get("account").id) ||
       (pendo.accountId) ||
       null;
+    values.accountId = account;
     if (!account) {
       add("warn", "Account ID", "No account ID found");
     } else {
@@ -1337,6 +2014,7 @@ function runPendoHealthCheck() {
       (pendo.getVersion && pendo.getVersion()) ||
       pendo.VERSION ||
       null;
+    values.version = version;
     if (version) {
       // Only show as check if old (major < 2), otherwise suppress
       var parts = version.split(".");
@@ -1357,6 +2035,7 @@ function runPendoHealthCheck() {
       (pendo.get && pendo.get("apiKey")) ||
       (pendo.apiKey) ||
       null;
+    values.apiKey = apiKey;
     if (!apiKey) {
       add("warn", "API Key", "Could not determine API key");
     }
@@ -1415,6 +2094,19 @@ function runPendoHealthCheck() {
       add("warn", "Data Host", "Could not determine data or content host");
     }
     // Suppress pass row — CDN/CNAME routing is infrastructure detail, not admin-actionable
+    values.dataHost = detectedDataHost;
+    values.contentHost = detectedContentHost;
+    // Realm: derive from data host suffix. CNAME deployments fall back to "Custom".
+    try {
+      if (detectedDataHost) {
+        var dh = String(detectedDataHost).toLowerCase();
+        if (dh.indexOf("eu.pendo.io") !== -1) values.realm = "EU";
+        else if (dh.indexOf("us1.pendo.io") !== -1) values.realm = "US1";
+        else if (dh.indexOf("jp.pendo.io") !== -1 || dh.indexOf("jpn.pendo.io") !== -1) values.realm = "JP";
+        else if (dh.indexOf("pendo.io") !== -1) values.realm = "US";
+        else values.realm = "Custom CNAME";
+      }
+    } catch (_) {}
   } catch (e) {
     add("warn", "Data Host", "Error detecting data host: " + e.message);
   }
@@ -1527,8 +2219,33 @@ function runPendoHealthCheck() {
     add("info", "Feature Flags", "Could not inspect feature flags: " + e.message);
   }
 
+  // v3: Active guides count (chip only — not a graded check)
+  try {
+    var guides = null;
+    if (typeof pendo.getActiveGuides === "function") guides = pendo.getActiveGuides();
+    else if (Array.isArray(pendo.guides)) guides = pendo.guides;
+    if (guides && typeof guides.length === "number") values.activeGuides = guides.length;
+  } catch (_) {}
 
-  return { pendoDetected: true, checks: checks };
+  // v3: Subscription ID (chip only — what operators paste into Pendo tickets / API calls)
+  try {
+    var subId = null;
+    if (typeof pendo.getSubscriptionId === "function") subId = pendo.getSubscriptionId();
+    if (!subId && pendo._config && pendo._config.subscriptionId) subId = pendo._config.subscriptionId;
+    if (!subId && pendo.subscriptionId) subId = pendo.subscriptionId;
+    if (subId !== null && subId !== undefined) values.subscriptionId = String(subId);
+  } catch (_) {}
+
+  // v3: Session ID (chip only — what Pendo support asks for)
+  try {
+    var sid = null;
+    if (typeof pendo.getSessionId === "function") sid = pendo.getSessionId();
+    if (!sid && pendo._session && pendo._session.id) sid = pendo._session.id;
+    if (!sid && pendo.sessionId) sid = pendo.sessionId;
+    if (sid !== null && sid !== undefined) values.sessionId = String(sid);
+  } catch (_) {}
+
+  return { pendoDetected: true, checks: checks, values: values };
 }
 
 // ===========================================================================
@@ -2331,7 +3048,7 @@ function runPendoSetupAssistant() {
       var major = parseInt(parts[0], 10);
       if (major < 2) {
         recommend("tip", "Agent version may be outdated",
-          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo-io/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
+          "Running Pendo agent v" + ver + " (major version < 2).\n  FIX: Update to the latest agent by replacing your snippet script src with the current CDN URL, or if using npm, run: npm update @pendo/agent\n  Newer versions include performance improvements, Session Replay support, and security patches.\n  Docs: https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script");
       }
     }
   } catch (e) {}
@@ -2397,125 +3114,193 @@ function runPendoSetupAssistant() {
     }
   } catch (_) {}
 
+  // ========================================================================
+  // 10. CMP CONSENT GATING (v3) — flag only when 5-of-5 conditions are met
+  // ========================================================================
+  //
+  // Goal: catch the case where Pendo is initialized and identifying a real
+  // user before the page's consent manager indicates analytics consent.
+  //
+  // Hard rules to avoid false flags:
+  //   (1) CMP global is present
+  //   (2) The CMP exposes a readable consent state for analytics
+  //   (3) That state says analytics consent is explicitly denied or pending
+  //   (4) Pendo agent is loaded AND pendo.isReady() === true
+  //   (5) Visitor ID is set AND is NOT anonymous
+  // If ANY of those is unknown, we say nothing. Anonymous-pre-consent
+  // buffering is a legitimate Pendo pattern and must not be flagged.
+  //
+  // TrustArc + TCF v2.0 are inform-only (their consent APIs are too
+  // inconsistent to read confidently from outside the integration).
+  // ========================================================================
+  try {
+    var cmp = null;            // detected platform name
+    var cmpReadable = false;   // can we read analytics consent state?
+    var cmpAnalyticsDenied = null;
+    var cmpRemediationUrl = null;
+    var cmpInformOnly = false;
+
+    // --- Cookiebot: Cookiebot.consent.statistics is a boolean ---
+    if (typeof window.Cookiebot !== "undefined" && window.Cookiebot && window.Cookiebot.consent) {
+      cmp = "Cookiebot";
+      if (typeof window.Cookiebot.consent.statistics === "boolean") {
+        cmpReadable = true;
+        cmpAnalyticsDenied = (window.Cookiebot.consent.statistics === false);
+      }
+      cmpRemediationUrl = "https://support.cookiebot.com/hc/en-us/articles/4405978132242-Manual-cookie-blocking";
+    }
+    // --- Didomi: purpose-level status ---
+    else if (typeof window.Didomi !== "undefined" && window.Didomi &&
+             typeof window.Didomi.getUserConsentStatusForPurpose === "function") {
+      cmp = "Didomi";
+      try {
+        var didomiAnalytics = window.Didomi.getUserConsentStatusForPurpose("analytics");
+        if (typeof didomiAnalytics === "boolean") {
+          cmpReadable = true;
+          cmpAnalyticsDenied = (didomiAnalytics === false);
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://developers.didomi.io/cmp/web-sdk/third-parties/no-tag-manager";
+    }
+    // --- Osano: getConsent returns an object keyed by category ---
+    else if (typeof window.Osano !== "undefined" && window.Osano && window.Osano.cm &&
+             typeof window.Osano.cm.getConsent === "function") {
+      cmp = "Osano";
+      try {
+        var osanoConsent = window.Osano.cm.getConsent();
+        if (osanoConsent && typeof osanoConsent.ANALYTICS === "string") {
+          cmpReadable = true;
+          cmpAnalyticsDenied = (osanoConsent.ANALYTICS === "DENY");
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://docs.osano.com/consent-management-getting-started";
+    }
+    // --- OneTrust: narrow read. Only flag when active groups string contains
+    // ONLY C0001 (strictly-necessary). Category IDs are customer-configurable,
+    // so anything broader invites false positives. ---
+    else if (typeof window.OneTrust !== "undefined") {
+      cmp = "OneTrust";
+      try {
+        var groups = window.OnetrustActiveGroups;
+        if (typeof groups === "string" && groups.length > 0) {
+          var parts = groups.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+          if (parts.length === 1 && parts[0] === "C0001") {
+            cmpReadable = true;
+            cmpAnalyticsDenied = true;
+          }
+        }
+      } catch (_) {}
+      cmpRemediationUrl = "https://developer.onetrust.com/onetrust/docs/single-page-applications";
+    }
+    // --- TrustArc: inform-only ---
+    else if (typeof window.truste !== "undefined") {
+      cmp = "TrustArc";
+      cmpInformOnly = true;
+    }
+    // --- TCF v2.0: inform-only ---
+    else if (typeof window.__tcfapi === "function") {
+      cmp = "TCF v2.0";
+      cmpInformOnly = true;
+    }
+
+    if (cmp) {
+      if (cmpInformOnly) {
+        recommend("tip", "Consent manager detected (" + cmp + ")",
+          cmp + " is present on this page. The extension does not read " + cmp + "'s consent state automatically (the API varies across deployments). Verify manually that Pendo's initialization is gated on analytics consent for your jurisdiction.\n  Docs: https://support.pendo.io/hc/en-us/articles/21326554691227-Data-collection-and-compliance");
+      } else if (cmpReadable && cmpAnalyticsDenied) {
+        // Conditions 4 + 5: Pendo ready AND non-anonymous visitor
+        var pendoReady = false;
+        try { pendoReady = (typeof pendo.isReady === "function" && pendo.isReady()); } catch (_) {}
+
+        var cmpVisitorId = null;
+        try {
+          cmpVisitorId = (pendo.getVisitorId && pendo.getVisitorId()) ||
+                         (pendo.get && pendo.get("visitor") && pendo.get("visitor").id) ||
+                         pendo.visitorId || null;
+        } catch (_) {}
+        var nonAnonymousVisitor = !!(cmpVisitorId && typeof cmpVisitorId === "string" &&
+          !cmpVisitorId.startsWith("VISITOR-") && !cmpVisitorId.startsWith("_PENDO_T_"));
+
+        if (pendoReady && nonAnonymousVisitor) {
+          recommend("warning", "Pendo may be running without consent (" + cmp + ")",
+            cmp + " indicates analytics consent has not been granted, but Pendo is initialized and identifying a real visitor. This may be a compliance issue depending on your jurisdiction. Verify how Pendo is categorized in " + cmp + " and that initialization is gated on the analytics/statistics consent state.\n  FIX: Block Pendo's initialization until " + cmp + " signals consent. " + cmp + " remediation pattern: " + cmpRemediationUrl + "\n  Supplementary docs: https://support.pendo.io/hc/en-us/articles/21326554691227-Data-collection-and-compliance");
+        }
+        // Else: not flagged. Pendo not ready OR anonymous visitor → both
+        // legitimate pre-consent states under Pendo's own guidance.
+      }
+      // Else: CMP present but consent state unreadable → say nothing.
+    }
+  } catch (_) {}
+
   return result;
 }
 
 
 // ---------------------------------------------------------------------------
-// Feedback System
+// Feedback — UPDATE_2.md
+//
+// One-click handler. No in-popup textarea, no modal scrim. Clicking
+// "Send feedback" opens a pre-filled GitHub issue compose URL in a new tab
+// via chrome.tabs.create. The user writes the actual feedback in GitHub,
+// where they have a real form. The popup's job is just to ship the diagnostic
+// context so the user doesn't have to retype it.
+//
+// PII rules (per UPDATE_2.md):
+//   - Must NOT include: page URL, visitor/account IDs, email/name, cookies,
+//     auth tokens. The extension never sees most of these, but the rule
+//     applies to anything pulled from values too.
+//   - May include: extension version, Pendo agent version, realm, health
+//     status, grade letter, issue count by severity, UA.
 // ---------------------------------------------------------------------------
 
-(function initFeedback() {
-  const feedbackBtn = document.getElementById("feedback-btn");
-  const feedbackModal = document.getElementById("feedback-modal");
-  const feedbackTextarea = document.getElementById("feedback-text");
-  const feedbackSubmit = document.getElementById("feedback-submit");
-  const feedbackCancel = document.getElementById("feedback-cancel");
-  const feedbackStatus = document.getElementById("feedback-status");
+(function v4WireFeedback() {
+  var btn = document.getElementById("feedback-btn");
+  if (!btn) return;
+  btn.addEventListener("click", function () {
+    var values = window.__lastValues || {};
+    var issues = window.__lastIssues || [];
+    var grade  = window.__lastGrade || null;
+    var version = chrome.runtime.getManifest().version;
 
-  if (!feedbackBtn) return;
+    // Status text mirrors the hero state.
+    var status = grade
+      ? (function () {
+          if (grade.criticals > 0 || grade.letter === "F") return "outage";
+          if (grade.warnings > 0)                          return "degraded";
+          return "healthy";
+        })()
+      : "unknown";
 
-  feedbackBtn.addEventListener("click", () => {
-    feedbackModal.style.display = "flex";
-    feedbackTextarea.value = "";
-    feedbackStatus.textContent = "";
-    feedbackStatus.className = "feedback-status";
-    feedbackTextarea.focus();
-  });
+    var sevBreakdown = issues.length
+      ? issues.map(function (i) { return i.sev; }).join(", ")
+      : "none";
 
-  feedbackCancel.addEventListener("click", () => {
-    feedbackModal.style.display = "none";
-  });
+    var body = [
+      "<!-- Describe the issue or suggestion below. -->",
+      "",
+      "",
+      "---",
+      "**Diagnostic context** (auto-filled, PII-scrubbed):",
+      "",
+      "| Field | Value |",
+      "|---|---|",
+      "| Extension version | " + version + " |",
+      "| Pendo agent | " + (values.version || "not loaded") + " |",
+      "| Realm | " + (values.realm || "unknown") + " |",
+      "| Page status | " + status + " (grade " + (grade ? grade.letter : "?") + ") |",
+      "| Issues | " + issues.length + " (" + sevBreakdown + ") |",
+      "| Browser | " + navigator.userAgent + " |"
+    ].join("\n");
 
-  feedbackModal.addEventListener("click", (e) => {
-    if (e.target === feedbackModal) {
-      feedbackModal.style.display = "none";
+    var url = "https://github.com/prolitariat/pendo-health-check/issues/new"
+      + "?labels=feedback"
+      + "&body=" + encodeURIComponent(body);
+
+    try {
+      chrome.tabs.create({ url: url });
+    } catch (_) {
+      window.open(url, "_blank", "noopener,noreferrer");
     }
-  });
-
-  // PII scrubbing before feedback leaves the extension
-  function scrubPII(str) {
-    if (!str) return str;
-    str = str.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, "[REDACTED_EMAIL]");
-    str = str.replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[REDACTED_SSN]");
-    str = str.replace(/\b(?:\d[ \-]?){13,19}\b/g, "[REDACTED_CC]");
-    str = str.replace(/(?:\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}\b/g, "[REDACTED_PHONE]");
-    str = str.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[REDACTED_IP]");
-    return str;
-  }
-
-  function buildFeedbackPayload() {
-    const text = feedbackTextarea.value.trim();
-    const pageUrl = document.getElementById("page-url").textContent || "(no URL)";
-    const version = chrome.runtime.getManifest().version;
-    return {
-      feedback: scrubPII(text),
-      url: scrubPII(pageUrl),
-      version: version,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  // GitHub Issue button
-  feedbackSubmit.addEventListener("click", () => {
-    const text = feedbackTextarea.value.trim();
-    if (!text) {
-      feedbackStatus.textContent = "Please enter some feedback.";
-      feedbackStatus.className = "feedback-status feedback-error";
-      return;
-    }
-
-    const p = buildFeedbackPayload();
-    const title = encodeURIComponent("Feedback: " + p.feedback.slice(0, 80) + (p.feedback.length > 80 ? "…" : ""));
-    const body = encodeURIComponent(
-      "## Feedback\n\n" + p.feedback +
-      "\n\n---\n" +
-      "**Page tested:** " + p.url + "\n" +
-      "**Extension version:** v" + p.version + "\n" +
-      "**Submitted:** " + p.timestamp
-    );
-    const issueUrl = "https://github.com/prolitariat/pendo-health-check/issues/new?labels=feedback&title=" + title + "&body=" + body;
-    chrome.tabs.create({ url: issueUrl });
-    trackEvent("feedback_submit", { method: "github" });
-
-    feedbackStatus.textContent = "Opening GitHub — thanks!";
-    feedbackStatus.className = "feedback-status feedback-success";
-    feedbackTextarea.value = "";
-    setTimeout(() => { feedbackModal.style.display = "none"; }, 1200);
-  });
-
-  // Email fallback button (no GitHub account needed)
-  const feedbackEmail = document.getElementById("feedback-email");
-  if (feedbackEmail) {
-    feedbackEmail.addEventListener("click", () => {
-      const text = feedbackTextarea.value.trim();
-      if (!text) {
-        feedbackStatus.textContent = "Please enter some feedback.";
-        feedbackStatus.className = "feedback-status feedback-error";
-        return;
-      }
-
-      const p = buildFeedbackPayload();
-      const subject = encodeURIComponent("Pendo Health Check Feedback (v" + p.version + ")");
-      const mailBody = encodeURIComponent(
-        p.feedback + "\n\n---\nPage tested: " + p.url +
-        "\nExtension version: v" + p.version +
-        "\nSubmitted: " + p.timestamp
-      );
-      chrome.tabs.create({ url: "mailto:pendohealthcheck@gmail.com?subject=" + subject + "&body=" + mailBody });
-      trackEvent("feedback_submit", { method: "email" });
-
-      feedbackStatus.textContent = "Opening email — thanks!";
-      feedbackStatus.className = "feedback-status feedback-success";
-      feedbackTextarea.value = "";
-      setTimeout(() => { feedbackModal.style.display = "none"; }, 1200);
-    });
-  }
-
-  // Allow Ctrl+Enter / Cmd+Enter to submit
-  feedbackTextarea.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      feedbackSubmit.click();
-    }
+    try { trackEvent("send_feedback"); } catch (_) {}
   });
 })();
