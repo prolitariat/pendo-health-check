@@ -2,6 +2,26 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [4.5.0] — 2026-05-15
+
+Applies `design_handoff_pendo_health_check/UPDATE_2_feedback.md`. The in-popup FeedbackModal is removed entirely; "Send feedback" becomes a one-click handler that opens a pre-filled GitHub Issue compose URL in a new tab.
+
+### Removed
+
+- **`FeedbackModal`** — the entire modal component is gone. Deleted in `popup.html`: `#feedback-modal`, `.feedback-modal-content`, `#feedback-text`, `#feedback-cancel`, `#feedback-email`, `#feedback-submit`, `#feedback-status`. Deleted in `popup.css`: all `#feedback-*`, `.feedback-modal-content`, `.feedback-modal-buttons` rules. Deleted in `popup.js`: the `initFeedback` IIFE (~115 lines) and its `scrubPII` / `buildFeedbackPayload` helpers.
+- **In-popup textarea** for feedback. The popup never owns the writing surface anymore. The user writes their feedback in GitHub, where they have a real form with persistence, formatting, attachments, and notification subscriptions.
+
+### Added
+
+- **One-click `Send feedback` handler.** Click the existing `.ph-footer-feedback` button → `chrome.tabs.create({ url })` opens GitHub's new-issue compose URL pre-filled with diagnostic context. The user just types their feedback and submits.
+- **Auto-filled diagnostic context** in the issue body: extension version, Pendo agent version, realm, page status + grade letter, count of issues by severity, and browser user-agent. Rendered as a Markdown table for readability inside GitHub. The issue is labeled `feedback`.
+
+### Notes
+
+- PII scrubbing rule from UPDATE_2.md respected: the pre-filled body contains no current-page URL, no visitor/account IDs, no email/name, no cookies, no auth tokens. Only the explicitly-allowed fields (version, agent, realm, status/grade, issue count by severity, UA) are included.
+- `window.__lastGrade` is now stored at the end of `renderGradeCard` so the feedback handler can read it without recomputing.
+- `mailto:` fallback path described in UPDATE_2.md was not wired in this commit — the repo is public on GitHub and that's the canonical destination. If you want a `mailto:` alternative as a fallback when the user isn't signed into GitHub, say so and I'll add a second click target.
+
 ## [4.4.0] — 2026-05-14
 
 Applies `design_handoff_pendo_health_check/UPDATE_1.md` — anonymous-context handling (Part 1) and footer cleanup (Part 2) shipped together.

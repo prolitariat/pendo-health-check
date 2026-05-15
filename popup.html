@@ -189,7 +189,7 @@
          per UPDATE_1.md Part 2. Version on the left, Send feedback on
          the right (margin-left: auto handles the spacing). -->
     <div class="ph-footer">
-      <span class="ph-footer-version" id="version-text">v4.4.0</span>
+      <span class="ph-footer-version" id="version-text">v4.5.0</span>
       <button class="ph-footer-feedback" id="feedback-btn">Send feedback</button>
     </div>
   </div>
@@ -197,20 +197,9 @@
   <!-- Hidden URL holder for popup.js compatibility -->
   <div id="page-url" style="display:none"></div>
 
-  <!-- Feedback modal -->
-  <div id="feedback-modal">
-    <div class="feedback-modal-content">
-      <h3>Send Feedback</h3>
-      <p>Feedback is PII-scrubbed before it leaves the extension.</p>
-      <textarea id="feedback-text" placeholder="Describe the issue or suggestion..."></textarea>
-      <div class="feedback-modal-buttons">
-        <button id="feedback-cancel">Cancel</button>
-        <button id="feedback-email" title="Send via email (no account needed)">Email</button>
-        <button id="feedback-submit" title="Open a GitHub issue (GitHub account required)">GitHub Issue</button>
-      </div>
-      <div id="feedback-status"></div>
-    </div>
-  </div>
+  <!-- v4.5 / UPDATE_2.md: the in-popup FeedbackModal is deleted.
+       "Send feedback" in the footer now opens a pre-filled GitHub issue
+       compose URL in a new tab. The popup never owns a textarea. -->
 
   <script src="popup.js"></script>
 </body>

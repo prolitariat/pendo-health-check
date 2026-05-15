@@ -473,6 +473,9 @@ function renderGradeCard(grade) {
   // v4.4: infos counted separately so the hero sub-line can render
   // "Healthy · N notes" instead of the default copy.
   var infoCount = (grade && grade.infos) || 0;
+  // v4.5: cache the grade so the Send feedback handler can read it
+  // without having to recompute.
+  window.__lastGrade = grade;
   v4RenderHero(grade, state, issueCount, infoCount);
 }
 
@@ -3234,120 +3237,70 @@ function runPendoSetupAssistant() {
 
 
 // ---------------------------------------------------------------------------
-// Feedback System
+// Feedback — UPDATE_2.md
+//
+// One-click handler. No in-popup textarea, no modal scrim. Clicking
+// "Send feedback" opens a pre-filled GitHub issue compose URL in a new tab
+// via chrome.tabs.create. The user writes the actual feedback in GitHub,
+// where they have a real form. The popup's job is just to ship the diagnostic
+// context so the user doesn't have to retype it.
+//
+// PII rules (per UPDATE_2.md):
+//   - Must NOT include: page URL, visitor/account IDs, email/name, cookies,
+//     auth tokens. The extension never sees most of these, but the rule
+//     applies to anything pulled from values too.
+//   - May include: extension version, Pendo agent version, realm, health
+//     status, grade letter, issue count by severity, UA.
 // ---------------------------------------------------------------------------
 
-(function initFeedback() {
-  const feedbackBtn = document.getElementById("feedback-btn");
-  const feedbackModal = document.getElementById("feedback-modal");
-  const feedbackTextarea = document.getElementById("feedback-text");
-  const feedbackSubmit = document.getElementById("feedback-submit");
-  const feedbackCancel = document.getElementById("feedback-cancel");
-  const feedbackStatus = document.getElementById("feedback-status");
+(function v4WireFeedback() {
+  var btn = document.getElementById("feedback-btn");
+  if (!btn) return;
+  btn.addEventListener("click", function () {
+    var values = window.__lastValues || {};
+    var issues = window.__lastIssues || [];
+    var grade  = window.__lastGrade || null;
+    var version = chrome.runtime.getManifest().version;
 
-  if (!feedbackBtn) return;
+    // Status text mirrors the hero state.
+    var status = grade
+      ? (function () {
+          if (grade.criticals > 0 || grade.letter === "F") return "outage";
+          if (grade.warnings > 0)                          return "degraded";
+          return "healthy";
+        })()
+      : "unknown";
 
-  feedbackBtn.addEventListener("click", () => {
-    feedbackModal.style.display = "flex";
-    feedbackTextarea.value = "";
-    feedbackStatus.textContent = "";
-    feedbackStatus.className = "feedback-status";
-    feedbackTextarea.focus();
-  });
+    var sevBreakdown = issues.length
+      ? issues.map(function (i) { return i.sev; }).join(", ")
+      : "none";
 
-  feedbackCancel.addEventListener("click", () => {
-    feedbackModal.style.display = "none";
-  });
+    var body = [
+      "<!-- Describe the issue or suggestion below. -->",
+      "",
+      "",
+      "---",
+      "**Diagnostic context** (auto-filled, PII-scrubbed):",
+      "",
+      "| Field | Value |",
+      "|---|---|",
+      "| Extension version | " + version + " |",
+      "| Pendo agent | " + (values.version || "not loaded") + " |",
+      "| Realm | " + (values.realm || "unknown") + " |",
+      "| Page status | " + status + " (grade " + (grade ? grade.letter : "?") + ") |",
+      "| Issues | " + issues.length + " (" + sevBreakdown + ") |",
+      "| Browser | " + navigator.userAgent + " |"
+    ].join("\n");
 
-  feedbackModal.addEventListener("click", (e) => {
-    if (e.target === feedbackModal) {
-      feedbackModal.style.display = "none";
+    var url = "https://github.com/prolitariat/pendo-health-check/issues/new"
+      + "?labels=feedback"
+      + "&body=" + encodeURIComponent(body);
+
+    try {
+      chrome.tabs.create({ url: url });
+    } catch (_) {
+      window.open(url, "_blank", "noopener,noreferrer");
     }
-  });
-
-  // PII scrubbing before feedback leaves the extension
-  function scrubPII(str) {
-    if (!str) return str;
-    str = str.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, "[REDACTED_EMAIL]");
-    str = str.replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[REDACTED_SSN]");
-    str = str.replace(/\b(?:\d[ \-]?){13,19}\b/g, "[REDACTED_CC]");
-    str = str.replace(/(?:\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}\b/g, "[REDACTED_PHONE]");
-    str = str.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[REDACTED_IP]");
-    return str;
-  }
-
-  function buildFeedbackPayload() {
-    const text = feedbackTextarea.value.trim();
-    const pageUrl = document.getElementById("page-url").textContent || "(no URL)";
-    const version = chrome.runtime.getManifest().version;
-    return {
-      feedback: scrubPII(text),
-      url: scrubPII(pageUrl),
-      version: version,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  // GitHub Issue button
-  feedbackSubmit.addEventListener("click", () => {
-    const text = feedbackTextarea.value.trim();
-    if (!text) {
-      feedbackStatus.textContent = "Please enter some feedback.";
-      feedbackStatus.className = "feedback-status feedback-error";
-      return;
-    }
-
-    const p = buildFeedbackPayload();
-    const title = encodeURIComponent("Feedback: " + p.feedback.slice(0, 80) + (p.feedback.length > 80 ? "…" : ""));
-    const body = encodeURIComponent(
-      "## Feedback\n\n" + p.feedback +
-      "\n\n---\n" +
-      "**Page tested:** " + p.url + "\n" +
-      "**Extension version:** v" + p.version + "\n" +
-      "**Submitted:** " + p.timestamp
-    );
-    const issueUrl = "https://github.com/prolitariat/pendo-health-check/issues/new?labels=feedback&title=" + title + "&body=" + body;
-    chrome.tabs.create({ url: issueUrl });
-    trackEvent("feedback_submit", { method: "github" });
-
-    feedbackStatus.textContent = "Opening GitHub — thanks!";
-    feedbackStatus.className = "feedback-status feedback-success";
-    feedbackTextarea.value = "";
-    setTimeout(() => { feedbackModal.style.display = "none"; }, 1200);
-  });
-
-  // Email fallback button (no GitHub account needed)
-  const feedbackEmail = document.getElementById("feedback-email");
-  if (feedbackEmail) {
-    feedbackEmail.addEventListener("click", () => {
-      const text = feedbackTextarea.value.trim();
-      if (!text) {
-        feedbackStatus.textContent = "Please enter some feedback.";
-        feedbackStatus.className = "feedback-status feedback-error";
-        return;
-      }
-
-      const p = buildFeedbackPayload();
-      const subject = encodeURIComponent("Pendo Health Check Feedback (v" + p.version + ")");
-      const mailBody = encodeURIComponent(
-        p.feedback + "\n\n---\nPage tested: " + p.url +
-        "\nExtension version: v" + p.version +
-        "\nSubmitted: " + p.timestamp
-      );
-      chrome.tabs.create({ url: "mailto:pendohealthcheck@gmail.com?subject=" + subject + "&body=" + mailBody });
-      trackEvent("feedback_submit", { method: "email" });
-
-      feedbackStatus.textContent = "Opening email — thanks!";
-      feedbackStatus.className = "feedback-status feedback-success";
-      feedbackTextarea.value = "";
-      setTimeout(() => { feedbackModal.style.display = "none"; }, 1200);
-    });
-  }
-
-  // Allow Ctrl+Enter / Cmd+Enter to submit
-  feedbackTextarea.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      feedbackSubmit.click();
-    }
+    try { trackEvent("send_feedback"); } catch (_) {}
   });
 })();

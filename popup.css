@@ -532,74 +532,7 @@ body { width: 384px; background: var(--bg); }
 .ph-switch input:checked + .ph-switch-track { background: var(--pank); }
 .ph-switch input:checked + .ph-switch-track::before { transform: translateX(14px); }
 
-/* Feedback modal — restyled to match .ph-* palette */
-#feedback-modal {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 1000;
-  align-items: center; justify-content: center;
-}
-.feedback-modal-content {
-  background: var(--bg);
-  border-radius: 12px;
-  padding: 22px;
-  width: 90%;
-  max-width: 340px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.18);
-}
-.feedback-modal-content h3 {
-  font-weight: 700;
-  font-size: 15px;
-  margin: 0 0 6px;
-  letter-spacing: -.2px;
-}
-.feedback-modal-content p {
-  font-size: 12px;
-  color: var(--muted-fg);
-  margin: 0 0 14px;
-}
-#feedback-text {
-  width: 100%; height: 90px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 12px;
-  resize: none;
-  margin-bottom: 14px;
-  line-height: 1.5;
-  color: var(--fg);
-  background: var(--bg);
-}
-#feedback-text:focus {
-  outline: none;
-  border-color: var(--pank);
-  box-shadow: 0 0 0 3px rgba(235,71,120,0.16);
-}
-.feedback-modal-buttons {
-  display: flex; gap: 8px; justify-content: flex-end;
-}
-.feedback-modal-buttons button {
-  padding: 7px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid transparent;
-}
-#feedback-cancel {
-  border-color: var(--border);
-  background: var(--bg);
-  color: var(--fg);
-}
-#feedback-submit { background: var(--pank); color: #fff; }
-#feedback-email  { background: var(--charcoal); color: #fff; }
-#feedback-status {
-  margin-top: 10px;
-  font-size: 12px;
-  text-align: center;
-}
-#feedback-status.feedback-error   { color: var(--err-700); }
-#feedback-status.feedback-success { color: var(--ok-700); }
+/* v4.5 / UPDATE_2.md: feedback modal CSS removed. "Send feedback" is now
+   a one-click handler that opens a pre-filled GitHub issue compose URL
+   in a new tab. The popup never owns a textarea, so there's no modal,
+   scrim, or modal-content styles to ship. */
