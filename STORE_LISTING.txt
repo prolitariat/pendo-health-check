@@ -1,4 +1,4 @@
-=== CHROME WEB STORE LISTING CONTENT (v4.2.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v4.3.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
@@ -20,11 +20,11 @@ STATUS PANEL
 Default view on open. The current page URL appears in a chip at the top so you can confirm the extension is looking at what you think it's looking at. Below that, either:
 
 • An "All systems operational" block when the page is healthy, or
-• A list of active issues, each color-coded by severity (orange for warnings, red for failures, gray for tips)
+• A list of active issues — each row is a SINGLE LINE with a severity icon (orange for warnings, red for failures) and a short title like "No account ID found"
 
-Beneath the issues sits the Copy Issues to Clipboard primary button (more on that below) and a collapsed "Why this grade?" disclosure. Expanding it shows the full prioritized check list with pass / warn / fail dots so you can see exactly what the grade is computed from.
+Beneath the issues sits the Copy Issues to Clipboard primary button and a closed "Why this grade?" disclosure. Opening the disclosure reveals one block per active issue: title, the "why" in plain English, a "Fix:" line, and a "Docs →" link to the relevant Pendo Help Center article or vendor remediation page. No explanation text appears anywhere else in the popup — chips stay one-liners, the disclosure holds the detail.
 
-A compact Quick Copy table is always pinned at the bottom of the Status panel: Visitor, Account, Session, Agent, Realm. Click any value to copy it; empty rows render grayed out and uncopyable so you can tell at a glance what's set vs. missing.
+Identifiers are owned exclusively by the IDs tab — the Status panel does not mirror them.
 
 IDS PANEL
 

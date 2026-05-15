@@ -2,6 +2,33 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [4.3.0] — 2026-05-14
+
+Implements the README v3 "Status tab anatomy" specification literally. Issue chips are one-liners, the Why-this-grade disclosure carries per-issue explanations, identifiers are owned exclusively by the IDs tab.
+
+### Added
+
+- **Unified Issue data model.** `{ id, sev: 'warn'|'err', title, why, fix, docsUrl }` per the handoff README. One array now drives both the issue chips (title only) and the per-issue blocks inside the closed `<details>` disclosure. Sourced from runtime health-check items (mapped via a new `V4_HC_ISSUE_TEMPLATES` table that holds verified short titles plus longer why/fix/docsUrl) and from `runPendoSetupAssistant` recommendations (parsed from the existing `detail\n  FIX: …\n  Docs: …` shape into the same triple). CSP issues are folded in too so the chip count matches what `computeGrade` sees.
+- **`.ph-why-item` blocks.** Each issue contributes one block to the `<details>` body: severity icon + title, a "why" paragraph, and a "Fix: …" line with a "Docs →" link. Backtick spans in the templates render as inline `<code>`. No content lives outside the disclosure; nothing is rendered above the Copy button.
+- **CSS for `.ph-why-item`, `.ph-why-item-title`, and `.ph-why-item code`** added to `popup.css` verbatim from `popup_reference.html` v3.
+
+### Changed
+
+- **Issue chips render `title` only.** Previously the chip rendered `c.detail` from the runtime check (which often contained the value itself, e.g. `Anonymous visitor: _PENDO_T_…`). Now the chip is a short, sentence-case title (e.g. `No account ID found`, `Multiple Pendo instances detected`) and the explanation lives in the matching `.ph-why-item` block.
+- **`renderChecks` is bookkeeping-only.** Previously it populated `#checks-list` with `.ph-check` rows. README v3 specifies that the disclosure shows per-issue blocks, not the full check list. The function still tracks pass/warn/fail counts, stores `window.__lastChecks`, calls `showView` and `showTabs`, computes the preliminary grade, and pulses the copy button — but no longer touches the DOM directly.
+
+### Removed
+
+- **Quick Copy compact table from the Status panel.** README v3 explicitly: "Quick Copy is owned by the IDs tab. The Status tab does not show identifiers." `#quick-copy-status`, the `V4_CHIPS_STATUS` array, and the corresponding call in `v4RenderAllQuickCopy` are all gone.
+- **`#checks-list` element.** Replaced by `#why-items` (the per-issue blocks container inside the `<details>` body). `renderChecks` no longer writes to it.
+- **Inline FIX / explanation text on issue rows.** All such text was rerouted to the `.ph-why-item` blocks inside the disclosure. Issue rows are one-liners now.
+
+### Notes
+
+- Anonymous visitor IDs continue to be PASS (not warn/fail), per `project_pendo_anonymous_visitors_legitimate.md`. They therefore never enter the Issue[] pipeline and never appear as chips or why-items.
+- Existing helpers (`buildIssuesReport`, CMP consent-gating check, `validateInstall` capture, Copy Issues button) consume the legacy `check[]` shape and were not touched. They produce the same plain-text Copy Issues output as before.
+- Render order in the analysis flow: HC analysis → first issue render (HC-only) → setup analysis → final issue render (HC + setup). Both passes use the same `v4BuildIssues` → `v4RenderIssuesList` + `v4RenderWhyItems` path; no rendering happens through `renderChecks` anymore.
+
 ## [4.2.0] — 2026-05-13
 
 Literal implementation of `design_handoff_pendo_health_check/popup_reference.html` (v2 of the handoff). Markup and CSS copied verbatim from the reference; no creative interpretation.

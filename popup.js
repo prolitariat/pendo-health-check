@@ -344,53 +344,20 @@ let lastSetupData = null;
 // ---------------------------------------------------------------------------
 
 function renderChecks(checks) {
-  // Store health data globally for grade computation
+  // v4.3: this function used to populate #checks-list with .ph-check rows.
+  // README v3 says the Why-this-grade disclosure body contains per-issue
+  // .ph-why-item blocks (rendered by v4RenderWhyItems), NOT the full check
+  // list. So no DOM rendering happens here anymore — kept only for the
+  // bookkeeping (counts, lastHealthData, prelim grade, copy-button pulse).
   lastHealthData = { checks: checks };
   window.__lastChecks = checks;
 
-  const list = document.getElementById("checks-list");
-  list.innerHTML = "";
-
   let pass = 0, warn = 0, fail = 0;
-
-  // Sort: problems first (fail → warn → info → pass)
-  const ORDER = { fail: 0, warn: 1, info: 2, pass: 3 };
-  const sorted = [...checks].sort((a, b) => (ORDER[a.status] ?? 2) - (ORDER[b.status] ?? 2));
-
-  // Separate into problem checks vs passing checks
-  const problemChecks = [];
-  const passingChecks = [];
-
-  sorted.forEach((c) => {
-    if (c.status === "pass") { pass++; passingChecks.push(c); }
-    else if (c.status === "warn") { warn++; problemChecks.push(c); }
-    else if (c.status === "fail") { fail++; problemChecks.push(c); }
-    else problemChecks.push(c); // info counts as noteworthy
+  (checks || []).forEach((c) => {
+    if (c.status === "pass") pass++;
+    else if (c.status === "warn") warn++;
+    else if (c.status === "fail") fail++;
   });
-
-  // Render problem checks at full opacity
-  if (problemChecks.length > 0) {
-    problemChecks.forEach((c) => {
-      const row = document.createElement("div");
-      row.className = "ph-check " + c.status;
-      row.innerHTML = `
-        <span class="ph-check-status">${STATUS_ICONS[c.status]}</span>
-        <div class="ph-check-info">
-          <div class="ph-check-label">${escapeHtml(c.label)}</div>
-          <div class="ph-check-detail">${escapeHtml(c.detail)}</div>
-        </div>
-      `;
-      list.appendChild(row);
-    });
-  } else {
-    const allGood = document.createElement("div");
-    allGood.style.cssText = "text-align:center;padding:12px 8px;color:var(--success);font-weight:600;font-size:13px";
-    allGood.textContent = "✅ All checks passed";
-    list.appendChild(allGood);
-  }
-
-  // Passed checks omitted — the hero card and Why-this-grade accordion already
-  // expose enough state. v4: this list lives inside the accordion now.
 
   showView("__none__");
   showTabs();
@@ -521,16 +488,9 @@ var V4_SVG = {
   info:         '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
 };
 
-// Chips on the Status panel (compact, five rows). The IDs tab gets the same
-// list plus Subscription appended. Diagnostic state (Framework, Ready,
-// Active Guides) intentionally does NOT appear here — that's the hero's job.
-var V4_CHIPS_STATUS = [
-  { key: "visitorId",      label: "Visitor" },
-  { key: "accountId",      label: "Account" },
-  { key: "sessionId",      label: "Session" },
-  { key: "version",        label: "Agent" },
-  { key: "realm",          label: "Realm" }
-];
+// IDs tab owns identifiers per README v3. The Status tab no longer mirrors
+// them — see the Status tab anatomy section ("Quick Copy is owned by the
+// IDs tab. The Status tab does not show identifiers.").
 var V4_CHIPS_IDS = [
   { key: "visitorId",      label: "Visitor" },
   { key: "accountId",      label: "Account" },
@@ -586,22 +546,244 @@ function v4RenderHero(grade, state, issueCount) {
   hero.style.display = "flex";
 }
 
-// --- Severity-colored issue rows (top of Status panel) -------------------
+// --- Severity helpers ---------------------------------------------------
 
-// v4.2: severity maps to a data-sev attribute (warn|err|info|tip) on .ph-issue.
-function v4SeverityAttr(status) {
-  if (status === "fail") return "err";
-  if (status === "warn") return "warn";
-  if (status === "info") return "info";
-  return "info";
-}
-function v4SeverityIcon(status) {
-  if (status === "fail") return V4_SVG.alertOctagon;
-  if (status === "warn") return V4_SVG.alertTri;
+function v4SeverityIcon(sev) {
+  // sev is 'err' | 'warn' (Issue.sev). Anything else falls through to info.
+  if (sev === "err") return V4_SVG.alertOctagon;
+  if (sev === "warn") return V4_SVG.alertTri;
   return V4_SVG.info;
 }
 
-function v4RenderIssuesList(checks) {
+// ===========================================================================
+// v4.3: Unified Issue model (per README v3 "Status tab anatomy")
+// ===========================================================================
+//
+// One Issue array drives BOTH the chip list (title only) and the
+// "Why this grade?" per-issue blocks (title + why + fix + docsUrl).
+// Shape:
+//
+//   { id, sev: 'warn'|'err', title, why, fix, docsUrl }
+//
+// Sources:
+//   * runPendoHealthCheck check items (fail | warn) — mapped via
+//     V4_HC_ISSUE_TEMPLATES below to known titles / why / fix / docs.
+//   * runPendoSetupAssistant recommendations — parsed from the existing
+//     "detail\n  FIX: fix-text\n  Docs: url" string format that
+//     runPendoSetupAssistant already emits.
+//
+// Anonymous-visitor handling: anonymous visitors are PASS in the data
+// layer (see popup.js Visitor ID section, and project memory
+// project_pendo_anonymous_visitors_legitimate.md), so they never reach
+// this layer as warn or fail. No special-case needed here.
+// ===========================================================================
+
+var V4_HC_ISSUE_TEMPLATES = {
+  "Pendo Agent Loaded": {
+    fail: {
+      title: "Pendo snippet not detected on this page",
+      why: "The Pendo agent (`window.pendo`) isn't present. Until the install snippet runs, nothing will be tracked on this page.",
+      fix: "Add the Pendo install snippet to your `<head>` with the correct API key for this subscription.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Pendo Ready": {
+    warn: {
+      title: "Pendo not ready yet",
+      why: "`pendo.isReady()` returned false. The agent is loaded but `pendo.initialize()` either hasn't run or ran before the script finished loading.",
+      fix: "Call `pendo.initialize(...)` only after the Pendo script tag has loaded.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    },
+    fail: {
+      title: "Pendo ready check threw an error",
+      why: "Calling `pendo.isReady()` raised an exception. Usually means the script loaded partially or the snippet URL doesn't match the subscription.",
+      fix: "Clear browser cache, hard reload, and verify the API key in the snippet URL belongs to this subscription.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Visitor ID": {
+    fail: {
+      title: "No visitor ID found",
+      why: "`pendo.initialize()` was called without a visitor argument, so Pendo can't attribute events to anyone.",
+      fix: "Call `pendo.initialize({ visitor: { id: 'USER_ID' } })` after the user authenticates.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Account ID": {
+    warn: {
+      title: "No account ID found",
+      why: "Without an `account.id`, you can't roll up usage by customer. For B2B products this breaks segmentation by org or plan.",
+      fix: "Pass an `account` object to `pendo.initialize()` with your tenant or organization ID.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Pendo Instances": {
+    warn: {
+      title: "Multiple Pendo instances detected",
+      why: "More than one Pendo agent is running on this page. This causes double-counted analytics and conflicting guides.",
+      fix: "Check for duplicate `<script>` tags, duplicate bundler imports, or a GTM tag overlapping a hardcoded snippet.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Data Transmission": {
+    warn: {
+      title: "Pendo requests are blocked",
+      why: "No Pendo network activity was detected. Most likely an ad blocker, a restrictive CSP, or a corporate firewall.",
+      fix: "Disable ad blockers for this domain, ask IT to allowlist `*.pendo.io`, or configure a CNAME so Pendo traffic appears first-party.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360032209131-Content-Security-Policy-for-Pendo"
+    }
+  },
+  "Feature Flags": {
+    warn: {
+      title: "Pendo features are disabled in config",
+      why: "Your `pendo.initialize()` config has one or more disable flags set (e.g. `disableGuides`, `disableAnalytics`).",
+      fix: "Remove the disable flags from the initialize call if the disabling wasn't intentional.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Data Host": {
+    warn: {
+      title: "Could not determine Pendo data host",
+      why: "Pendo's `dataHost` and `contentHost` couldn't be read from the agent config. The agent may not be fully initialized.",
+      fix: "Check the `pendo.initialize()` call for `contentHost` and `dataHost` options.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "Agent Version": {
+    warn: {
+      title: "Pendo agent is outdated",
+      why: "A pre-2.x Pendo agent is running. Newer versions ship performance fixes, Session Replay support, and security patches.",
+      fix: "Replace the snippet's script src with the current CDN URL, or run `npm update @pendo/agent`.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  },
+  "API Key": {
+    warn: {
+      title: "Could not determine API key",
+      why: "The API key isn't reachable from `pendo.get('apiKey')` or `pendo.apiKey`. The agent may have failed to fully load.",
+      fix: "Verify the install snippet includes a valid API key in the script URL.",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360046272771-Developer-s-guide-to-implementing-Pendo-using-the-install-script"
+    }
+  }
+};
+
+function v4SlugifyId(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+// Split a setup recommendation's `detail` string into a (why, fix, docsUrl)
+// triple. The shape produced by runPendoSetupAssistant is:
+//   "<problem text>\n  FIX: <fix text>\n  Docs: <url>"
+// All three parts are optional except `why`.
+function v4ParseSetupDetail(detail) {
+  var why = String(detail || "");
+  var fix = "";
+  var docsUrl = "";
+  var fixIdx = why.indexOf("\n  FIX:");
+  if (fixIdx !== -1) {
+    var afterWhy = why.substring(fixIdx + 7).trim();
+    why = why.substring(0, fixIdx).trim();
+    // Pull out an inline Docs: URL if present.
+    var docsMatch = afterWhy.match(/\n\s*Docs:\s*(https?:\/\/\S+)/);
+    if (docsMatch) {
+      docsUrl = docsMatch[1];
+      afterWhy = afterWhy.replace(docsMatch[0], "").trim();
+    }
+    fix = afterWhy;
+  } else {
+    var topDocs = why.match(/\n\s*Docs:\s*(https?:\/\/\S+)/);
+    if (topDocs) {
+      docsUrl = topDocs[1];
+      why = why.replace(topDocs[0], "").trim();
+    }
+  }
+  return { why: why, fix: fix, docsUrl: docsUrl };
+}
+
+function v4BuildIssues(checks, setupData) {
+  var issues = [];
+
+  // Pass 1: health-check items. Map via template; fall back to the raw
+  // check.label/detail when a template isn't defined.
+  (checks || []).forEach(function (c) {
+    if (c.status !== "fail" && c.status !== "warn") return; // info / pass don't surface as issues
+    var sev = c.status === "fail" ? "err" : "warn";
+    var template = V4_HC_ISSUE_TEMPLATES[c.label] && V4_HC_ISSUE_TEMPLATES[c.label][c.status];
+    if (template) {
+      issues.push({
+        id: "hc-" + v4SlugifyId(c.label) + "-" + c.status,
+        sev: sev,
+        title: template.title,
+        why: template.why,
+        fix: template.fix,
+        docsUrl: template.docsUrl
+      });
+    } else {
+      // Fallback for any check label not in the template map.
+      issues.push({
+        id: "hc-" + v4SlugifyId(c.label) + "-" + c.status,
+        sev: sev,
+        title: c.label,
+        why: c.detail || "",
+        fix: "",
+        docsUrl: ""
+      });
+    }
+  });
+
+  // Pass 2: setup recommendations. Use the parsed (why, fix, docsUrl) triple.
+  if (setupData && Array.isArray(setupData.recommendations)) {
+    setupData.recommendations.forEach(function (r) {
+      // Per README spec: issues are warn/err only. Tips don't surface as chips.
+      var sev;
+      if (r.severity === "error" || r.severity === "fail") sev = "err";
+      else if (r.severity === "warning" || r.severity === "warn") sev = "warn";
+      else return; // skip tip / info
+      var parsed = v4ParseSetupDetail(r.detail);
+      issues.push({
+        id: "setup-" + v4SlugifyId(r.title),
+        sev: sev,
+        title: r.title,
+        why: parsed.why,
+        fix: parsed.fix,
+        docsUrl: parsed.docsUrl
+      });
+    });
+  }
+
+  // Pass 3: setup CSP issues are surfaced separately by extractSetupIssues
+  // but live under setupData.csp.issues. Render those too so the chip count
+  // matches what computeGrade sees.
+  if (setupData && setupData.csp && Array.isArray(setupData.csp.issues)) {
+    setupData.csp.issues.forEach(function (ci) {
+      var sev;
+      if (ci.severity === "error" || ci.severity === "fail") sev = "err";
+      else if (ci.severity === "warning" || ci.severity === "warn") sev = "warn";
+      else return;
+      var parsed = v4ParseSetupDetail((ci.detail || "") + (ci.fix ? "\n  FIX: " + ci.fix : ""));
+      issues.push({
+        id: "csp-" + v4SlugifyId(ci.directive),
+        sev: sev,
+        title: "CSP: " + ci.directive,
+        why: parsed.why,
+        fix: parsed.fix,
+        docsUrl: parsed.docsUrl
+      });
+    });
+  }
+
+  // Dedup by id — should be unique already, but defensive.
+  var seen = {};
+  return issues.filter(function (iss) {
+    if (seen[iss.id]) return false;
+    seen[iss.id] = true;
+    return true;
+  });
+}
+
+// --- Render: issue chips (title only) -----------------------------------
+
+function v4RenderIssuesList(issues) {
   var section = document.getElementById("issues-section");
   var ok      = document.getElementById("ok-block");
   var list    = document.getElementById("issues-list");
@@ -609,15 +791,11 @@ function v4RenderIssuesList(checks) {
   var tabCount = document.getElementById("tab-status-count");
   if (!section || !ok || !list || !countEl) return 0;
 
-  // Filter to actionable items: fail + warn + info. Passes do not appear here.
-  var actionable = (checks || []).filter(function (c) {
-    return c.status === "fail" || c.status === "warn" || c.status === "info";
-  });
-
+  issues = issues || [];
   list.innerHTML = "";
-  countEl.textContent = actionable.length;
+  countEl.textContent = issues.length;
 
-  if (actionable.length === 0) {
+  if (issues.length === 0) {
     section.style.display = "none";
     ok.style.display = "block";
     if (tabCount) {
@@ -629,21 +807,89 @@ function v4RenderIssuesList(checks) {
 
   ok.style.display = "none";
   section.style.display = "block";
-  actionable.forEach(function (c) {
+
+  issues.forEach(function (iss) {
     var row = document.createElement("div");
     row.className = "ph-issue";
-    row.setAttribute("data-sev", v4SeverityAttr(c.status));
-    var text = (c.detail && c.detail.trim()) ? c.detail : c.label;
-    row.innerHTML = v4SeverityIcon(c.status) + '<span class="ph-issue-text"></span>';
-    row.querySelector(".ph-issue-text").textContent = text;
+    row.setAttribute("data-sev", iss.sev);
+    row.setAttribute("data-issue-id", iss.id);
+    // README v3: the row shows the issue's short TITLE only.
+    // why/fix/docsUrl render in .ph-why-item blocks below, not here.
+    row.innerHTML = v4SeverityIcon(iss.sev) + '<span class="ph-issue-text"></span>';
+    row.querySelector(".ph-issue-text").textContent = iss.title;
     list.appendChild(row);
   });
 
   if (tabCount) {
-    tabCount.textContent = actionable.length;
+    tabCount.textContent = issues.length;
     tabCount.style.display = "inline-flex";
   }
-  return actionable.length;
+  return issues.length;
+}
+
+// --- Render: Why-this-grade per-issue blocks -----------------------------
+
+// Renders one .ph-why-item block per issue into the closed <details>
+// disclosure body. README v3 spec:
+//   <div class="ph-why-item">
+//     <div class="ph-why-item-title"><svg/>{title}</div>
+//     <p>{why}</p>
+//     <p><b>Fix:</b> {fix}. <a href="{docsUrl}">Docs →</a></p>
+//   </div>
+//
+// Inline `<code>` styling falls out of the CSS — see .ph-why-item code in
+// popup.css. We don't auto-format `code` ticks here; the template strings
+// already include backtick syntax which we render as HTML so the styling
+// applies.
+function v4RenderWhyItems(issues) {
+  var mount = document.getElementById("why-items");
+  if (!mount) return;
+  mount.innerHTML = "";
+  if (!issues || issues.length === 0) return;
+
+  issues.forEach(function (iss) {
+    var item = document.createElement("div");
+    item.className = "ph-why-item";
+
+    var titleEl = document.createElement("div");
+    titleEl.className = "ph-why-item-title";
+    titleEl.innerHTML = v4SeverityIcon(iss.sev) + '<span></span>';
+    titleEl.querySelector("span").textContent = iss.title;
+    item.appendChild(titleEl);
+
+    if (iss.why) {
+      var whyP = document.createElement("p");
+      whyP.innerHTML = v4RenderBackticks(iss.why);
+      item.appendChild(whyP);
+    }
+
+    if (iss.fix || iss.docsUrl) {
+      var fixP = document.createElement("p");
+      var html = "";
+      if (iss.fix) html += "<b>Fix:</b> " + v4RenderBackticks(iss.fix);
+      if (iss.docsUrl) {
+        if (iss.fix) html += " ";
+        // Renders as "Docs →" linking to the verified URL.
+        html += '<a href="' + v4EscapeAttr(iss.docsUrl) + '" target="_blank" rel="noopener noreferrer">Docs →</a>';
+      }
+      fixP.innerHTML = html;
+      item.appendChild(fixP);
+    }
+
+    mount.appendChild(item);
+  });
+}
+
+// Minimal markdown-ish: backtick spans become <code>. No other formatting.
+function v4RenderBackticks(text) {
+  var s = String(text || "");
+  // Escape HTML first, then unescape backtick spans into <code>.
+  var safe = s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return safe.replace(/`([^`]+)`/g, function (_, body) { return "<code>" + body + "</code>"; });
+}
+
+function v4EscapeAttr(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // --- Compact quick-copy table -------------------------------------------
@@ -709,11 +955,10 @@ function v4RenderQuickCopy(values, specs, mountId) {
   });
 }
 
-// Convenience: render both Status (compact) and IDs (full) tables from
-// the same values object.
+// IDs tab table only. Status tab no longer renders identifiers (README v3:
+// "Quick Copy is owned by the IDs tab"). Name kept for call-site continuity.
 function v4RenderAllQuickCopy(values) {
-  v4RenderQuickCopy(values, V4_CHIPS_STATUS, "quick-copy-status");
-  v4RenderQuickCopy(values, V4_CHIPS_IDS,    "quick-copy-ids");
+  v4RenderQuickCopy(values, V4_CHIPS_IDS, "quick-copy-ids");
 }
 
 // --- Tab switching --------------------------------------------------------
@@ -1101,11 +1346,14 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       activeTabId = "report";
       renderChecks(data.checks);
 
-      // v4: populate the Quick Copy compact table (Status) and the full IDs
-      // table (IDs tab) immediately from the first analysis pass. Issue rows
-      // and hero card update again below once setup analysis completes.
+      // v4.3: build unified Issue[] from HC checks; setup data is folded in
+      // below once it completes. Both renderers (issue chips + Why-this-grade
+      // per-issue blocks) consume the same array.
       v4RenderAllQuickCopy(window.__lastValues);
-      v4RenderIssuesList(data.checks);
+      var prelimIssues = v4BuildIssues(data.checks, null);
+      window.__lastIssues = prelimIssues;
+      v4RenderIssuesList(prelimIssues);
+      v4RenderWhyItems(prelimIssues);
 
       // Re-render status filtered to detected environment
       const env = detectEnvFromChecks(data.checks);
@@ -1139,7 +1387,11 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               });
               var allChecks = data.checks.concat(setupAsChecks);
               renderChecks(allChecks);
-              v4RenderIssuesList(allChecks);
+              // v4.3: unify issues and re-render both chips and Why blocks
+              var finalIssues = v4BuildIssues(data.checks, setupData);
+              window.__lastIssues = finalIssues;
+              v4RenderIssuesList(finalIssues);
+              v4RenderWhyItems(finalIssues);
 
               // Compute final grade from both HC and setup data
               const finalGrade = computeGrade(data.checks, setupIssues);

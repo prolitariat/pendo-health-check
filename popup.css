@@ -320,6 +320,30 @@ body { width: 384px; background: var(--bg); }
 .ph-why-body a { color: var(--pank); text-decoration: none; font-weight: 500; }
 .ph-why-body a:hover { text-decoration: underline; }
 
+/* v4.3: Per-issue blocks inside the Why-this-grade disclosure.
+   One .ph-why-item per active issue. Title + why paragraph + Fix line. */
+.ph-why-item { padding: 10px 0; border-top: 1px solid var(--border); }
+.ph-why-item:first-child { border-top: none; padding-top: 4px; }
+.ph-why-item-title {
+  font-size: 12px; font-weight: 600; color: var(--fg);
+  margin-bottom: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.ph-why-item-title svg { flex: 0 0 auto; }
+.ph-why-item p { margin: 0 0 6px; font-size: 12px; line-height: 1.55; color: var(--muted-fg); }
+.ph-why-item p:last-child { margin-bottom: 0; }
+.ph-why-item code {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background: var(--muted);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--fg);
+  white-space: nowrap;
+}
+.ph-why-item a { color: var(--pank); text-decoration: none; font-weight: 500; }
+.ph-why-item a:hover { text-decoration: underline; }
+
 /* Why-this-grade — inner check rows (from runtime diagnostics) */
 .ph-check {
   display: flex; gap: 8px;

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pendo Health Check",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "Side project, not an official Pendo product. Compact dashboard, A-F install grade, Quick Copy IDs, optional auto-check badge.",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
   "optional_host_permissions": ["<all_urls>"],

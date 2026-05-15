@@ -119,17 +119,17 @@
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
             </summary>
-            <div class="ph-why-body">
-              <div id="checks-list"></div>
-            </div>
+            <!-- v4.3: per-issue .ph-why-item blocks, one per active issue.
+                 Populated by v4RenderWhyItems(issues). Empty when there are
+                 no issues, in which case the parent <details> still renders
+                 but expanding it shows nothing — there's nothing to say. -->
+            <div class="ph-why-body" id="why-items"></div>
           </details>
         </div>
 
-        <!-- Quick Copy compact table — always visible -->
-        <div class="ph-section">
-          <div class="ph-subhead">Quick Copy</div>
-          <div class="ph-ids" id="quick-copy-status"></div>
-        </div>
+        <!-- v4.3: Quick Copy compact table removed from Status panel.
+             Identifiers are owned exclusively by the IDs tab per the README
+             v3 Status tab anatomy ("Status tab does not show identifiers"). -->
       </div>
 
       <!-- IDs panel: fuller table with Subscription + Copy all as JSON -->
