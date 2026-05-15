@@ -2,6 +2,36 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [4.4.0] — 2026-05-14
+
+Applies `design_handoff_pendo_health_check/UPDATE_1.md` — anonymous-context handling (Part 1) and footer cleanup (Part 2) shipped together.
+
+### Added
+
+- **Third severity: `info`.** Non-actionable observations. Blue chip styling (`#EFF6FF` / `#BFDBFE` / `#1D4ED8`). Info issues **do not lower the grade**, do not count toward the tab badge, and do not trigger the Copy Issues button. The "Why this grade?" disclosure renders info items without a `Fix:` line; the doc link reads "Learn about anonymous visitors →" rather than "Docs →".
+- **Anonymous-context detector.** A page is in anonymous context when the visitor ID has Pendo's anonymous-tracker prefix (`_PENDO_T_` or `VISITOR-`) OR both visitor and account are unset. In that state the extension:
+  - Demotes the missing-account-id `warn` into a single `info` chip titled "Anonymous context — no user identified."
+  - Suppresses setup recommendations matching visitor/account/metadata patterns (covered by the unified info chip).
+  - Keeps the hero state `healthy`, with the sub-line reading "Healthy · N notes" instead of the default copy.
+  - Switches the subhead to `NOTES · N` and shows the OK block alongside the info chips with copy "Healthy" / "N informational note(s)".
+  - Hides the Copy Issues to Clipboard button (no warn/err to copy).
+
+### Changed
+
+- **Grade calculation ignores info.** `computeGrade` now adds `infos` to its returned summary count but does not deduct points for them. A page with one info note still scores 100 / A.
+- **Tab count badge counts `warn + err` only.** Info issues never bump the Status tab count.
+- **Footer cleanup (UPDATE_1.md Part 2).** Removed the pink `::before` dot on `.ph-footer-version`, the `·` separator (`.ph-footer-dot`), and the "Badge on/off" label (`#badge-state-text`). The footer now reads `v4.4.0` on the left, `Send feedback` on the right — nothing in between. The badge toggle on the Tools tab remains the only place to view or change badge state.
+- **`v4SyncBadgeStateText` removed.** The function and its wireup are gone with the footer label.
+
+### Fixed
+
+- **`version-label` → `version-text`.** popup.js was updating an element by an ID that hadn't existed since v4.0. The actual `#version-text` element now renders the live `chrome.runtime.getManifest().version` correctly.
+
+### Notes
+
+- UPDATE_1.md cited `https://support.pendo.io/hc/en-us/articles/360032202851` for the anonymous-visitors article. That ID is not present in Google's index. The code uses the verified ID `360032202751` ("Anonymous visitors") instead. The discrepancy is one digit (851 vs 751); recommend correcting in the handoff doc.
+- On `pendo.io/pendo-blog/state-walkthroughs-pendo/` the expected popup state is: Grade A (green), title "Pendo is healthy", sub "Healthy · 1 note", URL chip, OK block with "Healthy / 1 informational note", subhead `NOTES · 1`, one blue info chip, no Copy Issues button, closed "Why this grade?" disclosure containing one `.ph-why-item`.
+
 ## [4.3.0] — 2026-05-14
 
 Implements the README v3 "Status tab anatomy" specification literally. Issue chips are one-liners, the Why-this-grade disclosure carries per-issue explanations, identifiers are owned exclusively by the IDs tab.

@@ -218,7 +218,11 @@ body { width: 384px; background: var(--bg); }
   border: 1px solid var(--err-200);
   color: var(--err-700);
 }
-.ph-issue[data-sev="info"],
+.ph-issue[data-sev="info"] {
+  background: #EFF6FF;       /* blue-50 */
+  border: 1px solid #BFDBFE; /* blue-200 */
+  color: #1D4ED8;            /* blue-700 */
+}
 .ph-issue[data-sev="tip"] {
   background: var(--muted);
   border: 1px solid var(--border);
@@ -435,15 +439,11 @@ body { width: 384px; background: var(--bg); }
   font-size: 11px;
   color: var(--muted-fg);
 }
-.ph-footer-dot { color: var(--border-strong); }
+/* v4.4: pink dot before version and the · separator + "Badge on" label
+   are removed per UPDATE_1.md Part 2. The version reads on its own; the
+   feedback link auto-rights via the existing margin-left:auto. */
 .ph-footer-version {
-  display: inline-flex; align-items: center; gap: 6px;
   font-variant-numeric: tabular-nums;
-}
-.ph-footer-version::before {
-  content: "";
-  width: 6px; height: 6px; border-radius: 999px;
-  background: var(--pank);
 }
 .ph-footer-feedback {
   margin-left: auto;

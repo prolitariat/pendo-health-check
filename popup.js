@@ -134,7 +134,7 @@ function trackEvent(event, data) {
 try {
   const v = chrome.runtime.getManifest().version;
   document.addEventListener("DOMContentLoaded", () => {
-    const el = document.getElementById("version-label");
+    const el = document.getElementById("version-text");
     if (el) el.textContent = "v" + v;
   });
 } catch (_) {}
@@ -426,19 +426,20 @@ function computeGrade(hcChecks, setupIssues) {
   var score = 100;
   var criticals = 0, warnings = 0, passed = 0, infos = 0;
 
-  // Health Check items — graded on a curve so F = badly broken, not "some warnings"
+  // v4.4: info severity does NOT lower the grade (per UPDATE_1.md). Only
+  // warn and fail deduct points. infos are still counted for the summary.
   (hcChecks || []).forEach(function(c) {
     if (c.status === "fail") { score -= 10; criticals++; }
     else if (c.status === "warn") { score -= 3; warnings++; }
-    else if (c.status === "info") { score -= 1; infos++; }
+    else if (c.status === "info") { infos++; }
     else { passed++; }
   });
 
-  // Setup issues (CSP errors, recommendations)
+  // Setup issues (CSP errors, recommendations). info/tip do not deduct.
   (setupIssues || []).forEach(function(si) {
     if (si.severity === "error" || si.severity === "fail") { score -= 10; criticals++; }
     else if (si.severity === "warning" || si.severity === "warn") { score -= 3; warnings++; }
-    else if (si.severity === "tip" || si.severity === "info") { score -= 1; infos++; }
+    else if (si.severity === "tip" || si.severity === "info") { infos++; }
   });
 
   score = Math.max(0, Math.min(100, score));
@@ -456,7 +457,7 @@ function computeGrade(hcChecks, setupIssues) {
   if (infos > 0) parts.push(infos + " info");
   parts.push(passed + " passed");
 
-  return { score: score, letter: letter, cssClass: cssClass, summary: parts.join(" · "), criticals: criticals, warnings: warnings };
+  return { score: score, letter: letter, cssClass: cssClass, summary: parts.join(" · "), criticals: criticals, warnings: warnings, infos: infos };
 }
 
 // ---------------------------------------------------------------------------
@@ -469,7 +470,10 @@ function computeGrade(hcChecks, setupIssues) {
 function renderGradeCard(grade) {
   var state = v4DeriveState(grade, true);
   var issueCount = (grade && (grade.criticals + grade.warnings)) || 0;
-  v4RenderHero(grade, state, issueCount);
+  // v4.4: infos counted separately so the hero sub-line can render
+  // "Healthy · N notes" instead of the default copy.
+  var infoCount = (grade && grade.infos) || 0;
+  v4RenderHero(grade, state, issueCount, infoCount);
 }
 
 // ===========================================================================
@@ -516,7 +520,7 @@ function v4DeriveState(grade, pendoDetected) {
 
 // --- Hero card -----------------------------------------------------------
 
-function v4RenderHero(grade, state, issueCount) {
+function v4RenderHero(grade, state, issueCount, infoCount) {
   var hero       = document.getElementById("hero");
   var square     = document.getElementById("grade-square");
   var titleEl    = document.getElementById("hero-title");
@@ -535,8 +539,13 @@ function v4RenderHero(grade, state, issueCount) {
     degraded: "Pendo is degraded",
     outage:   "Pendo is not running"
   };
+  // v4.4: when only info issues exist on a healthy page, the sub-line
+  // reads "Healthy · N notes" instead of the default copy.
+  var healthySub = (infoCount > 0)
+    ? "Healthy · " + infoCount + " note" + (infoCount !== 1 ? "s" : "")
+    : "Tracking events, guides loading correctly.";
   var subs = {
-    healthy:  "Tracking events, guides loading correctly.",
+    healthy:  healthySub,
     degraded: issueCount + " issue" + (issueCount === 1 ? "" : "s") + " found · agent live",
     outage:   "Agent failed to initialize on this page"
   };
@@ -700,13 +709,29 @@ function v4ParseSetupDetail(detail) {
   return { why: why, fix: fix, docsUrl: docsUrl };
 }
 
-function v4BuildIssues(checks, setupData) {
+// v4.4: anonymous-context detection. Pulled from UPDATE_1.md Part 1.
+// A page is anonymous when EITHER the visitor ID has Pendo's anonymous
+// prefix (_PENDO_T_ or VISITOR-) OR both visitor and account are unset.
+// In anonymous context the missing-account-id warn is suppressed and a
+// single info-severity issue ("Anonymous context") is emitted instead.
+function v4IsAnonymousContext(values) {
+  if (!values) return false;
+  if (values.visitorAnonymous === true) return true;
+  if (!values.visitorId && !values.accountId) return true;
+  return false;
+}
+
+function v4BuildIssues(checks, setupData, values) {
   var issues = [];
+  var anonymous = v4IsAnonymousContext(values);
 
   // Pass 1: health-check items. Map via template; fall back to the raw
   // check.label/detail when a template isn't defined.
   (checks || []).forEach(function (c) {
     if (c.status !== "fail" && c.status !== "warn") return; // info / pass don't surface as issues
+    // In anonymous context, the "Account ID warn" is rolled up into the
+    // single Anonymous context info chip below — don't double-report.
+    if (anonymous && c.label === "Account ID" && c.status === "warn") return;
     var sev = c.status === "fail" ? "err" : "warn";
     var template = V4_HC_ISSUE_TEMPLATES[c.label] && V4_HC_ISSUE_TEMPLATES[c.label][c.status];
     if (template) {
@@ -739,6 +764,10 @@ function v4BuildIssues(checks, setupData) {
       if (r.severity === "error" || r.severity === "fail") sev = "err";
       else if (r.severity === "warning" || r.severity === "warn") sev = "warn";
       else return; // skip tip / info
+      // v4.4: in anonymous context, suppress visitor/account/metadata
+      // recommendations entirely — they're covered by the single Anonymous
+      // context info chip below.
+      if (anonymous && /visitor|account|metadata|identif/i.test(r.title)) return;
       var parsed = v4ParseSetupDetail(r.detail);
       issues.push({
         id: "setup-" + v4SlugifyId(r.title),
@@ -772,6 +801,21 @@ function v4BuildIssues(checks, setupData) {
     });
   }
 
+  // v4.4: in anonymous context, append a single info chip summarising the
+  // state instead of per-field warnings. The docs link uses the verified
+  // "Anonymous visitors" article ID (360032202751); UPDATE_1.md cited 851
+  // which isn't a real Pendo article.
+  if (anonymous) {
+    issues.push({
+      id: "anonymous-context",
+      sev: "info",
+      title: "Anonymous context — no user identified",
+      why: "This page hasn't called pendo.identify() with a visitor object. That's expected for public pages (blog, marketing, pricing) but a problem for authenticated app routes.",
+      fix: "",
+      docsUrl: "https://support.pendo.io/hc/en-us/articles/360032202751"
+    });
+  }
+
   // Dedup by id — should be unique already, but defensive.
   var seen = {};
   return issues.filter(function (iss) {
@@ -784,47 +828,77 @@ function v4BuildIssues(checks, setupData) {
 // --- Render: issue chips (title only) -----------------------------------
 
 function v4RenderIssuesList(issues) {
-  var section = document.getElementById("issues-section");
-  var ok      = document.getElementById("ok-block");
-  var list    = document.getElementById("issues-list");
-  var countEl = document.getElementById("active-issues-count");
+  var section  = document.getElementById("issues-section");
+  var ok       = document.getElementById("ok-block");
+  var okTitle  = ok ? ok.querySelector(".ph-ok-title") : null;
+  var okSub    = ok ? ok.querySelector(".ph-ok-sub")   : null;
+  var list     = document.getElementById("issues-list");
+  var countEl  = document.getElementById("active-issues-count");
+  var labelEl  = document.getElementById("active-issues-label");
   var tabCount = document.getElementById("tab-status-count");
+  var copyWrap = document.getElementById("copy-issues-actions");
   if (!section || !ok || !list || !countEl) return 0;
 
   issues = issues || [];
-  list.innerHTML = "";
-  countEl.textContent = issues.length;
 
+  var actionableCount = 0;
+  var infoCount = 0;
+  issues.forEach(function (iss) {
+    if (iss.sev === "info") infoCount++;
+    else actionableCount++;
+  });
+
+  list.innerHTML = "";
+
+  // Zero issues → just the default OK block, no list.
   if (issues.length === 0) {
     section.style.display = "none";
     ok.style.display = "block";
-    if (tabCount) {
-      tabCount.textContent = "";
-      tabCount.style.display = "none";
-    }
+    if (okTitle) okTitle.textContent = "All systems operational";
+    if (okSub)   okSub.textContent   = "No issues detected on this page";
+    if (tabCount) { tabCount.textContent = ""; tabCount.style.display = "none"; }
     return 0;
   }
 
-  ok.style.display = "none";
-  section.style.display = "block";
-
+  // Render the chips (one line each, title only).
   issues.forEach(function (iss) {
     var row = document.createElement("div");
     row.className = "ph-issue";
     row.setAttribute("data-sev", iss.sev);
     row.setAttribute("data-issue-id", iss.id);
-    // README v3: the row shows the issue's short TITLE only.
-    // why/fix/docsUrl render in .ph-why-item blocks below, not here.
     row.innerHTML = v4SeverityIcon(iss.sev) + '<span class="ph-issue-text"></span>';
     row.querySelector(".ph-issue-text").textContent = iss.title;
     list.appendChild(row);
   });
 
-  if (tabCount) {
-    tabCount.textContent = issues.length;
-    tabCount.style.display = "inline-flex";
+  section.style.display = "block";
+  countEl.textContent = issues.length;
+
+  // v4.4: info-only state → keep OK block visible (with a healthy-note copy)
+  // alongside the info chips. Subhead reads NOTES. Copy Issues hidden.
+  if (actionableCount === 0) {
+    if (labelEl) labelEl.textContent = "NOTES";
+    if (okTitle) okTitle.textContent = "Healthy";
+    if (okSub)   okSub.textContent   = infoCount + " informational note" + (infoCount !== 1 ? "s" : "");
+    ok.style.display = "block";
+    if (copyWrap) copyWrap.style.display = "none";
+  } else {
+    if (labelEl) labelEl.textContent = "ACTIVE ISSUES";
+    ok.style.display = "none";
+    if (copyWrap) copyWrap.style.display = "flex";
   }
-  return issues.length;
+
+  // v4.4: tab count badge shows warn+err only (info doesn't count).
+  if (tabCount) {
+    if (actionableCount > 0) {
+      tabCount.textContent = actionableCount;
+      tabCount.style.display = "inline-flex";
+    } else {
+      tabCount.textContent = "";
+      tabCount.style.display = "none";
+    }
+  }
+  return actionableCount;
 }
 
 // --- Render: Why-this-grade per-issue blocks -----------------------------
@@ -869,8 +943,10 @@ function v4RenderWhyItems(issues) {
       if (iss.fix) html += "<b>Fix:</b> " + v4RenderBackticks(iss.fix);
       if (iss.docsUrl) {
         if (iss.fix) html += " ";
-        // Renders as "Docs →" linking to the verified URL.
-        html += '<a href="' + v4EscapeAttr(iss.docsUrl) + '" target="_blank" rel="noopener noreferrer">Docs →</a>';
+        // v4.4: info-severity issues use "Learn about anonymous visitors →"
+        // copy (and similar). warn/err use the default "Docs →" label.
+        var linkLabel = (iss.sev === "info") ? "Learn about anonymous visitors →" : "Docs →";
+        html += '<a href="' + v4EscapeAttr(iss.docsUrl) + '" target="_blank" rel="noopener noreferrer">' + linkLabel + '</a>';
       }
       fixP.innerHTML = html;
       item.appendChild(fixP);
@@ -976,14 +1052,9 @@ function v4ActivateTab(name) {
   });
 }
 
-// --- Badge state text in footer ------------------------------------------
-
-function v4SyncBadgeStateText() {
-  var input = document.getElementById("badge-enabled");
-  var text  = document.getElementById("badge-state-text");
-  if (!input || !text) return;
-  text.textContent = input.checked ? "Badge on" : "Badge off";
-}
+// v4.4: v4SyncBadgeStateText removed — UPDATE_1.md Part 2 deleted the
+// footer "Badge on/off" label. The toggle on the Tools tab is the only
+// surface for badge state now.
 
 // --- Wireup: tabs, why-grade accordion, refresh, JSON copy, footer ------
 
@@ -1035,12 +1106,7 @@ function v4SyncBadgeStateText() {
   // Footer "Send feedback" link — same handler as the legacy feedback-btn
   // (the click listener is attached lower in the file, no extra wiring needed).
 
-  // Badge checkbox controls the footer text label too.
-  var badgeInput = document.getElementById("badge-enabled");
-  if (badgeInput) {
-    badgeInput.addEventListener("change", v4SyncBadgeStateText);
-    v4SyncBadgeStateText();
-  }
+  // v4.4: footer "Badge on/off" label removed; nothing extra to sync here.
 })();
 
 // ---------------------------------------------------------------------------
@@ -1350,7 +1416,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       // below once it completes. Both renderers (issue chips + Why-this-grade
       // per-issue blocks) consume the same array.
       v4RenderAllQuickCopy(window.__lastValues);
-      var prelimIssues = v4BuildIssues(data.checks, null);
+      var prelimIssues = v4BuildIssues(data.checks, null, data.values);
       window.__lastIssues = prelimIssues;
       v4RenderIssuesList(prelimIssues);
       v4RenderWhyItems(prelimIssues);
@@ -1388,7 +1454,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
               var allChecks = data.checks.concat(setupAsChecks);
               renderChecks(allChecks);
               // v4.3: unify issues and re-render both chips and Why blocks
-              var finalIssues = v4BuildIssues(data.checks, setupData);
+              var finalIssues = v4BuildIssues(data.checks, setupData, data.values);
               window.__lastIssues = finalIssues;
               v4RenderIssuesList(finalIssues);
               v4RenderWhyItems(finalIssues);

@@ -91,12 +91,15 @@
           <div class="ph-ok-sub">No issues detected on this page</div>
         </div>
 
-        <!-- Issues section (degraded / outage) -->
+        <!-- Issues section (degraded / outage / info-only).
+             Subhead label and the visibility of the Copy Issues action are
+             both driven by v4RenderIssuesList: NOTES · N when issues are
+             info-only; ACTIVE ISSUES · N when any warn/err is present. -->
         <div id="issues-section" style="display:none">
-          <div class="ph-subhead">ACTIVE ISSUES · <span id="active-issues-count">0</span></div>
+          <div class="ph-subhead"><span id="active-issues-label">ACTIVE ISSUES</span> · <span id="active-issues-count">0</span></div>
           <div class="ph-issues" id="issues-list"></div>
 
-          <div class="ph-actions">
+          <div class="ph-actions" id="copy-issues-actions">
             <button class="ph-btn ph-btn-primary" id="tool-copy-issues">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -182,11 +185,11 @@
 
     </div>
 
-    <!-- Footer -->
+    <!-- Footer — v4.4: pink dot + "Badge on" label + separator removed
+         per UPDATE_1.md Part 2. Version on the left, Send feedback on
+         the right (margin-left: auto handles the spacing). -->
     <div class="ph-footer">
-      <span class="ph-footer-version" id="version-text">v4.2.0</span>
-      <span class="ph-footer-dot">·</span>
-      <span id="badge-state-text">Badge on</span>
+      <span class="ph-footer-version" id="version-text">v4.4.0</span>
       <button class="ph-footer-feedback" id="feedback-btn">Send feedback</button>
     </div>
   </div>
