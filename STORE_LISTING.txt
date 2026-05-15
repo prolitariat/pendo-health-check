@@ -1,4 +1,4 @@
-=== CHROME WEB STORE LISTING CONTENT (v4.3.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v4.4.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
@@ -19,12 +19,16 @@ STATUS PANEL
 
 Default view on open. The current page URL appears in a chip at the top so you can confirm the extension is looking at what you think it's looking at. Below that, either:
 
-• An "All systems operational" block when the page is healthy, or
-• A list of active issues — each row is a SINGLE LINE with a severity icon (orange for warnings, red for failures) and a short title like "No account ID found"
+• An "All systems operational" block when the page is healthy and quiet, or
+• A list of active issues — each row is a SINGLE LINE with a severity icon (red for failures, orange for warnings, blue for informational notes) and a short title like "No account ID found" or "Anonymous context — no user identified"
 
-Beneath the issues sits the Copy Issues to Clipboard primary button and a closed "Why this grade?" disclosure. Opening the disclosure reveals one block per active issue: title, the "why" in plain English, a "Fix:" line, and a "Docs →" link to the relevant Pendo Help Center article or vendor remediation page. No explanation text appears anywhere else in the popup — chips stay one-liners, the disclosure holds the detail.
+Beneath the issues sits the Copy Issues to Clipboard primary button and a closed "Why this grade?" disclosure. Opening the disclosure reveals one block per active issue: title, the "why" in plain English, a "Fix:" line (or a "Learn more →" link for info-only items), and a verified docs link. No explanation text appears anywhere else in the popup — chips stay one-liners, the disclosure holds the detail.
 
 Identifiers are owned exclusively by the IDs tab — the Status panel does not mirror them.
+
+ANONYMOUS PAGES ARE NOT FALSELY FLAGGED
+
+Public pages (blog, marketing, pricing) typically don't have a logged-in user, so they don't have an account ID — and that's correct, not a misconfiguration. The extension detects anonymous context (Pendo's _PENDO_T_ / VISITOR- tracker prefix, or no visitor + no account) and replaces what would otherwise be a noisy stack of warnings with a single blue info note. Info-severity issues do not lower the grade. A blog page where Pendo is doing its job correctly still scores Grade A.
 
 IDS PANEL
 
