@@ -1,4 +1,4 @@
-=== CHROME WEB STORE LISTING CONTENT (v4.4.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v4.6.0) ===
 
 --- EXTENSION NAME ---
 Pendo Health Check
@@ -9,7 +9,7 @@ Side project, not an official Pendo product. A-F install grade, Quick Copy IDs, 
 --- DETAILED DESCRIPTION ---
 Heads up: this is a side project built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract, no guarantees. If something breaks, file a GitHub issue; please don't open a Pendo support ticket, because Pendo didn't ship this and can't help with it.
 
-Open it on any page with Pendo and you get a compact dashboard: an A-to-F install grade with a plain-English status line, a Status panel for triage, an IDs panel for values you paste into tickets, and a Tools panel for the actions you run all day. Built so Pendo admins, implementation engineers, and support folks can make decisions faster with less effort.
+Open it on any page with Pendo to see an A-to-F install grade, copy Visitor and Account IDs, and toggle the Pendo Debugger from the first view. Copy Issues is there too when the page has actionable findings. The IDs panel holds the full identifier table and JSON export; Tools holds badge and auto-check settings.
 
 HERO STATUS
 
@@ -17,14 +17,12 @@ A single source of status truth at the top of the popup: a colored grade square 
 
 STATUS PANEL
 
-Default view on open. The current page URL appears in a chip at the top so you can confirm the extension is looking at what you think it's looking at. Below that, either:
+Default view on open. The current page URL appears in a chip at the top. Visitor ID and Account ID are one-click copy rows, followed by Toggle Pendo Debugger and, when actionable findings are present, Copy Issues to Clipboard. These controls stay above the findings. Below them, either:
 
 • An "All systems operational" block when the page is healthy and quiet, or
 • A list of active issues — each row is a SINGLE LINE with a severity icon (red for failures, orange for warnings, blue for informational notes) and a short title like "No account ID found" or "Anonymous context — no user identified"
 
-Beneath the issues sits the Copy Issues to Clipboard primary button and a closed "Why this grade?" disclosure. Opening the disclosure reveals one block per active issue: title, the "why" in plain English, a "Fix:" line (or a "Learn more →" link for info-only items), and a verified docs link. No explanation text appears anywhere else in the popup — chips stay one-liners, the disclosure holds the detail.
-
-Identifiers are owned exclusively by the IDs tab — the Status panel does not mirror them.
+A closed "Why this grade?" disclosure sits beneath the findings. Open it for each issue's explanation, suggested fix, and documentation link. Informational notes have a "Learn more" link instead of a fix.
 
 ANONYMOUS PAGES ARE NOT FALSELY FLAGGED
 
@@ -36,7 +34,6 @@ A fuller table of identifiers including Subscription, plus a "Copy all as JSON" 
 
 TOOLS PANEL
 
-• Toggle Pendo Debugger as the primary action. The debugger is the daily tool for tagging operators, in-app content authors, and Pendo support staff, so it sits as a primary CTA in Tools rather than buried.
 • Show badge on extension icon — a real on/off switch (replaces the old footer checkbox).
 • Auto-check pages on load — opt-in proactive checking. Flipping it on triggers Chrome's permission prompt for "<all_urls>". Once granted, the extension probes every page on load and updates the toolbar badge automatically. Tab-hopping between several Pendo-instrumented apps becomes a glanceable activity. Off by default. Turning it off revokes the permission immediately.
 

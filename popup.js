@@ -495,9 +495,12 @@ var V4_SVG = {
   info:         '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
 };
 
-// IDs tab owns identifiers per README v3. The Status tab no longer mirrors
-// them — see the Status tab anatomy section ("Quick Copy is owned by the
-// IDs tab. The Status tab does not show identifiers.").
+// Frequent ID copy actions are available immediately on Status. The IDs
+// tab retains the full table and JSON export.
+var V4_CHIPS_HOME = [
+  { key: "visitorId", label: "Visitor ID" },
+  { key: "accountId", label: "Account ID" }
+];
 var V4_CHIPS_IDS = [
   { key: "visitorId",      label: "Visitor" },
   { key: "accountId",      label: "Account" },
@@ -851,6 +854,10 @@ function v4RenderIssuesList(issues) {
     else actionableCount++;
   });
 
+  // This action sits above the findings, outside the conditional section.
+  // Reset visibility on every render, including the zero-issue early return.
+  if (copyWrap) copyWrap.style.display = actionableCount > 0 ? "flex" : "none";
+
   list.innerHTML = "";
 
   // Zero issues → just the default OK block, no list.
@@ -884,11 +891,9 @@ function v4RenderIssuesList(issues) {
     if (okTitle) okTitle.textContent = "Healthy";
     if (okSub)   okSub.textContent   = infoCount + " informational note" + (infoCount !== 1 ? "s" : "");
     ok.style.display = "block";
-    if (copyWrap) copyWrap.style.display = "none";
   } else {
     if (labelEl) labelEl.textContent = "ACTIVE ISSUES";
     ok.style.display = "none";
-    if (copyWrap) copyWrap.style.display = "flex";
   }
 
   // v4.4: tab count badge shows warn+err only (info doesn't count).
@@ -990,6 +995,7 @@ function v4RenderQuickCopyRow(spec, values) {
   if (!empty) {
     row.type = "button";
     row.setAttribute("data-key", spec.key);
+    row.setAttribute("aria-label", "Copy " + spec.label);
   }
 
   var label = document.createElement("span");
@@ -1034,9 +1040,8 @@ function v4RenderQuickCopy(values, specs, mountId) {
   });
 }
 
-// IDs tab table only. Status tab no longer renders identifiers (README v3:
-// "Quick Copy is owned by the IDs tab"). Name kept for call-site continuity.
 function v4RenderAllQuickCopy(values) {
+  v4RenderQuickCopy(values, V4_CHIPS_HOME, "quick-copy-home");
   v4RenderQuickCopy(values, V4_CHIPS_IDS, "quick-copy-ids");
 }
 
@@ -1556,7 +1561,7 @@ function setToolStatus(msg, cls) {
   const el = document.getElementById("tool-status");
   if (!el) return;
   el.textContent = msg;
-  el.className = cls || "";
+  el.className = "ph-tool-status" + (cls ? " " + cls : "");
 }
 
 function runPendoCommand(funcToInject, successMsg) {
@@ -1663,7 +1668,7 @@ function buildIssuesReport() {
   // Preamble doubles as orientation for a human reader AND any LLM the user
   // pastes this into. Keep it factual and short. No marketing.
   lines.push(`Pendo Health Check report — ${url}`);
-  lines.push(`Generated: ${new Date().toLocaleString()} by github.com/prolitariat/pendo-health-check v3.0.0 (Chrome extension; side project, not an official Pendo product).`);
+  lines.push(`Generated: ${new Date().toLocaleString()} by github.com/prolitariat/pendo-health-check v${chrome.runtime.getManifest().version} (Chrome extension; side project, not an official Pendo product).`);
   lines.push(`Findings are ordered by severity (PROBLEM > INCIDENT > WARNING > INFO > TIP). Doc URLs at the bottom are verified Pendo Help Center articles; CMP vendor URLs appear inline in the relevant fix.`);
   lines.push("");
 
@@ -1855,7 +1860,7 @@ function buildIssuesReport() {
 
 document.getElementById("tool-copy-issues")?.addEventListener("click", () => {
   const btn = document.getElementById("tool-copy-issues");
-  const label = btn.querySelector(".tool-label");
+  const label = btn.querySelector(".btn-label");
   const origLabel = label ? label.textContent : null;
   // v3: also run pendo.validateInstall() so the artifact contains both the
   // extension's interpretation AND Pendo's own verdict. The whole thing is

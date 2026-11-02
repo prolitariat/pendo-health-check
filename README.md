@@ -1,5 +1,13 @@
 # Pendo Health Check — Chrome Extension
 
+### v4.6.0: common actions on the opening view
+
+The opening Status view shows the installation grade, one-click Visitor ID and Account ID copy controls, and Toggle Pendo Debugger. Copy Issues appears above the findings when actionable issues are present. The IDs tab keeps the full identifier table and JSON export; Tools contains the badge and auto-check settings.
+
+To test this version locally, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select the folder containing `manifest.json`. Disable the store-installed copy while testing to avoid confusing it with the local build. Open `https://help.splunk.com/` and click the local extension's toolbar icon. After editing files, click **Reload** on that extension's card and reopen its popup on the test page.
+
+To prepare the store update, run `npm run package`. Upload the resulting `pendo-health-check-v4.6.0.zip` as a new package for the existing extension in the Chrome Web Store Developer Dashboard.
+
 > **Side project, not an official Pendo product.** Built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract. If something breaks, file a GitHub issue here; please don't file a Pendo support ticket about it.
 
 A Manifest V3 Chrome extension that helps Pendo operators make decisions faster on any page with [Pendo](https://www.pendo.io/) installed. v4 ships the **Compact Dashboard** redesign: a hero grade card up top, segmented **Status / IDs / Tools** tabs, severity-colored issue rows, and a Quick Copy table of the IDs operators actually paste into tickets. The full prioritized check list lives behind a "Why this grade?" accordion that stays collapsed by default.

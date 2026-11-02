@@ -1,6 +1,6 @@
 {
   "name": "pendo-health-check",
-  "version": "2.0.0",
+  "version": "4.6.0",
   "private": true,
   "description": "Dev tooling for Pendo Health Check Chrome extension",
   "scripts": {

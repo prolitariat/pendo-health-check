@@ -2,6 +2,14 @@
 
 All notable changes to the Pendo Health Check Chrome extension are documented here.
 
+## [4.6.0] - 2026-11-01
+
+- Added Visitor ID and Account ID copy controls to the opening Status panel.
+- Moved Toggle Pendo Debugger to Status and added visible command feedback.
+- Placed Copy Issues above the findings when actionable issues are present.
+- Kept the full identifier table and JSON export in IDs, and badge settings in Tools.
+- Fixed Copy Issues progress and success messages and the report's version label.
+
 ## [4.5.0] — 2026-05-15
 
 Applies `design_handoff_pendo_health_check/UPDATE_2_feedback.md`. The in-popup FeedbackModal is removed entirely; "Send feedback" becomes a one-click handler that opens a pre-filled GitHub Issue compose URL in a new tab.
