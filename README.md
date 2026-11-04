@@ -1,12 +1,12 @@
 # Pendo Health Check — Chrome Extension
 
-### v4.6.0: common actions on the opening view
+### v4.6.1: show available identifiers
 
-The opening Status view shows the installation grade, one-click Visitor ID and Account ID copy controls, and Toggle Pendo Debugger. Copy Issues appears above the findings when actionable issues are present. The IDs tab keeps the full identifier table and JSON export; Tools contains the badge and auto-check settings.
+The opening Status view shows the installation grade, one-click Visitor ID and Account ID copy controls, and Toggle Pendo Debugger. Identifier rows appear only when their values are available, in both Status and IDs. Copy Issues appears above the findings when actionable issues are present. The IDs tab keeps the full identifier table and JSON export; Tools contains the badge and auto-check settings.
 
 To test this version locally, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select the folder containing `manifest.json`. Disable the store-installed copy while testing to avoid confusing it with the local build. Open `https://help.splunk.com/` and click the local extension's toolbar icon. After editing files, click **Reload** on that extension's card and reopen its popup on the test page.
 
-To prepare the store update, run `npm run package`. Upload the resulting `pendo-health-check-v4.6.0.zip` as a new package for the existing extension in the Chrome Web Store Developer Dashboard.
+To prepare the store update, run `npm run package`. Upload the resulting `pendo-health-check-v4.6.1.zip` as a new package for the existing extension in the Chrome Web Store Developer Dashboard.
 
 > **Side project, not an official Pendo product.** Built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract. If something breaks, file a GitHub issue here; please don't file a Pendo support ticket about it.
 
@@ -66,7 +66,7 @@ To update later, just `git pull` and click the ↻ reload button on the extensio
 
 **Restricted Pages** — On `chrome://` pages and the Chrome Web Store, the extension shows an error state explaining the restriction.
 
-**Quick Copy chips** — The chip grid below the header surfaces six values an operator actually pastes into a ticket, Slack, or API call: Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, Realm. Chips for values that aren't set on this page render grayed out and uncopyable so missing data is visible, not hidden. Diagnostic state (Framework, Ready, Active Guides count) stays out of the chip grid because it isn't a copy-paste value — it's already covered by the grade pill and the "Why this grade" drawer.
+**Quick Copy identifiers**: The tables show available Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, and Realm values. Unset rows are omitted. Missing-ID diagnostic findings remain in Status, and the JSON export retains all fields. Diagnostic state (Framework, Ready, Active Guides count) stays in the grade and findings.
 
 **Score diff** — The grade pill in the header is paired with a score-diff badge (↑ +12 / ↓ −8 / · 0) showing the delta from your last visit to the same hostname + path. Click the badge for a popover with the last five scores. History is stored locally in `chrome.storage.local`; nothing leaves your browser.
 

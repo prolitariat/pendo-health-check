@@ -1035,9 +1035,13 @@ function v4RenderQuickCopy(values, specs, mountId) {
   var mount = document.getElementById(mountId);
   if (!mount) return;
   mount.innerHTML = "";
+  values = values || {};
   specs.forEach(function (spec) {
-    mount.appendChild(v4RenderQuickCopyRow(spec, values || {}));
+    if (v4FormatChipValue(values[spec.key]) !== null) {
+      mount.appendChild(v4RenderQuickCopyRow(spec, values));
+    }
   });
+  mount.style.display = mount.children.length > 0 ? "" : "none";
 }
 
 function v4RenderAllQuickCopy(values) {
