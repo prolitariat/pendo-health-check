@@ -1,71 +1,37 @@
-=== CHROME WEB STORE LISTING CONTENT (v2.2.0) ===
+=== CHROME WEB STORE LISTING CONTENT (v4.6.1) ===
 
---- EXTENSION NAME ---
+--- EXTENSION NAME (FROM PACKAGE) ---
 Pendo Health Check
 
---- SHORT DESCRIPTION (132 chars max) ---
-Instant Pendo installation grade with prioritized diagnostics, one-click issue export, inline debugger, and live service status.
+--- SHORT DESCRIPTION (FROM PACKAGE, 132 CHARACTERS MAXIMUM) ---
+Side project, not an official Pendo product. Compact dashboard, A-F install grade, Quick Copy IDs, optional auto-check badge.
 
 --- DETAILED DESCRIPTION ---
-Pendo Health Check gives your Pendo installation a letter grade from A to F. Open it on any page and get a single, prioritized diagnostic report — no guesswork, no DevTools.
+Inspect a page's Pendo installation, copy the IDs you need, and open Pendo's debugger from one compact popup.
 
-Built for Pendo admins who need to prove what's wrong and hand it to engineering.
+Pendo Health Check is an independent side project built by a Pendo user. It is not an official Pendo product and is not affiliated with or endorsed by Pendo. Please report extension problems through the GitHub issue tracker rather than Pendo support.
 
-INSTALLATION GRADE (A–F)
+STATUS: COMMON ACTIONS UP FRONT
+See an A-to-F installation grade and review findings from the extension's health and setup checks. Copy available Visitor and Account IDs, toggle Pendo's on-page debugger, and use Copy Issues to Clipboard when actionable warnings or errors exist. Open Why this grade? for explanations, suggested fixes, and documentation links.
 
-Your Pendo installation is scored from A to F across runtime health checks and a deep setup analysis. Issues are sorted by severity so you know exactly where to start.
+IDS: ONLY AVAILABLE VALUES
+Copy populated Visitor, Account, Subscription, Session, Agent, and Realm values. Empty rows are hidden. Copy all as JSON exports the full set of identifier fields, including null values.
 
-Health Checks:
-• Agent loaded — confirms pendo.js is on the page
-• Initialization — verifies the agent started via pendo.isReady()
-• Visitor ID — checks that a non-anonymous visitor ID is set
-• Account ID — validates account-level identity
-• Active Guides — reports loaded guide count and state
-• Duplicate detection — flags multiple Pendo instances or agent scripts
-• Agent Version — reports the running version
-• Data Transmission — validates that analytics data is reaching Pendo servers
-• Feature Flags — surfaces disabled features (guides off, analytics off, etc.)
+TOOLS: OPTIONAL AUTOMATIC CHECKS
+Choose whether to show the issue-count badge. Auto-check pages on load is off by default. Turning it on requests optional access to websites so a smaller background check can update the badge after page loads. Opening the popup runs the fuller analysis.
 
-Setup Analysis (merged into the same view):
-• Framework detection (React, Angular, Vue, Ember, Svelte, Next.js, Nuxt, jQuery)
-• Snippet analysis — install method, placement, async loading
-• CSP compatibility — directive-by-directive check with strict-dynamic and nonce awareness
-• Report-Only CSP detection — won't flag non-enforcing policies as blocking errors
-• CNAME-aware host detection for custom CDN and data endpoints
-• CMP/GDPR consent detection (OneTrust, Cookiebot, Didomi, Osano, TrustArc, TCF v2.0)
-• Visitor and account metadata validation — PII detection, data types, field naming
-• Actionable recommendations with links to Pendo documentation
+WHAT IT CHECKS
+Agent presence and readiness, identity, duplicate agent scripts, available configuration and metadata, hosting and network signals, snippet setup, CSP, framework clues, and supported consent-manager signals.
 
-COPY TO CLIPBOARD
+The grade uses this extension's rules. Network signals do not prove server-side event delivery, and consent findings are prompts for implementation review. When you click Copy Issues, the extension also runs pendo.validateInstall() if available and adds captured console output to the report.
 
-One click exports a priority-sorted diagnostic report with remediation steps. Paste into Slack, Jira, or a support ticket. Includes grade, all issues, and Pendo service status.
+PRIVACY AND SHARING
+Diagnostic analysis runs in your browser. The extension sends usage events to the publisher's Cloudflare Worker, including event names, extension version, and basic action context or check counts. Those usage-event payloads exclude inspected URLs, visitor/account ID values, page contents, cookies, and authentication tokens. Version 4.6.1 has no analytics opt-out setting.
 
-DEVELOPER TOOLS (collapsible)
+Copied reports can contain the inspected URL, diagnostic details, and Pendo validation output. Review them before sharing. Send feedback opens a GitHub issue draft with technical context; it does not submit an issue automatically. The extension also requests Pendo's public service-status summary for copied-report context.
 
-• Toggle Pendo Debugger — one click, no DevTools needed
-• Validate Install — runs pendo.validateInstall() with inline results
-• Validate Environment — runs pendo.validateEnvironment() with inline results
-
-ICON BADGE
-
-• Yellow badge shows issue count after analysis
-• Red badge when critical problems are found
-• Clears automatically when you navigate to a new page — never shows stale data
-• Toggle the badge on or off from the feedback bar
-
-PENDO SERVICE STATUS
-
-• Live monitoring from status.pendo.io — only shown during outages or incidents
-• Per-component health (App, Data Pipeline, Guides, Integrations)
-• Included in copied diagnostic reports
-
-PRIVACY
-
-• All checks run locally in your browser
-• No data is collected or sent to third parties
-• No account or login required
-
-Built for Pendo admins, implementation engineers, and customer success teams who need fast, accurate answers about agent health.
+Source and support: https://github.com/prolitariat/pendo-health-check
+Privacy: https://github.com/prolitariat/pendo-health-check/blob/main/PRIVACY.md
 
 --- CATEGORY ---
 Developer Tools
@@ -74,4 +40,18 @@ Developer Tools
 English
 
 --- SINGLE PURPOSE DESCRIPTION ---
-Diagnose and grade the health, configuration, and service status of the Pendo analytics agent on any webpage, with inline developer tools and one-click issue export.
+Inspect the Pendo agent on a web page, show an installation grade and diagnostic findings, copy available identifiers and reports, and toggle Pendo debugging. Optional automatic checks update the toolbar badge after page loads.
+
+--- HOMEPAGE URL ---
+https://github.com/prolitariat/pendo-health-check
+
+--- SUPPORT URL ---
+https://github.com/prolitariat/pendo-health-check/issues
+
+--- PRIVACY POLICY URL ---
+https://github.com/prolitariat/pendo-health-check/blob/main/PRIVACY.md
+
+--- SCREENSHOTS, IN ORDER ---
+store-screenshots/v4.6.1/01-status.png
+store-screenshots/v4.6.1/02-identifiers.png
+store-screenshots/v4.6.1/03-tools.png
