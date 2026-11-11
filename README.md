@@ -1,280 +1,128 @@
-# Pendo Health Check — Chrome Extension
+# Pendo Health Check
 
-### v4.6.1: show available identifiers
+A Chrome extension for inspecting the Pendo agent on the current web page. It brings an installation grade, available identifiers, debugger toggle, and diagnostic report into one popup.
 
-The opening Status view shows the installation grade, one-click Visitor ID and Account ID copy controls, and Toggle Pendo Debugger. Identifier rows appear only when their values are available, in both Status and IDs. Copy Issues appears above the findings when actionable issues are present. The IDs tab keeps the full identifier table and JSON export; Tools contains the badge and auto-check settings.
+**Independent side project built by a Pendo user. It is not an official Pendo product and is not affiliated with or endorsed by Pendo.** Report extension issues here rather than opening a Pendo support ticket.
 
-To test this version locally, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select the folder containing `manifest.json`. Disable the store-installed copy while testing to avoid confusing it with the local build. Open `https://help.splunk.com/` and click the local extension's toolbar icon. After editing files, click **Reload** on that extension's card and reopen its popup on the test page.
+[Chrome Web Store](https://chromewebstore.google.com/detail/pendo-health-check/clcjdjkhbhigpbcfliedfdielpjfjcmo) | [Report an issue](https://github.com/prolitariat/pendo-health-check/issues) | [Privacy](PRIVACY.md) | [Changelog](CHANGELOG.md)
 
-To prepare the store update, run `npm run package`. Upload the resulting `pendo-health-check-v4.6.1.zip` as a new package for the existing extension in the Chrome Web Store Developer Dashboard.
+## Current version: 4.6.1
 
-> **Side project, not an official Pendo product.** Built by a Pendo customer admin, not by Pendo. Not affiliated with or endorsed by Pendo. No SLA, no support contract. If something breaks, file a GitHub issue here; please don't file a Pendo support ticket about it.
+The opening **Status** view contains the grade, available Visitor ID and Account ID copy rows, and **Toggle Pendo Debugger**. **Copy Issues to Clipboard** appears above the findings when actionable warnings or errors exist.
 
-A Manifest V3 Chrome extension that helps Pendo operators make decisions faster on any page with [Pendo](https://www.pendo.io/) installed. v4 ships the **Compact Dashboard** redesign: a hero grade card up top, segmented **Status / IDs / Tools** tabs, severity-colored issue rows, and a Quick Copy table of the IDs operators actually paste into tickets. The full prioritized check list lives behind a "Why this grade?" accordion that stays collapsed by default.
+The **IDs** tab shows available Visitor, Account, Subscription, Session, Agent, and Realm values. Unset rows are hidden. **Copy all as JSON** keeps the full set of identifier fields, including null values.
 
-Companion tool to [pendo-io/ai-setup-assistant](https://github.com/pendo-io/ai-setup-assistant). The ai-setup-assistant helps developers **install** Pendo into a codebase; this extension **validates and triages** the running installation from the browser.
+The **Tools** tab contains the badge and optional automatic-check settings. The footer contains the version and **Send feedback**.
 
-Built for Pendo admins, implementation engineers, and customer success folks. Scope includes Pendo-adjacent problems too (consent management, CSP, CNAME, framework integration), and remediation links point to whichever vendor owns the actual fix.
+## Install and test
 
----
+Install the published version from the [Chrome Web Store](https://chromewebstore.google.com/detail/pendo-health-check/clcjdjkhbhigpbcfliedfdielpjfjcmo). A store update becomes available after Google's review and publication; a package upload alone does not update installed copies.
 
-## Table of Contents
+To test the source:
 
-- [Installation](#installation)
-- [Usage](#usage)
-- [What It Checks](#what-it-checks)
-- [Extension Architecture](#extension-architecture)
-- [File Reference](#file-reference)
-- [QA Test Harness](#qa-test-harness)
-- [Feedback System](#feedback-system)
-- [Permissions](#permissions)
-- [Extending the Extension](#extending-the-extension)
-- [Contributing](#contributing)
-- [License](#license)
+1. Clone this repository, or extract the release ZIP into a folder.
+2. Open `chrome://extensions` and enable Developer mode.
+3. Choose **Load unpacked** and select the folder containing `manifest.json`.
+4. Disable older copies of Pendo Health Check while testing, and pin the test copy.
+5. Confirm the extension card and popup both show **4.6.1**.
+6. Open a page with Pendo installed, such as `https://help.splunk.com/`, and open the extension.
 
----
+After replacing files, click **Reload** on the extension card and reopen the popup. The extension itself has no build step or runtime npm dependencies.
 
-## Installation
+## What each view does
 
-### Chrome Web Store
+| View | Available actions |
+| --- | --- |
+| Status | Review the grade and findings; copy available Visitor/Account IDs; toggle Pendo's debugger; copy actionable findings; open **Why this grade?** for details. |
+| IDs | Copy populated identifiers individually or export all identifier fields as JSON. |
+| Tools | Toggle the issue-count badge and opt in to a smaller automatic check after page loads. |
 
-[**Install from Chrome Web Store**](https://chromewebstore.google.com/detail/pendo-health-check/clcjdjkhbhigpbcfliedfdielpjfjcmo)
+On pages without Pendo, the popup displays **Pendo Not Detected**. Chrome's internal pages and other restricted pages cannot be inspected.
 
-### Install from Source (Developer Mode)
+### Validation commands
 
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/prolitariat/pendo-health-check.git
-   cd pendo-health-check
-   ```
-2. **Open Chrome** and navigate to `chrome://extensions`
-3. **Enable Developer mode** (toggle in the top-right corner)
-4. **Click "Load unpacked"** and select the cloned directory
-5. **Pin the extension** in the toolbar for quick access
+Opening the popup runs this extension's `runPendoHealthCheck()` and `runPendoSetupAssistant()` functions in the page's main JavaScript context. The grade uses those checks.
 
-No build step, no npm install, no bundler. Pure vanilla JS.
+Clicking **Copy Issues to Clipboard** also calls `pendo.validateInstall()` when that method is available. Its synchronous `console.log` and `console.warn` output is appended to the report. The extension does not call `pendo.validateEnvironment()` and does not include standalone validation buttons.
 
-To update later, just `git pull` and click the ↻ reload button on the extension card.
+The debugger action calls Pendo's `enableDebugging()` or `disableDebugging()` methods. It does not install or initialize the Pendo agent.
 
----
+## Checks and limits
 
-## Usage
+| Area | Signals inspected |
+| --- | --- |
+| Agent and identity | Agent presence, readiness, version, Visitor ID, Account ID, and duplicate agent scripts or objects. |
+| Hosting and network | Pendo-related resource timing, readiness, configured hosts, and custom-domain/CNAME clues. |
+| Configuration | Disabled-feature flags and available visitor/account metadata, including naming, types, and potentially sensitive field names. |
+| Setup | Framework clues, snippet placement/loading, CSP headers or meta tags, and supported consent-manager signals. |
 
-**Pendo Detected** — Navigate to any page with Pendo installed and click the icon. The popup shows your installation grade, all diagnostics sorted by severity, and Developer Tools (auto-expanded when there's room).
+Network checks are diagnostic clues. They do not prove that Pendo accepted an event or stored it on the server. Consent findings prompt an implementation review; they are not a legal compliance determination. Some private agent properties and consent-manager APIs vary across versions and deployments.
 
-**Pendo Not Detected** — On pages without Pendo, the extension shows a "Pendo Not Detected" message with guidance.
+Anonymous prefixes such as `_PENDO_T_` and `VISITOR-` are recognized. Some identifier findings are grouped into an informational note for anonymous contexts. Raw missing-ID checks can still affect the grade, so a public or anonymous page is not guaranteed a green status.
 
-**Restricted Pages** — On `chrome://` pages and the Chrome Web Store, the extension shows an error state explaining the restriction.
+### Grade and color
 
-**Quick Copy identifiers**: The tables show available Visitor ID, Account ID, Subscription ID, Session ID, Agent Version, and Realm values. Unset rows are omitted. Missing-ID diagnostic findings remain in Status, and the JSON export retains all fields. Diagnostic state (Framework, Ready, Active Guides count) stays in the grade and findings.
+The score starts at 100. Each failed/error check deducts 10 points and each warning deducts 3. Informational notes and tips do not deduct points. Scores are limited to 0 through 100.
 
-**Score diff** — The grade pill in the header is paired with a score-diff badge (↑ +12 / ↓ −8 / · 0) showing the delta from your last visit to the same hostname + path. Click the badge for a popover with the last five scores. History is stored locally in `chrome.storage.local`; nothing leaves your browser.
+| Grade | Score |
+| --- | --- |
+| A | 90 or higher |
+| B | 75 through 89 |
+| C | 60 through 74 |
+| D | 40 through 59 |
+| F | Below 40 |
 
-**Toggle Pendo Debugger** — A pinned top-level button alongside Copy Issues. One click opens or closes Pendo's on-page debug overlay. The debugger is the daily tool for tagging operators, in-app content authors, and Pendo support, so it lives outside any "developer tools" framing.
+The hero color and status text follow issue severity as well as the grade. A grade of A can appear orange when a warning exists. A critical finding produces the red state. These are the extension's local rules, not Pendo's official validation verdict or a live availability check.
 
-**Copy Issues** — One plain-text output. Clicking runs `pendo.validateInstall()` in the page, captures its console output, and appends it to the report under a labeled "Pendo's official validateInstall() output" section. The artifact you hand to engineering now contains both the extension's interpretation and Pendo's own verdict in one paste. The preamble identifies the tool, version, and source repo and notes that Pendo doc URLs in the report are verified Help Center articles. When issues are detected, the copy button pulses to draw attention.
+The extension fetches Pendo's public status summary for context in copied reports. Vendor incidents do not determine the grade.
 
-**CMP consent-gating warning** — If a consent manager is on the page and Pendo is initialized with a non-anonymous visitor while the CMP reports analytics consent denied, the extension flags it with a warning. Actionable detection on Cookiebot, Didomi, Osano, and a narrow OneTrust read. Inform-only on TrustArc and TCF v2.0. The check is conservative: any unknown signal suppresses the flag.
+## Optional automatic checks
 
-**Icon Badge** — After analysis, the extension icon shows a yellow badge (warnings) or red badge (critical failures). The badge clears automatically when you navigate to a new page and updates correctly when switching tabs. Toggle the badge on or off from the footer.
+**Auto-check pages on load** is off by default. Turning it on requests the optional `<all_urls>` permission. With access granted, the background service worker runs a smaller readiness-and-identity probe after page loads to update the badge. Opening the popup runs the fuller analysis.
 
-**Send Feedback** — A feedback button at the bottom lets you report issues or suggest features via GitHub Issue or email. All feedback is PII-scrubbed before it leaves the extension.
+Turning automatic checks off requests removal of that optional access. Chrome restrictions and permission choices can prevent inspection of a page.
 
----
+## Privacy and data handling
 
-## What It Checks
+Diagnostic analysis runs in the browser. Badge and auto-check preferences are stored in `chrome.storage.local`; per-tab badge results are held by the service worker.
 
-### Installation Grade (A–F)
+The extension also sends usage events to the publisher's Cloudflare Worker. These contain event names and extension version, with basic context such as the selected tab, copied field name, Pendo-detected flag, or check counts. The usage-event payload does not include inspected page URLs, copied ID values, page contents, cookies, or authentication tokens. This version has no analytics opt-out control.
 
-Score starts at 100. Each fail/error deducts 10 points, each warning deducts 3, each info/tip deducts 1. Thresholds: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F < 40.
+**Copy Issues** and JSON export write to your clipboard. A report can contain the inspected URL, diagnostic details, and values printed by Pendo's validator. Review it before sharing.
 
-### Runtime Health Checks
+**Send feedback** opens a GitHub issue composition page containing extension and agent versions, realm, grade/status, issue severity counts, and browser user agent. It does not send page URLs or visitor/account IDs in that context and does not submit the issue for you. Text you add on GitHub is your responsibility to review.
 
-Injected via `runPendoHealthCheck()` into the page's MAIN world:
-
-| Check | What It Inspects |
-|-------|-----------------|
-| **Pendo Agent Loaded** | `typeof window.pendo !== "undefined"` |
-| **Pendo Ready** | `pendo.isReady()` return value |
-| **Visitor ID** | `pendo.getVisitorId()` — flags anonymous IDs |
-| **Account ID** | `pendo.getAccountId()` |
-| **Active Guides** | `pendo.guides` array length |
-| **Pendo Instances** | Detects dual init and multiple agent scripts (excludes debugger/designer) |
-| **Agent Version** | `pendo.getVersion()` or `pendo.VERSION` |
-| **Data Transmission** | Validates analytics data is reaching Pendo servers |
-| **Feature Flags** | Surfaces disabled features (guides off, analytics off, etc.) |
-
-Checks that pass without issues (API Key, Data Host, Pendo Instances) are suppressed to reduce noise — they only appear when there's a problem.
-
-### Setup Analysis
-
-Runs in the background after health checks complete. Findings merge into the same view:
-
-- **Framework detection** — React, Angular, Vue, Ember, Svelte, Next.js, Nuxt, jQuery
-- **Snippet analysis** — install method, placement, async loading
-- **CSP compatibility** — directive-by-directive check with `strict-dynamic` and nonce awareness; Report-Only CSP detection (won't flag non-enforcing policies as errors)
-- **CNAME-aware host detection** — custom CDN and data endpoints
-- **CMP/GDPR consent detection** — OneTrust, Cookiebot, Didomi, Osano, TrustArc, TCF v2.0
-- **Visitor and account metadata validation** — PII detection, data types, field naming
-- **Actionable recommendations** with links to Pendo documentation
-
-### Developer Tools
-
-A collapsible drawer that auto-expands when vertical space allows:
-
-- **Toggle Pendo Debugger** — one click, no DevTools needed
-- **Validate Install** — runs `pendo.validateInstall()` with inline results
-- **Validate Environment** — runs `pendo.validateEnvironment()` with inline results
-
-### Pendo Service Status
-
-Auto-detects realm (US/EU/US1/JP), shows status badge from `status.pendo.io`, highlights active incidents. Included in copied diagnostic reports.
-
----
-
-## Extension Architecture
-
-```
-popup.html (click extension icon)
-  ├── Header (icon + page URL)
-  ├── Pendo Service Status (live from status.pendo.io)
-  ├── Report panel (scrollable)
-  │   ├── Loading indicator ("Analyzing Pendo installation...")
-  │   ├── Grade card (A–F, score, summary)
-  │   ├── Checks list (severity-sorted: fail → warn → info → pass)
-  │   └── Developer Tools drawer (auto-expands if room)
-  │       ├── Toggle Pendo Debugger
-  │       ├── Validate Install
-  │       └── Validate Environment
-  ├── Copy Issues to Clipboard (pinned below scroll area)
-  └── Footer (version, badge toggle, feedback)
-
-background.js (service worker)
-  ├── Clears badge on page navigation
-  ├── Caches full-analysis results per tab
-  ├── Updates badge on tab switch
-  └── Syncs badge preference
-
-popup.js injects into target page via chrome.scripting.executeScript:
-  ├── runPendoHealthCheck() → MAIN world → reads window.pendo
-  └── runPendoSetupAssistant() → MAIN world → reads CSP, DOM, network
-```
-
-**Key design decisions:**
-
-- **No content scripts.** Diagnostics are injected on-demand via `chrome.scripting.executeScript` with `world: "MAIN"`. No broad host permissions required.
-- **Single-view layout.** All diagnostics in one scrollable panel — no tabs. Developer Tools auto-expand when there's room, collapse when space is tight.
-- **Background badge management.** The service worker clears stale badges on navigation and restores the correct badge when switching tabs.
-- **Loading → fade-in transition.** Popup shows "Analyzing Pendo installation…" while checks run, then fades in results for a smooth visual load.
-- **Zero external dependencies.** Pure vanilla JS with inline CSS. No build step, no npm, no bundler.
-- **Minimal permissions.** `activeTab` + `scripting` + `storage` + `tabs`. No host permissions, no content scripts.
-
----
-
-## File Reference
-
-| File | Purpose |
-|------|---------|
-| `manifest.json` | Manifest V3 configuration (v2.2.0) |
-| `popup.html` | Popup UI — all CSS inline, flex column layout |
-| `popup.js` | All UI logic, both injected diagnostic functions, grade computation, badge messaging, Developer Tools, clipboard export |
-| `background.js` | Service worker — badge clearing on navigation, per-tab result cache, tab switching |
-| `icons/` | Extension icons (16, 48, 128px PNG + 128px SVG) |
-| `test-harness.html` | QA regression test page (not included in CWS submission) |
-| `STORE_LISTING.txt` | Chrome Web Store listing copy |
-| `CHANGELOG.md` | Version history |
-
----
-
-## QA Test Harness
-
-`test-harness.html` is a self-contained page for regression-testing every extension check without a live Pendo installation.
-
-**Presets:** 8 one-click scenarios — Healthy, Broken, CSP Blocked, GDPR Waiting, CNAME, Ad Blocked, Partial Setup, React SPA.
-
-**Granular controls:** Sidebar toggles for Pendo agent state, identity/metadata, network/hosting, CSP modes, CMP/GDPR platforms, and frameworks.
-
-**How to use:** Open `test-harness.html` in Chrome, select a preset or configure toggles, then click the extension icon to run diagnostics against the mocked state.
-
-**Note:** Not included in Chrome Web Store submissions.
-
----
-
-## Feedback System
-
-Two submission options, both PII-scrubbed before leaving the extension:
-
-- **GitHub Issue** — pre-filled issue on this repo (requires GitHub account)
-- **Email** — `mailto:` link (no account needed)
-
-Scrubbed patterns: emails, phone numbers, SSNs, credit card numbers, IPv4 addresses.
-
----
+See [PRIVACY.md](PRIVACY.md) for the data inventory and external services. The analytics Worker source is in `analytics/`; that directory is not included in the extension package.
 
 ## Permissions
 
-| Permission | Why | Scope |
-|------------|-----|-------|
-| `activeTab` | Access current tab on click | Only the active tab, only on click |
-| `scripting` | Inject diagnostic functions | Only the active tab, only on click |
-| `storage` | Persist badge preference | Local only, no sync |
-| `tabs` | Clear badge on navigation, restore badge on tab switch | Tab URL change events only |
+| Permission | Use |
+| --- | --- |
+| `activeTab` | Inspect the active page after you invoke the extension. |
+| `scripting` | Run the health/setup checks and requested Pendo commands in the page. |
+| `storage` | Save badge and automatic-check preferences locally. |
+| `tabs` | Read the current URL, respond to navigation/tab changes for badge state, and open the feedback page. |
+| Optional `<all_urls>` | Run the smaller automatic probe after page loads when the user opts in. |
 
-No host permissions, no background network access, no persistent content scripts.
+## Development and packaging
 
----
+| File | Purpose |
+| --- | --- |
+| `manifest.json` | Manifest V3 configuration and version. |
+| `popup.html`, `popup.css` | Popup structure and styles. |
+| `popup.js` | UI, diagnostic extraction, scoring, Pendo command handlers, clipboard export, and usage events. |
+| `background.js` | Badge handling and opt-in automatic checks. |
+| `icons/` | Packaged extension icons. |
+| `test-harness.html`, `tests/` | Development fixtures and legacy diagnostic test tooling. |
+| `scripts/package-cws.js` | Create a versioned extension ZIP. |
+| `STORE_LISTING.txt`, `CHROMEWEBSTORE.md` | Store copy, metadata, permissions, and release notes. |
+| `store-screenshots/v4.6.1/` | Current store screenshots rendered from the popup with sample data. |
 
-## Extending the Extension
+With Node.js installed, run `npm run package` to build `pendo-health-check-v4.6.1.zip`. The packaging script excludes development files and old ZIPs.
 
-### Adding a new Health Check
+`test-harness.html` provides eight Pendo/CSP/consent/framework scenarios. The legacy Puppeteer suite needs its expectations updated to match the current diagnostic return shape; it is not evidence that this release passed a full browser regression suite. Targeted identifier-rendering checks cover empty rows, falsey values, rerenders, and copying.
 
-In `popup.js`, find `runPendoHealthCheck()` and add before the `return` statement:
-
-```javascript
-try {
-  var myValue = pendo.someProperty;
-  if (myValue) {
-    add("pass", "My New Check", "Found: " + myValue);
-  } else {
-    add("warn", "My New Check", "someProperty not available");
-  }
-} catch (e) {
-  add("fail", "My New Check", "Error: " + e.message);
-}
-```
-
-Add a remediation entry in `REMEDIATION_MAP`:
-
-```javascript
-"My New Check": {
-  warn: "Actionable fix suggestion.\n  Docs: https://support.pendo.io/..."
-}
-```
-
-### Adding a Setup Recommendation
-
-In `runPendoSetupAssistant()`, in the recommendations section:
-
-```javascript
-recommend("warning", "My Recommendation Title",
-  "Detailed explanation with actionable guidance.");
-// severity: "error" | "warning" | "tip"
-```
-
----
-
-## Contributing
-
-Contributions are welcome! This is a pure vanilla JS project with no build step.
-
-1. Fork the repo
-2. Clone your fork locally
-3. Load the extension in Chrome via Developer Mode
-4. Make your changes — edit `popup.js`, `popup.html`, or `background.js` directly
-5. Test on any page with Pendo installed, and use `test-harness.html` for regression testing
-6. Submit a PR
-
----
+When adding checks, keep `v4BuildIssues()` explanations, scoring, and the report output consistent. Test on a live Pendo page and representative fixtures, and inspect the actual popup before release.
 
 ## License
 

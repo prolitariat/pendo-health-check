@@ -7,6 +7,7 @@ All notable changes to the Pendo Health Check Chrome extension are documented he
 - Hide unset identifier rows in the opening Status view and the IDs tab.
 - Hide the identifier table when no values are available; show it again when values return.
 - Keep missing-ID diagnostic findings and the JSON export unchanged.
+- Updated the README, store listing copy, privacy/data handling documentation, permission justifications, and store screenshots for this release.
 
 ## [4.6.0] - 2026-11-01
 
